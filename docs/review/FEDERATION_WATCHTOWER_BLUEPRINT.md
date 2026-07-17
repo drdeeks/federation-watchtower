@@ -2,9 +2,9 @@
 
 ## Product statement
 
-Federation Watchtower is an embeddable agent-operations sitcom: verified organizations register agents, expose live operational events through REST/WebSocket/MCP, and render tiny SVG characters that speak when tests pass, agents fail, loops recurse, budgets burn, or incidents occur.
+Federation Watchtower is an embeddable agent-operations sitcom and the visible control plane for a broader autonomous-systems safety stack. Verified organizations register agents, expose live operational events through REST/WebSocket/MCP, and render tiny SVG characters that speak when tests pass, agents fail, guardrails trigger, loops recurse, budgets burn, or incidents occur.
 
-The joke layer is memorable. The operational layer is real.
+The joke layer is memorable. The operational and governance layers are real.
 
 ## Core systems
 
@@ -94,6 +94,22 @@ Events should include:
 
 Existing source has the base feed table and renderer. Missing work is to formalize event types and map them to speech packets.
 
+### 5. Guardrail and enterprise operations
+
+Purpose: make the Watchtower the presentation and telemetry surface for the repository's existing guardrail, blueprint, crew, and self-healing systems.
+
+Guardrail signals should include:
+
+- Runaway or recursive chain detection.
+- Duplicate work and conflicting state detection.
+- Budget, attempt, and rate thresholds.
+- Validation-gate pass/fail results.
+- Policy violations and blocked actions.
+- Source, manifest, and configuration verification.
+- Recovery, retry, escalation, and self-healing outcomes.
+
+The `skills-reference/enterprise-blueprint/` tree contains the deeper enforcement and operations patterns. The Worker/API and TV widget provide the common event surface; individual guardrail services can emit structured packets into it.
+
 ### 5. MCP and external access
 
 Purpose: allow external organizations/agents to query and interact with the Federation programmatically.
@@ -111,7 +127,7 @@ Existing source:
 - `source/federation-serverless/README.md`
 - `source/federation-serverless/src/schema.sql` MCP org/access-log tables.
 
-### 6. On-chain identity / attribution
+### 7. On-chain identity / attribution
 
 Current state:
 
@@ -133,4 +149,3 @@ Why it fits:
 - Debugging and DevOps utility.
 - Codex-built product with clear developer value.
 - Real-world problem: runaway autonomous agents burning credits and corrupting work.
-
