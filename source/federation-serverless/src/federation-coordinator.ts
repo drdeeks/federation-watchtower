@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Env } from "./agent-registry";
+import type { WatchtowerEnv } from "./agent-registry";
 
 export interface ProjectSummary {
   projectId: string; name: string; track: string; color: string; emoji: string; prefix: string;
@@ -47,10 +47,10 @@ export interface MCPOrg {
   status: 'active' | 'suspended' | 'revoked'; createdAt: number; lastAccessAt?: number; metadata: string;
 }
 
-export class FederationCoordinator extends DurableObject<Env> {
+export class FederationCoordinator extends DurableObject<WatchtowerEnv> {
   private db: D1Database;
 
-  constructor(ctx: DurableObjectState, env: Env) { super(ctx, env); this.db = env.DB; }
+  constructor(ctx: DurableObjectState, env: WatchtowerEnv) { super(ctx, env); this.db = env.DB; }
 
   async getProjects(): Promise<ProjectSummary[]> {
     const projects = await this.db.prepare(`SELECT * FROM projects ORDER BY id`).all<any>();

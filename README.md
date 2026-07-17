@@ -103,6 +103,8 @@ npm run types       # regenerate Worker binding types
 npm run check       # run Wrangler's installed validation command
 npm run deploy      # deploy Worker, assets, and custom domains
 npm run schema      # apply src/schema.sql to the remote D1 database
+npm run migrate:watchtower # apply the additive Watchtower enforcement tables
+npm test             # validate the event contract and core runaway rules
 ```
 
 The checked-in `wrangler.toml` is the source of truth for the current bindings and hostnames. Do not replace its live D1 ID with a placeholder when editing the file.
@@ -147,12 +149,13 @@ The widget exposes project agents, feed events, status changes, and speech-line 
 | `GET` | `/api/rooms` | Rooms across projects. |
 | `GET` | `/ws?projectId=...` | Live WebSocket feed. |
 
-Project-scoped routes use `/api/projects/{projectId}/...` and cover agent registration, heartbeats, status, rooms, feed, summaries, memory, daily notes, entities, and search. The complete route table is maintained in [`source/federation-serverless/README.md`](source/federation-serverless/README.md).
+Project-scoped routes use `/api/projects/{projectId}/...` and cover agent registration, heartbeats, status, rooms, feed, summaries, memory, daily notes, entities, and search. Mutating legacy routes require the administrative bearer token in production. The complete route table is maintained in [`source/federation-serverless/README.md`](source/federation-serverless/README.md).
 
 Example registration:
 
 ```bash
 curl -X POST 'https://fapi.drdeeks.xyz/api/projects/autopilot/agents' \
+  -H 'Authorization: Bearer YOUR_WATCHTOWER_ADMIN_TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{"agentId":"demo-agent-01","name":"Demo Agent","role":"coding","capabilities":["tests"]}'
 ```
@@ -173,6 +176,7 @@ The widget’s `public/brand/` directory is the deployment copy of those assets;
 - [`docs/README.md`](docs/README.md) — documentation index.
 - [`docs/review/FEDERATION_WATCHTOWER_BLUEPRINT.md`](docs/review/FEDERATION_WATCHTOWER_BLUEPRINT.md) — product and architecture blueprint.
 - [`docs/review/SUPER_STATEMENT_PACKET_SPEC.md`](docs/review/SUPER_STATEMENT_PACKET_SPEC.md) — event packet contract.
+- [`docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md`](docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md) — audited gap map and phased enforcement architecture.
 - [`docs/review/BUILD_PLAN.md`](docs/review/BUILD_PLAN.md) — staged implementation plan.
 - [`docs/review/SOURCE_INVENTORY.md`](docs/review/SOURCE_INVENTORY.md) — provenance and source map.
 - [`source/federation-serverless/agents-skill.md`](source/federation-serverless/agents-skill.md) — agent registration and integration contract.
@@ -184,7 +188,7 @@ The widget’s `public/brand/` directory is the deployment copy of those assets;
 - Keep `brand/` canonical and treat the public copy as a deployment artifact.
 - Keep generated dependencies, Wrangler state, logs, and release archives ignored.
 - Prefer the Cloudflare Worker path for production behavior; use the local adapter for fast demos and tests.
-- Authentication and authorization for administrative/API mutation routes remain a production-hardening task. Do not treat CORS as access control.
+- Production secrets must be set before deployment: `WATCHTOWER_INGESTION_SECRET` signs telemetry and `WATCHTOWER_ADMIN_TOKEN` protects administrative routes. Do not treat CORS as access control.
 
 ## License
 

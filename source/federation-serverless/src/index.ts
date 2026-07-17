@@ -1,9 +1,12 @@
 import { AgentRegistry } from "./agent-registry";
 import { FederationCoordinator } from "./federation-coordinator";
-import { Env } from "./agent-registry";
+import type { WatchtowerEnv } from "./agent-registry";
+import { ProjectGuardrail } from "./project-guardrail";
+import { constantTimeEqual, hmacSha256Hex, sha256Hex, validateOperationalEvent } from "./watchtower";
 
 export { AgentRegistry } from "./agent-registry";
 export { FederationCoordinator } from "./federation-coordinator";
+export { ProjectGuardrail } from "./project-guardrail";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,8 +22,65 @@ function error(message: string, status = 400): Response {
   return json({ error: message }, status);
 }
 
+const MAX_EVENT_BYTES = 64 * 1024;
+const SIGNATURE_WINDOW_MS = 5 * 60 * 1_000;
+
+class HttpError extends Error {
+  constructor(readonly status: number, message: string) { super(message); }
+}
+
+async function readBoundedJson(request: Request, maxBytes = MAX_EVENT_BYTES): Promise<{ raw: string; value: unknown }> {
+  const contentLength = request.headers.get("Content-Length");
+  if (contentLength && (!/^\d+$/.test(contentLength) || Number(contentLength) > maxBytes)) throw new HttpError(413, "request body exceeds the allowed size");
+  if (!request.body) throw new HttpError(400, "request body is required");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) throw new HttpError(413, "request body exceeds the allowed size");
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  const raw = new TextDecoder().decode(bytes);
+  try { return { raw, value: JSON.parse(raw) }; } catch { throw new HttpError(400, "request body must be valid JSON"); }
+}
+
+async function authenticateProducer(request: Request, rawBody: string, env: WatchtowerEnv): Promise<string> {
+  const secret = env.WATCHTOWER_INGESTION_SECRET;
+  if (!secret) {
+    if (env.ENVIRONMENT === "production") throw new HttpError(503, "event ingestion is not configured");
+    return "local-development";
+  }
+  const timestamp = request.headers.get("X-Watchtower-Timestamp");
+  const supplied = request.headers.get("X-Watchtower-Signature")?.replace(/^sha256=/i, "");
+  if (!timestamp || !supplied || !/^\d{10,13}$/.test(timestamp) || !/^[a-f0-9]{64}$/i.test(supplied)) throw new HttpError(401, "missing or malformed producer signature");
+  const timestampMs = timestamp.length === 10 ? Number(timestamp) * 1_000 : Number(timestamp);
+  if (!Number.isSafeInteger(timestampMs) || Math.abs(Date.now() - timestampMs) > SIGNATURE_WINDOW_MS) throw new HttpError(401, "producer signature timestamp is stale");
+  const expected = await hmacSha256Hex(secret, `${timestamp}.${rawBody}`);
+  if (!constantTimeEqual(expected, supplied.toLowerCase())) throw new HttpError(401, "producer signature is invalid");
+  const producer = request.headers.get("X-Watchtower-Producer") || "signed-producer";
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(producer)) throw new HttpError(400, "producer identifier contains unsupported characters");
+  return producer;
+}
+
+function requireAdmin(request: Request, env: WatchtowerEnv): Response | null {
+  const token = env.WATCHTOWER_ADMIN_TOKEN;
+  if (!token) return env.ENVIRONMENT === "production" ? error("administrative access is not configured", 503) : null;
+  const supplied = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") || "";
+  return constantTimeEqual(token, supplied) ? null : error("administrative authorization is required", 401);
+}
+
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: WatchtowerEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
@@ -45,10 +105,33 @@ export default {
       // ==================== HEALTH ====================
       if (path === "/health") return json({ status: "healthy", timestamp: Date.now() });
 
+      // ==================== WATCHTOWER EVENT INGESTION ====================
+      if (path === "/api/v1/events" && method === "POST") {
+        const { raw, value } = await readBoundedJson(request);
+        const producerId = await authenticateProducer(request, raw, env);
+        const event = validateOperationalEvent(value);
+        if (!await coordinator.getProjectSummary(event.projectId)) return error("project not found", 404);
+        const guardrailId = env.PROJECT_GUARDRAIL.idFromName(event.projectId);
+        const guardrail = env.PROJECT_GUARDRAIL.get(guardrailId) as DurableObjectStub<ProjectGuardrail>;
+        const result = await guardrail.ingest({ event, producerId, payloadDigest: await sha256Hex(raw), receivedAt: Date.now() });
+        console.log({ event: "watchtower.event.accepted", projectId: event.projectId, agentId: event.agentId, eventType: event.eventType, duplicate: result.duplicate, incidentCount: result.incidentIds.length });
+        return json(result, result.duplicate ? 200 : 201);
+      }
+      const incidentMatch = path.match(/^\/api\/v1\/projects\/([^/]+)\/incidents$/);
+      if (incidentMatch && method === "GET") {
+        const denied = requireAdmin(request, env);
+        if (denied) return denied;
+        const projectId = incidentMatch[1];
+        if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
+        const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
+        const limit = parseInt(url.searchParams.get("limit") || "50");
+        return json({ incidents: await guardrail.getIncidents(limit) });
+      }
+
       // ==================== SYSTEM ROUTES (before project routes) ====================
       if (path === "/api/status" && method === "GET") return json(await coordinator.getSystemStatus());
       if (path === "/api/projects" && method === "GET") return json(await coordinator.getProjects());
-      if (path === "/api/projects" && method === "POST") { const cfg = await request.json(); await coordinator.registerProject(cfg); return json({ success: true }); }
+      if (path === "/api/projects" && method === "POST") { const denied = requireAdmin(request, env); if (denied) return denied; const cfg = await request.json(); await coordinator.registerProject(cfg); return json({ success: true }); }
       if (path === "/api/feed" && method === "GET") { const limit = parseInt(url.searchParams.get("limit") || "100"); return json({ events: await coordinator.getGlobalFeed(limit) }); }
       if (path === "/api/search" && method === "GET") { const q = url.searchParams.get("q") || ""; const limit = parseInt(url.searchParams.get("limit") || "20"); return json({ results: await coordinator.searchAgents(q, limit) }); }
       if (path === "/api/health" && method === "GET") return json(await coordinator.healthCheckAll());
@@ -63,12 +146,14 @@ export default {
 
       // Get federation applications (admin)
       if (path === "/api/federation/applications" && method === "GET") {
+        const denied = requireAdmin(request, env); if (denied) return denied;
         const status = url.searchParams.get("status") || undefined;
         return json(await coordinator.getFederationApplications(status));
       }
 
       // Review federation application (admin)
       if (path.match(/^\/api\/federation\/applications\/(\d+)\/review$/) && method === "POST") {
+        const denied = requireAdmin(request, env); if (denied) return denied;
         const id = parseInt(path.match(/\/applications\/(\d+)\/review$/)?.[1] || "0");
         const { decision, reviewer, notes } = await request.json();
         return json(await coordinator.reviewFederationApplication(id, decision, reviewer, notes));
@@ -87,6 +172,7 @@ export default {
 
       // Submit speech line from verified federation agent
       if (path === "/api/federation/speech" && method === "POST") {
+        const denied = requireAdmin(request, env); if (denied) return denied;
         const { federationId, agentId, projectId, statement } = await request.json();
         return json(await coordinator.submitSpeechLine(federationId, agentId, projectId, statement));
       }
@@ -107,18 +193,21 @@ export default {
       // ==================== MCP ORG ROUTES ====================
       // Register MCP org (admin)
       if (path === "/api/mcp/organizations" && method === "POST") {
+        const denied = requireAdmin(request, env); if (denied) return denied;
         const data = await request.json();
         return json(await coordinator.registerMCPOrg(data));
       }
 
       // Get MCP org
       if (path.match(/^\/api\/mcp\/organizations\/([^/]+)$/) && method === "GET") {
+        const denied = requireAdmin(request, env); if (denied) return denied;
         const id = path.match(/\/organizations\/([^/]+)$/)?.[1];
         return json(await coordinator.getMCPOrg(id!));
       }
 
       // Get MCP access logs
       if (path === "/api/mcp/logs" && method === "GET") {
+        const denied = requireAdmin(request, env); if (denied) return denied;
         const orgId = url.searchParams.get("org_id") || undefined;
         const limit = parseInt(url.searchParams.get("limit") || "100");
         return json(await coordinator.getMCPAccessLogs(orgId, limit));
@@ -127,6 +216,7 @@ export default {
       // ==================== PROJECT-SPECIFIC ROUTES ====================
       const projectMatch = path.match(/^\/api\/projects\/([^/]+)\/(.*)$/);
       if (projectMatch) {
+        if (method !== "GET") { const denied = requireAdmin(request, env); if (denied) return denied; }
         const [, projectId, rest] = projectMatch;
         return handleProjectRoutes(request, env, projectId, rest, corsHeaders);
       }
@@ -146,12 +236,13 @@ export default {
       return error("Not found", 404);
     } catch (e) {
       console.error("Worker error:", e);
-      return json({ error: String(e) }, 500);
+      if (e instanceof HttpError) return error(e.message, e.status);
+      return json({ error: "internal server error" }, 500);
     }
   },
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<WatchtowerEnv>;
 
-async function handleProjectRoutes(request: Request, env: Env, projectId: string, restPath: string, corsHeaders: Record<string, string>): Promise<Response> {
+async function handleProjectRoutes(request: Request, env: WatchtowerEnv, projectId: string, restPath: string, corsHeaders: Record<string, string>): Promise<Response> {
   const registryId = env.AGENT_REGISTRY.idFromName(`${projectId}-registry`);
   const registry = env.AGENT_REGISTRY.get(registryId);
   const url = new URL(request.url);
@@ -222,7 +313,7 @@ async function handleProjectRoutes(request: Request, env: Env, projectId: string
   return error("Not found", 404);
 }
 
-async function handleWebSocket(request: Request, env: Env): Promise<Response> {
+async function handleWebSocket(request: Request, env: WatchtowerEnv): Promise<Response> {
   const url = new URL(request.url);
   const projectId = url.searchParams.get("projectId") || "all";
 

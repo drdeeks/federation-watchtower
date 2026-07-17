@@ -22,9 +22,10 @@ Browser / agent / MCP client
              │
              ▼
        federation-gateway Worker
-        ├── REST API and WebSocket feed
-        ├── FederationCoordinator Durable Object (global state)
-        ├── AgentRegistry Durable Object (per-project state)
+       ├── REST API and WebSocket feed
+       ├── FederationCoordinator Durable Object (global state)
+       ├── AgentRegistry Durable Object (per-project state)
+       ├── ProjectGuardrail Durable Object (per-project policy decisions)
         ├── D1: projects, agents, rooms, events, federation records
         ├── R2: federation vault objects
         └── Static assets → watch.drdeeks.xyz
@@ -60,6 +61,18 @@ Apply the schema to a remote database:
 
 ```bash
 npm run schema
+npm run migrate:watchtower
+```
+
+The Watchtower migration is additive and must be applied once to the existing
+production D1 database before `/api/v1/events` is enabled.
+
+Configure production credentials as Worker secrets, never as `vars` in
+`wrangler.toml`:
+
+```bash
+npx wrangler secret put WATCHTOWER_INGESTION_SECRET
+npx wrangler secret put WATCHTOWER_ADMIN_TOKEN
 ```
 
 Useful checks:
@@ -78,6 +91,8 @@ curl https://watch.drdeeks.xyz/
 | `npm run check` | Run Wrangler’s installed config/check command. |
 | `npm run deploy` | Upload Worker code, static assets, bindings, and custom domains. |
 | `npm run schema` | Execute `src/schema.sql` against remote D1. |
+| `npm run migrate:watchtower` | Apply the additive Watchtower event/incident migration to remote D1. |
+| `npm test` | Run event validation and runaway-policy tests. |
 | `npx wrangler dev --local` | Run the Worker locally with simulated bindings. |
 | `npx wrangler tail federation-gateway` | Follow production Worker logs. |
 
@@ -96,6 +111,32 @@ curl https://watch.drdeeks.xyz/
 | `GET` | `/api/health` | Run health checks across projects. |
 | `GET` | `/api/rooms` | List rooms across projects. |
 | `GET` | `/ws?projectId=...` | WebSocket feed for one project or `all`. |
+
+### Watchtower operational events
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/api/v1/events` | Signed, idempotent operational event ingestion. |
+| `GET` | `/api/v1/projects/{projectId}/incidents` | Read incidents; administrator authorization required. |
+
+The ingestion body follows the canonical event contract in
+[`../../docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md`](../../docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md).
+In production, sign the exact UTF-8 request body with HMAC-SHA-256 using
+`WATCHTOWER_INGESTION_SECRET`; send the hexadecimal signature in
+`X-Watchtower-Signature`, a Unix seconds or milliseconds timestamp in
+`X-Watchtower-Timestamp`, and optionally a producer ID in
+`X-Watchtower-Producer`. The signed input is:
+
+```text
+<timestamp>.<exact request body>
+```
+
+Requests older than five minutes, unknown event types, duplicated idempotency
+keys, oversized bodies, and metadata containing secret-shaped keys are rejected
+or safely redacted before persistence. Retrying a known idempotency key returns
+the original decision without another side effect. An accepted event is
+projected into the existing feed and can open an advisory incident/control
+command for a runaway-policy result.
 
 ### Project routes
 
@@ -140,13 +181,21 @@ All project routes use `/api/projects/{projectId}/...`.
 
 ### MCP organization records
 
-These routes maintain the organization registry and audit records used by a future authenticated MCP gateway:
+These routes maintain the organization registry and audit records used by a future authenticated MCP gateway. They require the administrative bearer token:
 
 - `POST /api/mcp/organizations`
 - `GET /api/mcp/organizations/{orgId}`
 - `GET /api/mcp/logs`
 
-The current Worker does not make CORS or a public hostname an authentication boundary. Add Cloudflare Access or application-level authorization before exposing administrative mutation routes to untrusted callers.
+All legacy mutation routes and private MCP/incident routes require
+`Authorization: Bearer <WATCHTOWER_ADMIN_TOKEN>` in production. CORS is not an
+authentication boundary; put the administrative and MCP hostname behind
+Cloudflare Access before sharing it outside the organization.
+
+Workers observability is enabled with full head sampling. Emit structured JSON
+only; Watchtower records the small safe correlation fields in Worker logs and
+keeps the durable event/audit record in D1 instead of logging prompts, payloads,
+or credentials.
 
 ## Example agent flow
 
@@ -156,6 +205,7 @@ PROJECT=autopilot
 AGENT=demo-agent-01
 
 curl -X POST "$API/api/projects/$PROJECT/agents" \
+  -H "Authorization: Bearer $WATCHTOWER_ADMIN_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"agentId":"demo-agent-01","name":"Demo Agent","role":"coding","capabilities":["tests"]}'
 
@@ -179,6 +229,10 @@ federation-serverless/
     ├── index.ts                    # Worker entry and HTTP/WebSocket routing
     ├── agent-registry.ts           # Per-project Durable Object
     ├── federation-coordinator.ts   # Global Durable Object
+    ├── project-guardrail.ts        # Per-project event/policy/incident coordinator
+    ├── watchtower.ts                # Event validation, HMAC, and runaway rules
+    ├── watchtower.test.ts           # Standalone core-policy tests
+    ├── migrations/0001_watchtower_enforcement.sql
     └── schema.sql                  # D1 schema
 ```
 

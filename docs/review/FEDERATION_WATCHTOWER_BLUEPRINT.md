@@ -92,7 +92,12 @@ Events should include:
 - `validation_gate_passed`
 - `validation_gate_failed`
 
-Existing source has the base feed table and renderer. Missing work is to formalize event types and map them to speech packets.
+The production Worker now has a formal, signed `/api/v1/events` intake with a
+public-safe feed projection and core runaway-policy evaluation. The legacy
+local statement adapter remains for demo compatibility. See
+[`WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md`](WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md)
+for the current implementation boundary: notifications, cooperative leases,
+watchdog alarms, and pre-tool denial are the next releases.
 
 ### 5. Guardrail and enterprise operations
 

@@ -5,6 +5,7 @@ Federation Watchtower documentation is grouped by purpose:
 ## Product and architecture
 
 - [`review/FEDERATION_WATCHTOWER_BLUEPRINT.md`](review/FEDERATION_WATCHTOWER_BLUEPRINT.md) — product statement, system boundaries, and current implementation map.
+- [`review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md`](review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md) — audited gaps, implementation status, and the phased control-loop design.
 - [`review/BUILD_PLAN.md`](review/BUILD_PLAN.md) — phased build and demo gates.
 - [`review/SOURCE_INVENTORY.md`](review/SOURCE_INVENTORY.md) — source provenance and important implementation files.
 
