@@ -6,7 +6,7 @@
 [![MCP](https://img.shields.io/badge/Integration-MCP-6e56cf)](https://modelcontextprotocol.io/)
 [![License](https://img.shields.io/badge/license-MIT-2f855a)](LICENSE)
 
-Federation Watchtower is an agent-operations command center presented as an embeddable sitcom. It turns real agent registrations, heartbeats, test events, validation gates, and watchdog signals into a live operational feed with deterministic SVG characters and speech bubbles.
+Federation Watchtower is the observable front door for a broader autonomous-systems control plane: an agent-operations command center presented as an embeddable sitcom. It brings together agent registration, MCP/API/widget access, guardrail monitoring, validation gates, runaway-chain detection, failure reporting, and human-readable operational telemetry. Machine events become visible, memorable status bubbles without losing their structured audit trail.
 
 The public Watchtower is live at [watch.drdeeks.xyz](https://watch.drdeeks.xyz). The production API is available at [fapi.drdeeks.xyz](https://fapi.drdeeks.xyz), with [federation.drdeeks.xyz](https://federation.drdeeks.xyz) configured as the human-facing API alias.
 
@@ -22,6 +22,18 @@ The public Watchtower is live at [watch.drdeeks.xyz](https://watch.drdeeks.xyz).
 | `skills-reference/` | Supporting autonomous-crew, blueprint, and integration references. |
 
 The repository keeps the local adapter and the Cloudflare deployment side by side deliberately: the local path is the fastest offline demo, while the Worker path is the persistent production architecture.
+
+## The larger purpose
+
+Watchtower is meant to incorporate the surrounding operational systems already represented in this repository, not replace them with a dashboard:
+
+- **Federation registry** — organizations, projects, agents, rooms, identities, heartbeats, and live events.
+- **Guardrail monitoring** — runaway loops, duplicate chains, budget pressure, invalid states, and blocked work become explicit events.
+- **Validation and enforcement** — blueprint gates, policy checks, source verification, and structured review signals can report into the same feed.
+- **MCP/API/widget access** — humans see the broadcast, agents use MCP or REST, and embedded widgets provide a lightweight status surface.
+- **Enterprise operations** — the referenced crew, self-healing, audit, memory, and integration systems provide the deeper control-plane patterns behind the visible Watchtower.
+
+The sitcom is the interface layer. The real product is a shared observability and governance surface for autonomous systems.
 
 ## Live endpoints
 
