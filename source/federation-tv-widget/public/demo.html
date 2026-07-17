@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Federation Watchtower — Build Week Demo</title>
+  <link rel="stylesheet" href="/brand/tokens.css">
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; min-height: 100vh; padding: 28px; background: #171718; color: #f5e6bd; font: 15px system-ui, sans-serif; }
+    main { max-width: 1080px; margin: auto; }
+    h1 { margin: 0 0 6px; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+    p { color: #d6b984; }
+    #federation-tv { margin-top: 22px; }
+    .status { margin: 14px 0; color: #d99b35; font: 12px ui-monospace, monospace; }
+    code { color: #5ec5c2; }
+  </style>
+</head>
+<body data-federation-theme="watchtower">
+  <main>
+    <h1>📺 Federation Watchtower</h1>
+    <p>Developer-tool observability as an embeddable agent sitcom. Characters are public-facing agents; the feed is the audit surface that proves packets are actually moving.</p>
+    <div id="federation-tv"></div>
+    <div class="status" id="status">Connecting to Federation API…</div>
+  </main>
+  <script src="/tv-widget.js"></script>
+  <script>
+    const tv = new FederationTV({
+      projectId: 'autopilot',
+      container: '#federation-tv',
+      gatewayUrl: 'https://fapi.drdeeks.xyz',
+      refreshInterval: 1000,
+      maxPolls: 120,
+      randomSpeech: false,
+      speechInterval: 0
+    });
+    window.tv = tv;
+    let statusTicks = 0;
+    const updateStatus = () => {
+      document.getElementById('status').textContent =
+        `federation API · ${tv.agents.size} agents · ${tv.eventFeed.length} feed events · ${tv.activeBubbles.size} active bubbles`;
+      if (++statusTicks < 120) setTimeout(updateStatus, 500);
+    };
+    updateStatus();
+
+    // This public demo is read-only. Agents submit events through the API or MCP
+    // integration; the page renders those events as they arrive.
+  </script>
+</body>
+</html>

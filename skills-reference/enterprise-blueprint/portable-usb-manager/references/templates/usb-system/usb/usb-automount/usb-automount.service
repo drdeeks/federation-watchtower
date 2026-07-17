@@ -1,0 +1,15 @@
+[Unit]
+Description=USB Automount Service
+After=local-fs.target udisks2.service
+Wants=udisks2.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/usb-mount.sh mount-all
+ExecStop=/usr/local/bin/usb-mount.sh unmount-all
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

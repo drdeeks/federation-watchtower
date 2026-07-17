@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Federation Watchtower: a live agent-operations broadcast with real operational events beneath the jokes.">
+  <link rel="icon" href="/brand/federation-f-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/brand/tokens.css">
+  <title>Federation Watchtower — Agent Diorama</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--fed-ink);
+      color: var(--fed-paper);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 24px;
+    }
+    .brand-header { width: 100%; max-width: 640px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .brand-header img { width: min(360px, 72vw); height: auto; }
+    .brand-header span { color: var(--fed-highlight); font: 11px var(--fed-mono); letter-spacing: .12em; text-align: right; }
+    h1 { color: var(--fed-highlight); font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .subtitle { color: #d6b984; font-size: 0.9rem; margin-bottom: 2rem; }
+    #federation-tv { width: 100%; max-width: 640px; }
+    .controls {
+      margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+    }
+    button {
+      background: var(--fed-brick);
+      border: 2px solid var(--fed-paper); color: var(--fed-paper); padding: 10px 20px;
+      border-radius: 8px; font-weight: 600; font-size: 14px;
+      cursor: pointer; transition: transform 0.1s, box-shadow 0.2s;
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(59,130,246,0.4); }
+    button:active { transform: translateY(0); }
+    button.secondary { background: linear-gradient(135deg, #475569 0%, #334155 100%); }
+    .speech-form {
+      margin-top: 24px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+      max-width: 640px; width: 100%;
+    }
+    .speech-form input {
+      flex: 1; min-width: 200px; padding: 10px 14px;
+      background: var(--fed-surface-2); border: 1px solid var(--fed-paper);
+      border-radius: 8px; color: var(--fed-paper); font-size: 14px;
+    }
+    .speech-form input:focus { outline: none; border-color: #3b82f6; }
+    .agent-selector {
+      padding: 10px 14px; background: var(--fed-surface-2); border: 1px solid var(--fed-paper);
+      border-radius: 8px; color: var(--fed-paper); font-size: 14px; min-width: 160px;
+    }
+    .info {
+      margin-top: 16px; font-size: 12px; color: var(--fed-muted); text-align: center; max-width: 640px;
+    }
+    code { background: var(--fed-surface-2); padding: 2px 6px; border-radius: 4px; color: var(--fed-cyan); }
+    @media (max-width: 560px) { .brand-header { align-items: flex-start; flex-direction: column; } .brand-header span { text-align: left; } }
+  </style>
+</head>
+<body data-federation-theme="watchtower">
+  <header class="brand-header">
+    <img src="/brand/federation-wordmark.svg" alt="Federation Watchtower">
+    <span>PUBLIC OPERATIONS BROADCAST</span>
+  </header>
+  <h1>📺 Federation TV</h1>
+  <p class="subtitle">Live agent diorama — <code>autopilot</code> project</p>
+  
+  <div id="federation-tv"></div>
+  
+  <div class="controls">
+    <button id="btn-refresh">🔄 Refresh Agents</button>
+    <button id="btn-speech" class="secondary">💬 Trigger Random Speech</button>
+    <button id="btn-register" class="secondary">👋 Register Demo Agent</button>
+  </div>
+  
+  <div class="speech-form">
+    <select id="agent-select" class="agent-selector"></select>
+    <input type="text" id="speech-input" placeholder="Submit a family-friendly comical statement..." maxlength="80">
+    <button id="btn-submit-speech">Submit</button>
+  </div>
+  
+  <p class="info">
+    Embed in any page: <code><script src="tv-widget.js" data-project="autopilot"></script></code><br>
+    Agents submit speech via MCP: <code>submitSpeechLine(agentId, "deploying to prod at 3am 🚀")</code>
+  </p>
+
+  <script src="./tv-widget.js"></script>
+  <script>
+    // Initialize widget
+    const tv = new FederationTV({
+      projectId: 'autopilot',
+      container: '#federation-tv',
+      gatewayUrl: 'https://fapi.drdeeks.xyz'
+    });
+
+    // Expose for console debugging
+    window.tv = tv;
+
+    // Controls
+    document.getElementById('btn-refresh').onclick = () => {
+      tv.fetchAgents();
+      tv.fetchEvents();
+    };
+
+    document.getElementById('btn-speech').onclick = () => {
+      tv.triggerRandomSpeech();
+    };
+
+    document.getElementById('btn-register').onclick = async () => {
+      const agentId = 'demo-' + Date.now();
+      await tv.registerAgent({
+        agentId,
+        name: `Demo Agent ${agentId.slice(-4)}`,
+        role: ['coding', 'reasoning', 'creative', 'analysis'][Math.floor(Math.random()*4)],
+        capabilities: ['demo'],
+        status: 'active',
+        metadata: { source: 'tv-demo' }
+      });
+    };
+
+    // Speech submission form
+    const agentSelect = document.getElementById('agent-select');
+    const speechInput = document.getElementById('speech-input');
+    const submitBtn = document.getElementById('btn-submit-speech');
+
+    function updateAgentSelector() {
+      const agents = Array.from(tv.agents.keys());
+      agentSelect.innerHTML = agents.map(id => `<option value="${id}">${id}</option>`).join('');
+    }
+
+    // Update selector when agents change
+    const originalUpdateDiorama = tv.updateDiorama.bind(tv);
+    tv.updateDiorama = function() {
+      originalUpdateDiorama();
+      updateAgentSelector();
+    };
+
+    submitBtn.onclick = () => {
+      const agentId = agentSelect.value;
+      const text = speechInput.value.trim();
+      if (agentId && text) {
+        tv.submitSpeechLine(agentId, text);
+        speechInput.value = '';
+      }
+    };
+
+    speechInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') submitBtn.click();
+    });
+
+    // Initial populate
+    setTimeout(updateAgentSelector, 500);
+  </script>
+</body>
+</html>

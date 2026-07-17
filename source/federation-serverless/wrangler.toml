@@ -1,0 +1,48 @@
+name = "federation-gateway"
+main = "src/index.ts"
+compatibility_date = "2026-07-17"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "AGENT_REGISTRY"
+class_name = "AgentRegistry"
+
+[[durable_objects.bindings]]
+name = "FEDERATION_COORDINATOR"
+class_name = "FederationCoordinator"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "federation-db"
+database_id = "acd17c56-b45b-4c82-adaf-c5318f049247"
+
+[[r2_buckets]]
+binding = "VAULT"
+bucket_name = "federation-vault"
+
+[assets]
+directory = "../federation-tv-widget/public"
+binding = "ASSETS"
+
+[vars]
+ENVIRONMENT = "production"
+
+[[routes]]
+pattern = "fapi.drdeeks.xyz"
+custom_domain = true
+
+[[routes]]
+pattern = "federation.drdeeks.xyz"
+custom_domain = true
+
+[[routes]]
+pattern = "watch.drdeeks.xyz"
+custom_domain = true
+
+[exports.AgentRegistry]
+type = "durable-object"
+storage = "sqlite"
+
+[exports.FederationCoordinator]
+type = "durable-object"
+storage = "sqlite"

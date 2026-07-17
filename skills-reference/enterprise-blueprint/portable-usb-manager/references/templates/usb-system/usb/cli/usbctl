@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# usbctl - Unified CLI entry point for USB Compute Automation
+
+set -euo pipefail
+
+# Determine script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Source core library
+# shellcheck source=../lib/core.sh
+source "$PROJECT_ROOT/lib/core.sh"
+
+# Source other libraries
+# shellcheck source=../lib/platform.sh
+source "$PROJECT_ROOT/lib/platform.sh"
+# shellcheck source=../lib/usb.sh
+source "$PROJECT_ROOT/lib/usb.sh"
+# shellcheck source=../lib/config.sh
+source "$PROJECT_ROOT/lib/config.sh"
+# shellcheck source=../lib/menu.sh
+source "$PROJECT_ROOT/lib/menu.sh"
+# shellcheck source=../lib/validation.sh
+source "$PROJECT_ROOT/lib/validation.sh"
+
+# Set standard traps
+set_standard_traps
+
+# Global config initialization
+config_init
+
+print_header "usbctl - USB Compute Automation CLI"
+
+usage() {
+  cat <<'EOF'
+Usage: usbctl <command> [options]
+
+Commands:
+  usb          USB device management (detect, mount, persistence)
+  config       Configuration management (host ID, settings)
+  alias        Alias management (list, add, remove, edit, search)
+  validate     Run system validation checks
+  help         Show this help message
+
+Options:
+  --dry-run    Preview actions without executing
+  --help       Show command-specific help
+
+Examples:
+  usbctl usb detect
+  usbctl config host-id
+  usbctl alias list
+  usbctl validate all
+EOF
+}
+
+# USB subcommands
+usb_cmd() {
+  local subcmd="${1:-}"
+  case "$subcmd" in
+    detect)
+      print_header "USB Device Detection"
+      # Source the main script's detection logic
+      if [[ -f "$PROJECT_ROOT/usb-setup-assistant.sh" ]]; then
+        # Extract and run detection function
+        bash -c "
+          source '$PROJECT_ROOT/usb-setup-assistant.sh' 2>/dev/null
+          # Call detection function if available
+          if declare -f detect_usb_devices >/dev/null; then
+            detect_usb_devices
+          else
+            echo 'Detection function not found in main script'
+          fi
+        "
+      else
+        print_error "Main script not found"
+        return 1
+      fi
+      ;;
+    mount)
+      print_header "Mount Ventoy USB"
+      if [[ -z "${SELECTED_DEVICE:-}" ]]; then
+        print_error "No device selected. Set SELECTED_DEVICE first."
+        return 1
+      fi
+      if detect_ventoy_mount; then
+        print_success "Ventoy mounted at: $VENTOY_MOUNT"
+      else
+        print_error "Failed to mount Ventoy"
+        return 1
+      fi
+      ;;
+    unmount)
+      print_header "Unmount Ventoy USB"
+      unmount_ventoy
+      print_success "Unmounted"
+      ;;
+    persistence)
+      print_header "Persistence Status"
+      if [[ -z "${SELECTED_DEVICE:-}" ]]; then
+        print_error "No device selected. Set SELECTED_DEVICE first."
+        return 1
+      fi
+      if detect_ventoy_mount; then
+        if check_persistence_exists; then
+          print_success "Persistence file exists"
+          echo "Size: $(get_persistence_size)"
+        else
+          print_warning "No persistence file found"
+        fi
+      else
+        print_error "Ventoy not mounted"
+        return 1
+      fi
+      ;;
+    *)
+      echo "Usage: usbctl usb {detect|mount|unmount|persistence}"
+      return 1
+      ;;
+  esac
+}
+
+# Config subcommands
+config_cmd() {
+  local subcmd="${1:-}"
+  case "$subcmd" in
+    host-id)
+      print_header "Host ID Management"
+      generate_host_id
+      ;;
+    show)
+      print_header "Current Configuration"
+      if [[ -f "$UCA_CONFIG_FILE" ]]; then
+        cat "$UCA_CONFIG_FILE" | jq . 2>/dev/null || cat "$UCA_CONFIG_FILE"
+      else
+        print_warning "No configuration file found"
+      fi
+      ;;
+    init)
+      print_header "Initialize Configuration"
+      config_init
+      print_success "Configuration initialized at $UCA_CONFIG_FILE"
+      ;;
+    *)
+      echo "Usage: usbctl config {host-id|show|init}"
+      return 1
+      ;;
+  esac
+}
+
+# Alias subcommands (delegate to alias_manager.sh)
+alias_cmd() {
+  local subcmd="${1:-}"
+  shift || true
+  if [[ -f "$PROJECT_ROOT/scripts/alias_manager.sh" ]]; then
+    bash "$PROJECT_ROOT/scripts/alias_manager.sh" "$subcmd" "$@"
+  else
+    print_error "alias_manager.sh not found"
+    return 1
+  fi
+}
+
+# Validate subcommands
+validate_cmd() {
+  local subcmd="${1:-all}"
+  case "$subcmd" in
+    all)
+      print_header "Full System Validation"
+      run_full_validation
+      ;;
+    host)
+      print_header "Host ID Validation"
+      validate_host_id
+      ;;
+    usb)
+      print_header "USB Mount Validation"
+      validate_usb_mount
+      ;;
+    menu)
+      print_header "Menu Stack Validation"
+      validate_menu_stack
+      ;;
+    *)
+      echo "Usage: usbctl validate {all|host|usb|menu}"
+      return 1
+      ;;
+  esac
+}
+
+# Main command dispatcher
+main() {
+  local cmd="${1:-help}"
+  shift || true
+
+  case "$cmd" in
+    usb)        usb_cmd "$@" ;;
+    config)     config_cmd "$@" ;;
+    alias)      alias_cmd "$@" ;;
+    validate)   validate_cmd "$@" ;;
+    help|--help|-h) usage ;;
+    *)
+      print_error "Unknown command: $cmd"
+      usage
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"
