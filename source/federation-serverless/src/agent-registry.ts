@@ -1,11 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 
-export interface Env {
-  DB: D1Database;
-  VAULT: R2Bucket;
-  AGENT_REGISTRY: DurableObjectNamespace;
-  FEDERATION_COORDINATOR: DurableObjectNamespace;
-}
+export type WatchtowerEnv = Env & {
+  WATCHTOWER_INGESTION_SECRET?: string;
+  WATCHTOWER_ADMIN_TOKEN?: string;
+};
 
 export interface Agent {
   id: string;
@@ -52,11 +50,11 @@ export interface HealthCheckResult {
 
 const MAX_AGENTS_PER_ROOM = 35;
 
-export class AgentRegistry extends DurableObject<Env> {
+export class AgentRegistry extends DurableObject<WatchtowerEnv> {
   private projectId: string;
   private db: D1Database;
 
-  constructor(ctx: DurableObjectState, env: Env) {
+  constructor(ctx: DurableObjectState, env: WatchtowerEnv) {
     super(ctx, env);
     this.projectId = ctx.id.name.split('-')[0];
     this.db = env.DB;

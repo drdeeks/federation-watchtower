@@ -6,7 +6,9 @@
     "check": "wrangler check",
     "types": "wrangler types",
     "deploy": "wrangler deploy",
-    "schema": "wrangler d1 execute federation-db --remote --file=src/schema.sql"
+    "schema": "wrangler d1 execute federation-db --remote --file=src/schema.sql",
+    "migrate:watchtower": "wrangler d1 execute federation-db --remote --file=src/migrations/0001_watchtower_enforcement.sql",
+    "test": "node --experimental-strip-types src/watchtower.test.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

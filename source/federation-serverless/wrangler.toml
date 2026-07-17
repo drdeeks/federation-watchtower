@@ -11,6 +11,10 @@ class_name = "AgentRegistry"
 name = "FEDERATION_COORDINATOR"
 class_name = "FederationCoordinator"
 
+[[durable_objects.bindings]]
+name = "PROJECT_GUARDRAIL"
+class_name = "ProjectGuardrail"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "federation-db"
@@ -26,6 +30,10 @@ binding = "ASSETS"
 
 [vars]
 ENVIRONMENT = "production"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
 
 [[routes]]
 pattern = "fapi.drdeeks.xyz"
@@ -44,5 +52,9 @@ type = "durable-object"
 storage = "sqlite"
 
 [exports.FederationCoordinator]
+type = "durable-object"
+storage = "sqlite"
+
+[exports.ProjectGuardrail]
 type = "durable-object"
 storage = "sqlite"
