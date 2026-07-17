@@ -1,0 +1,15 @@
+{
+  "name": "federation-serverless",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "wrangler check",
+    "types": "wrangler types",
+    "deploy": "wrangler deploy",
+    "schema": "wrangler d1 execute federation-db --remote --file=src/schema.sql"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "wrangler": "^4.0.0"
+  }
+}

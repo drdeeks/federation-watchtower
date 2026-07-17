@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Federation TV — Local Test</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 24px;
+    }
+    #federation-tv { width: 100%; max-width: 640px; }
+    .status { margin-top: 16px; font-size: 12px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <h1>📺 Federation TV (Local Test)</h1>
+  <div class="subtitle">Connected to gateway at localhost:41207</div>
+  
+  <div id="federation-tv"></div>
+  
+  <div class="status" id="status">Loading...</div>
+
+  <script src="./tv-widget.js"></script>
+  <script>
+    const tv = new FederationTV({
+      projectId: 'autopilot',
+      container: '#federation-tv',
+      gatewayUrl: 'http://localhost:41207',
+      refreshInterval: 15000,
+      speechInterval: 6000
+    });
+    window.tv = tv;
+
+    // Status updates
+    setInterval(() => {
+      document.getElementById('status').textContent = 
+        `Agents: ${tv.agents.size} | Speech pool: ${tv.speechLines.length} | Bubbles: ${tv.activeBubbles.size}`;
+    }, 1000);
+  </script>
+</body>
+</html>

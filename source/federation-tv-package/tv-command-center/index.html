@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hemlock Enterprise — Agent TV Command Center</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141f;
+    --card: #1a1a2e;
+    --accent: #2563eb;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --green: #22c55e;
+    --purple: #a855f7;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  .scanline {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 9999;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+    );
+    animation: scan 8s linear infinite;
+  }
+  @keyframes scan {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100vh; }
+  }
+  header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    border-bottom: 1px solid rgba(37,99,235,0.3);
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  header h1 {
+    font-size: 1.25rem; font-weight: 800;
+    background: linear-gradient(90deg, var(--accent), var(--cyan));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: -0.02em;
+  }
+  header .stats {
+    display: flex; gap: 24px; align-items: center;
+    font-size: 0.8rem; color: var(--muted);
+  }
+  header .stats span { display: flex; align-items: center; gap: 6px; }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); display: inline-block;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+  .master-grid {
+    display: grid; gap: 24px;
+    grid-template-columns: 1fr 1fr;
+  }
+  @media(max-width:1100px) { .master-grid { grid-template-columns: 1fr; } }
+  .screen-card {
+    background: var(--surface); border-radius: 12px;
+    border: 1px solid rgba(100,116,139,0.2); overflow: hidden;
+  }
+  .screen-card .screen-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(100,116,139,0.15);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .screen-body { padding: 16px; }
+  .tv-frame {
+    position: relative; background: #000; border-radius: 8px;
+    overflow: hidden; aspect-ratio: 16/9;
+    border: 2px solid rgba(100,116,139,0.3);
+  }
+  .tv-frame .static-overlay {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px
+    );
+    pointer-events: none; z-index: 2;
+  }
+  .tv-frame .noise {
+    position: absolute; inset: 0;
+    opacity: 0.03; z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+  .agent-grid {
+    display: grid; gap: 4px; padding: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    position: relative; z-index: 3;
+  }
+  .agent-avatar {
+    aspect-ratio: 1; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; font-weight: 700;
+    position: relative; transition: all 0.2s;
+    cursor: pointer;
+  }
+  .agent-avatar:hover {
+    transform: scale(1.15); z-index: 10;
+    filter: brightness(1.3);
+  }
+  .agent-avatar .label {
+    position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%);
+    font-size: 0.55rem; white-space: nowrap; opacity: 0;
+    transition: opacity 0.2s; color: var(--muted);
+  }
+  .agent-avatar:hover .label { opacity: 1; }
+  .agent-avatar.active {
+    box-shadow: 0 0 8px rgba(34,197,94,0.6);
+    animation: active-pulse 1.5s infinite;
+  }
+  @keyframes active-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(34,197,94,0.6); }
+    50% { box-shadow: 0 0 16px rgba(34,197,94,0.9); }
+  }
+  .agent-avatar.idle { opacity: 0.5; }
+  .agent-avatar.busy { opacity: 1; }
+  .agent-avatar.processing { animation: processing 0.5s infinite alternate; }
+  @keyframes processing {
+    from { filter: brightness(1); }
+    to { filter: brightness(1.4); }
+  }
+
+  .project-grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    margin-top: 24px;
+  }
+  .project-card {
+    background: var(--card); border-radius: 10px;
+    border: 1px solid rgba(100,116,139,0.15);
+    padding: 16px; cursor: pointer;
+    transition: all 0.2s; position: relative; overflow: hidden;
+  }
+  .project-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent); box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  .project-card .accent-bar {
+    position: absolute; top: 0; left: 0; width: 100%; height: 3px;
+  }
+  .project-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+  .project-card p { font-size: 0.8rem; color: var(--muted); margin-bottom: 8px; }
+  .project-card .room-info {
+    display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.7rem;
+  }
+  .room-tag {
+    background: rgba(100,116,139,0.15); padding: 2px 8px;
+    border-radius: 4px; display: flex; align-items: center; gap: 4px;
+  }
+
+  .production-rooms {
+    display: grid; gap: 12px; margin-top: 12px;
+  }
+  .room-panel {
+    background: rgba(0,0,0,0.3); border-radius: 8px;
+    border: 1px solid rgba(100,116,139,0.15); overflow: hidden;
+  }
+  .room-panel .room-header {
+    padding: 8px 12px; display: flex; justify-content: space-between;
+    align-items: center; font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.05em; background: rgba(0,0,0,0.2);
+  }
+  .room-panel .room-agents {
+    display: flex; flex-wrap: wrap; gap: 2px; padding: 8px;
+  }
+  .mini-agent {
+    width: 28px; height: 28px; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem; font-weight: 700;
+  }
+  .feed-bar {
+    display: flex; gap: 6px; align-items: center;
+    padding: 8px 12px; background: rgba(0,0,0,0.2);
+    border-top: 1px solid rgba(100,116,139,0.1);
+    font-size: 0.7rem; overflow-x: auto;
+  }
+  .feed-item {
+    display: flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px;
+    background: rgba(37,99,235,0.15); white-space: nowrap;
+    animation: feed-scroll 20s linear infinite;
+  }
+  @keyframes feed-scroll {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+  .feed-item .dot {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: var(--green); animation: pulse 2s infinite;
+  }
+  .modal {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.8); align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal.active { display: flex; }
+  .modal-content {
+    background: var(--surface); border-radius: 12px;
+    border: 1px solid rgba(100,116,139,0.2);
+    width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto;
+    padding: 24px;
+  }
+  .modal-content h2 { margin-bottom: 16px; }
+  .close-btn {
+    float: right; cursor: pointer; color: var(--muted); font-size: 1.5rem;
+  }
+  .close-btn:hover { color: var(--text); }
+  .status-bar {
+    display: flex; gap: 16px; padding: 12px 16px;
+    background: var(--surface); border-radius: 8px;
+    margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .status-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.75rem;
+  }
+  .count-badge {
+    background: rgba(37,99,235,0.2); padding: 2px 8px; border-radius: 4px;
+    font-weight: 600; font-size: 0.7rem;
+  }
+  .nav-links {
+    display: flex; gap: 12px; align-items: center;
+  }
+  .nav-links a {
+    color: var(--muted); text-decoration: none; font-size: 0.8rem;
+    padding: 4px 12px; border-radius: 4px;
+    transition: all 0.2s;
+  }
+  .nav-links a:hover {
+    color: var(--text); background: rgba(37,99,235,0.15);
+  }
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+
+<header>
+  <h1>◈ HEMLOCK ENTERPRISE — AGENT TV COMMAND CENTER</h1>
+  <div class="stats">
+    <span><span class="live-dot"></span> LIVE</span>
+    <span>👥 <span id="totalAgents">0</span> Agents</span>
+    <span>🏠 <span id="totalRooms">0</span> Rooms</span>
+  </div>
+  <div class="nav-links">
+    <a href="#" onclick="showProject('all')">All Projects</a>
+    <a href="#" onclick="showProject('autopilot')">Autopilot</a>
+    <a href="#" onclick="showProject('aires')">Aires</a>
+    <a href="#" onclick="showProject('mnemosyne')">Mnemosyne</a>
+    <a href="#" onclick="showProject('agora')">Agora</a>
+    <a href="#" onclick="showProject('edgewalker')">Edgewalker</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="status-bar" id="statusBar">
+    <div class="status-item"><span class="live-dot"></span> System Online</div>
+    <div class="status-item">📡 Federation: <span class="count-badge" id="federationStatus">○ CONNECTING</span></div>
+    <div class="status-item">🏢 Active Rooms: <span class="count-badge" id="activeRooms">0</span></div>
+    <div class="status-item">🤖 Agents Online: <span class="count-badge" id="agentsOnline">0</span></div>
+    <div class="status-item">🎬 Production Rooms: <span class="count-badge" id="productionRooms">0</span></div>
+  </div>
+
+  <div class="master-grid">
+    <div class="screen-card">
+      <div class="screen-header">
+        <span>🎬 MAIN STAGE — LIVE BROADCAST</span>
+        <span style="color:var(--muted);font-size:0.7rem;">REC ●</span>
+      </div>
+      <div class="screen-body">
+        <div class="tv-frame" id="mainStage">
+          <div class="noise"></div>
+          <div class="static-overlay"></div>
+          <div class="agent-grid" id="mainStageGrid"></div>
+        </div>
+        <div class="feed-bar" id="mainFeed"></div>
+      </div>
+    </div>
+
+    <div class="screen-card">
+      <div class="screen-header">
+        <span>🎥 PRODUCTION ROOMS</span>
+        <span id="roomCount" style="font-size:0.7rem;">0 rooms</span>
+      </div>
+      <div class="screen-body">
+        <div class="production-rooms" id="productionRoomsContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="project-grid" id="projectGrid"></div>
+</div>
+
+<div class="modal" id="projectModal">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeModal()">&times;</span>
+    <h2 id="modalTitle">Project Details</h2>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+// LIVE DATA — populated from the federation gateway (no static mock agents)
+let AGENTS = {};
+
+// Project display metadata (name/accent/emoji/color) keyed by projectId
+const PROJECT_META = {
+  autopilot:  { name: 'Autopilot',  accent: '#22c55e', emoji: '⚙️', color: 'rgba(34,197,94,0.2)' },
+  aires:      { name: 'Aires',      accent: '#a855f7', emoji: '🎬', color: 'rgba(168,85,247,0.2)' },
+  mnemosyne:  { name: 'Mnemosyne',  accent: '#3b82f6', emoji: '🧠', color: 'rgba(59,130,246,0.2)' },
+  agora:      { name: 'Agora',      accent: '#f59e0b', emoji: '🏛️', color: 'rgba(245,158,11,0.2)' },
+  edgewalker: { name: 'Edgewalker', accent: '#ef4444', emoji: '⚡', color: 'rgba(239,68,68,0.2)' }
+};
+
+// Pull real agents from the federation registry and reshape into AGENTS
+async function loadAgents() {
+  try {
+    const res = await fetch('/api/agents');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const remote = (data && data.agents) || {};
+    const next = {};
+    for (const key of Object.keys(PROJECT_META)) {
+      const meta = PROJECT_META[key];
+      const list = remote[key] || [];
+      next[key] = {
+        name: meta.name, accent: meta.accent, emoji: meta.emoji, color: meta.color,
+        agents: list.map(a => ({
+          id: a.agentId || a.id,
+          name: a.name || a.agentId || 'unknown',
+          role: a.role || (a.capabilities && a.capabilities[0]) || 'agent',
+          emoji: (a.avatar && a.avatar.length <= 4) ? a.avatar : '🤖',
+          active: a.status === 'active' || a.active === true
+        }))
+      };
+    }
+    AGENTS = next;
+    refresh();
+    document.getElementById('federationStatus') && (document.getElementById('federationStatus').textContent = '● LIVE');
+  } catch (e) {
+    console.error('loadAgents failed:', e);
+    document.getElementById('federationStatus') && (document.getElementById('federationStatus').textContent = '○ OFFLINE');
+  }
+}
+
+function refresh() {
+  const all = getAllAgents();
+  renderMainStage(all);
+  renderProductionRooms(all);
+  renderFeed(all);
+  updateStats(all);
+  renderProjects();
+  if (currentFilter !== 'all' && AGENTS[currentFilter]) showProject(currentFilter);
+}
+
+// Real-time WebSocket — any message triggers a re-fetch from the source of truth
+let tvWs = null;
+function connectWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const url = proto + '//' + location.host + '/ws?projectId=all';
+  try {
+    tvWs = new WebSocket(url);
+    tvWs.onmessage = () => { loadAgents(); };
+    tvWs.onclose = () => { setTimeout(connectWebSocket, 3000); };
+    tvWs.onerror = () => { try { tvWs.close(); } catch (e) {} };
+  } catch (e) { /* retry handled by onclose */ }
+}
+
+const MAX_AGENTS_PER_ROOM = 35;
+let currentFilter = 'all';
+
+function getAllAgents() {
+  let all = [];
+  for (let proj in AGENTS) {
+    AGENTS[proj].agents.forEach(a => {
+      all.push({ ...a, project: proj, projectData: AGENTS[proj] });
+    });
+  }
+  return all;
+}
+
+function createProductionRooms(agents, projectAccent) {
+  const rooms = [];
+  for (let i = 0; i < agents.length; i += MAX_AGENTS_PER_ROOM) {
+    rooms.push(agents.slice(i, i + MAX_AGENTS_PER_ROOM));
+  }
+  return rooms;
+}
+
+function renderMainStage(agents) {
+  const grid = document.getElementById('mainStageGrid');
+  grid.innerHTML = '';
+  const displayAgents = agents.slice(0, MAX_AGENTS_PER_ROOM);
+  displayAgents.forEach(a => {
+    const div = document.createElement('div');
+    div.className = `agent-avatar ${a.active ? 'active' : 'idle'}`;
+    div.style.background = a.projectData.color;
+    div.style.border = `1px solid ${a.projectData.accent}40`;
+    div.textContent = a.emoji;
+    div.innerHTML += `<span class="label">${a.id} ${a.name}</span>`;
+    div.title = `${a.id} - ${a.name} (${a.role}) - ${a.projectData.name}`;
+    grid.appendChild(div);
+  });
+}
+
+function renderProductionRooms(agents) {
+  const container = document.getElementById('productionRoomsContainer');
+  container.innerHTML = '';
+  const rooms = createProductionRooms(agents, '');
+  document.getElementById('roomCount').textContent = `${rooms.length} rooms`;
+
+  rooms.forEach((room, idx) => {
+    const panel = document.createElement('div');
+    panel.className = 'room-panel';
+    panel.innerHTML = `
+      <div class="room-header">
+        <span>🎬 Production Room ${idx + 1}</span>
+        <span>${room.length}/${MAX_AGENTS_PER_ROOM} agents</span>
+      </div>
+      <div class="room-agents"></div>
+    `;
+    const agentContainer = panel.querySelector('.room-agents');
+    room.forEach(a => {
+      const mini = document.createElement('div');
+      mini.className = 'mini-agent';
+      mini.style.background = a.projectData.color;
+      mini.style.border = `1px solid ${a.projectData.accent}40`;
+      mini.textContent = a.emoji;
+      mini.title = `${a.id} ${a.name}`;
+      agentContainer.appendChild(mini);
+    });
+    container.appendChild(panel);
+  });
+}
+
+function renderFeed(agents) {
+  const feed = document.getElementById('mainFeed');
+  feed.innerHTML = '';
+  const active = agents.filter(a => a.active).slice(0, 20);
+  active.forEach(a => {
+    const item = document.createElement('div');
+    item.className = 'feed-item';
+    item.innerHTML = `<span class="dot"></span>${a.emoji} ${a.id} ${a.name} <span style="color:var(--muted);font-size:0.6rem;">${a.role}</span>`;
+    feed.appendChild(item);
+  });
+}
+
+function renderProjects() {
+  const grid = document.getElementById('projectGrid');
+  grid.innerHTML = '';
+  for (let key in AGENTS) {
+    const p = AGENTS[key];
+    const rooms = createProductionRooms(p.agents, p.accent);
+    const card = document.createElement('div');
+    card.className = 'project-card';
+    card.style.borderColor = `${p.accent}30`;
+    card.innerHTML = `
+      <div class="accent-bar" style="background:${p.accent}"></div>
+      <h3>${p.emoji} ${p.name}</h3>
+      <p>${p.agents.length} agents · ${rooms.length} production room${rooms.length>1?'s':''}</p>
+      <div class="room-info">
+        <span class="room-tag">🏠 ${rooms.length} rooms</span>
+        <span class="room-tag">👥 ${p.agents.length}/${p.agents.length + Math.max(0, p.agents.length - MAX_AGENTS_PER_ROOM)} capacity</span>
+        <span class="room-tag" style="color:${p.accent}">${p.agents.filter(a=>a.active).length} active</span>
+      </div>
+    `;
+    card.onclick = () => showProject(key);
+    grid.appendChild(card);
+  }
+}
+
+function updateStats(agents) {
+  const rooms = createProductionRooms(agents, '');
+  document.getElementById('totalAgents').textContent = agents.length;
+  document.getElementById('totalRooms').textContent = rooms.length;
+  document.getElementById('activeRooms').textContent = rooms.length;
+  document.getElementById('agentsOnline').textContent = agents.filter(a => a.active).length;
+  document.getElementById('productionRooms').textContent = rooms.length;
+}
+
+function showProject(project) {
+  if (project === 'all') {
+    currentFilter = 'all';
+    const all = getAllAgents();
+    renderMainStage(all);
+    renderProductionRooms(all);
+    renderFeed(all);
+    updateStats(all);
+    renderProjects();
+    document.querySelector('header h1').textContent = '◈ HEMLOCK ENTERPRISE — AGENT TV COMMAND CENTER';
+    return;
+  }
+
+  const p = AGENTS[project];
+  if (!p) return;
+  currentFilter = project;
+  const agents = p.agents.map(a => ({ ...a, project, projectData: p }));
+  renderMainStage(agents);
+  renderProductionRooms(agents);
+  renderFeed(agents);
+  updateStats(agents);
+
+  document.querySelector('header h1').textContent = `◈ ${p.emoji} ${p.name} — LIVE FEED`;
+
+  const modal = document.getElementById('projectModal');
+  document.getElementById('modalTitle').textContent = `${p.emoji} ${p.name} — Agent Room`;
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <div style="display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+      ${p.agents.map(a => `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px;background:rgba(100,116,139,0.1);border-radius:6px;border-left:3px solid ${a.active ? p.accent : 'transparent'}">
+          <span style="font-size:1.3rem">${a.emoji}</span>
+          <div>
+            <div style="font-weight:600;font-size:0.85rem">${a.id} ${a.name}</div>
+            <div style="font-size:0.7rem;color:var(--muted)">${a.role}</div>
+          </div>
+          <span style="margin-left:auto;font-size:0.6rem;padding:2px 6px;border-radius:4px;background:${a.active ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.2)'};color:${a.active ? 'var(--green)' : 'var(--muted)'}">${a.active ? '● LIVE' : '○ OFFLINE'}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div style="margin-top:12px;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px">
+      <div style="font-weight:600;font-size:0.85rem;margin-bottom:8px">🎬 Production Rooms (${Math.ceil(p.agents.length / MAX_AGENTS_PER_ROOM)})</div>
+      ${createProductionRooms(p.agents, p.accent).map((room, idx) => `
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px">
+          <span style="font-size:0.65rem;width:100%;color:var(--muted);margin-bottom:4px">Room ${idx + 1}: ${room.length}/${MAX_AGENTS_PER_ROOM}</span>
+          ${room.map(a => `<span style="font-size:1.2rem" title="${a.id} ${a.name}">${a.emoji}</span>`).join('')}
+        </div>
+      `).join('')}
+    </div>
+  `;
+  modal.classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('projectModal').classList.remove('active');
+}
+
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('modal')) closeModal();
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});
+
+// Init — load real agents, open live WebSocket, poll as fallback
+loadAgents();
+connectWebSocket();
+setInterval(loadAgents, 15000);  // fallback refresh if WS is disconnected
+</script>
+</body>
+</html>

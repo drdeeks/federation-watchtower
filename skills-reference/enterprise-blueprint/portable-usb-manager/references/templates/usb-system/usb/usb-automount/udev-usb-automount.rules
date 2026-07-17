@@ -1,0 +1,15 @@
+# =============================================================================
+# USB Automount Udev Rules
+# =============================================================================
+# Triggers on USB storage device addition
+# Calls usb-mount.sh to handle mounting
+#
+# Install: sudo cp udev-usb-automount.rules /etc/udev/rules.d/99-usb-automount.rules
+# Reload:  sudo udevadm control --reload-rules && sudo udevadm trigger
+# =============================================================================
+
+# Match USB storage devices (partition addition)
+ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd[a-z][0-9]", ATTRS{idVendor}=="*", ENV{ID_FS_USAGE}=="filesystem", RUN+="/usr/local/bin/usb-mount.sh add %k"
+
+# Match USB storage device removal
+ACTION=="remove", SUBSYSTEM=="block", KERNEL=="sd[a-z][0-9]", RUN+="/usr/local/bin/usb-mount.sh remove %k"

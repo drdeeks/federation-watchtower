@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# hemlock-tui - Launch Hemlock TUI
+# Wrapper that auto-detects the Hemlock runtime directory or uses HEMLOCK_DIR.
+
+set -euo pipefail
+
+# Auto-detect Hemlock runtime location if HEMLOCK_DIR is not set.
+# Search order:
+#   1. $HEMLOCK_DIR (if explicitly set by user)
+#   2. ../hemlock/hemlock-runtime  (sibling directory layout — usb-hemlock-split)
+#   3. ../hemlock-complete-deployment/hemlock-runtime  (original repo layout)
+#   4. Fallback: print helpful error
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -z "${HEMLOCK_DIR:-}" ]]; then
+    for candidate in \
+        "$SCRIPT_DIR/../hemlock/hemlock-runtime" \
+        "$SCRIPT_DIR/../hemlock-complete-deployment/hemlock-runtime" \
+        "$SCRIPT_DIR/../hemlock-runtime" \
+    ; do
+        if [[ -d "$candidate/scripts" && -f "$candidate/scripts/hemlock" ]]; then
+            HEMLOCK_DIR="$(cd "$candidate" && pwd)"
+            break
+        fi
+    done
+fi
+
+HEMLOCK_PROJECT_ROOT="${HEMLOCK_DIR:-}"
+HEMLOCK_CLI="${HEMLOCK_PROJECT_ROOT:+$HEMLOCK_PROJECT_ROOT/scripts/hemlock}"
+
+if [[ -z "$HEMLOCK_CLI" || ! -f "$HEMLOCK_CLI" ]]; then
+    echo "Error: Hemlock CLI not found."
+    echo ""
+    echo "Searched:"
+    echo "  \$HEMLOCK_DIR/scripts/hemlock"
+    echo "  $SCRIPT_DIR/../hemlock/hemlock-runtime/scripts/hemlock"
+    echo "  $SCRIPT_DIR/../hemlock-complete-deployment/hemlock-runtime/scripts/hemlock"
+    echo ""
+    echo "Set HEMLOCK_DIR to the hemlock-runtime directory:"
+    echo "  export HEMLOCK_DIR=/path/to/hemlock-runtime"
+    exit 1
+fi
+
+exec "$HEMLOCK_CLI" menu "$@"
