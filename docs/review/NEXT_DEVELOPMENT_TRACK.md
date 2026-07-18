@@ -53,7 +53,7 @@ Implemented or materially present:
   and a deterministic labelled presentation cadence.
 - Signed event/control paths, validation gates, lease checks, loop/duplicate/
   attempt/budget rules, incident records, audit hashing, and evidence export.
-- SDK source and tests ready for the first npm package publication.
+- SDK source and tests are published as `@federation-watchtower/sdk@0.1.0`.
 
 Still required for a complete owner-to-agent product path:
 
@@ -78,9 +78,10 @@ Still required for a complete owner-to-agent product path:
 2. **Finish owner onboarding.** Add owner sessions, manifest submission,
    credential display-once handling, rotation, revocation, and reconnect
    guidance without exposing shared ingestion secrets.
-3. **Release the agent package.** Publish `@federation-watchtower/sdk`, then
-   add a production example that performs register → connect → heartbeat →
-   event → reconnect using environment-held credentials.
+3. **Exercise the published agent package.** Add a production example that
+   performs register → connect → heartbeat → event → reconnect using
+   environment-held credentials, then publish a semver patch only when that
+   path has evidence.
 4. **Make webhooks operational.** Add owner-scoped destinations, signed
    delivery, replay protection, bounded retries, dead-letter visibility, and
    delivery evidence. A producer must be able to go offline while its last

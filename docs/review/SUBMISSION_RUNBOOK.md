@@ -34,25 +34,22 @@ has not been recorded. Commit the Worker, public widget, generated Worker types,
 room-scene contract, and submission documents. Push the branch that contains
 the deployed commit, then use that repository URL in Devpost.
 
-## 2a. Publish the first npm package
+## 2a. Verify the published npm package
 
-The first package is the scoped server-side SDK at `@federation-watchtower/sdk`.
-Run this from the package directory after reviewing the committed diff:
+The first package is now published as `@federation-watchtower/sdk` version
+`0.1.0`. Verify the public artifact from the package directory:
 
 ```bash
 cd packages/watchtower-sdk
 npm test
 npm run pack:check
-npm login
-npm publish --access public
+npm view @federation-watchtower/sdk version
 ```
 
-The package has `prepublishOnly` checks and public scoped access configured. The
-publisher must be logged into the npm account that owns the
-`@federation-watchtower` organization, use npm 2FA if enabled, and verify the
-package contents from `npm pack --dry-run` before publishing. Do not publish
-from a machine containing `.dev.vars`, and never put a Worker secret or
-production credential in the package.
+The package has public scoped access configured. For future versions, publish
+from a clean reviewed commit with npm 2FA enabled. Do not publish from a
+machine containing `.dev.vars`, and never put a Worker secret or production
+credential in the package.
 
 ## 3. Record one real public demo — under three minutes
 
