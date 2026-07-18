@@ -305,6 +305,29 @@ Rollback Ref: remove organization.html route/page and revert documentation;
               lifecycle and MCP storage are unaffected
 ```
 
+## CL-0015 — Devpost Submission Audit and Thumbnail Verification
+
+```
+Date        : 2026-07-18
+Contributor : Codex
+Modules     : [MOD-015]
+Section Tags: [[QUALITY-v1], [SUBMISSION-v1]]
+Files Changed: [AGENTS.md, README.md, OPENAI_BUILD_WEEK_READINESS.md]
+Description : Audited the live OpenAI Build Week requirements and the published
+              Federation Watchtower Devpost project. Uploaded and verified the
+              Federation mark thumbnail, added repository/live-service/npm
+              project links, corrected the member-surface wording, and recorded
+              the remaining user-only requirements: attach the project to the
+              openai challenge, add a public under-three-minute video, provide
+              the /feedback session ID, complete identity fields, and submit.
+Tests Passing: Devpost project metadata and thumbnail CDN HTTP 200 verified;
+               repository verification remains subject to the documented gates
+Phase       : PHASE-7 submission preparation; hackathon submission remains
+              user-owned and intentionally not submitted by the agent
+Rollback Ref: remove the submission-readiness documentation and restore the
+              previous Devpost project links/description if required
+```
+
 ## CL-0013 — npm SDK Publication Handoff
 
 ```

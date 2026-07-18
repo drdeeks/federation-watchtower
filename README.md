@@ -290,6 +290,8 @@ profiles are the remaining UX/management work.
   majority of the core functionality.
 - [ ] Provide judge testing instructions; this README supplies live and local
   paths above.
+- [x] Standalone Devpost project is published with the Federation thumbnail
+  and repository, live-service, Federation, and npm links.
 - [ ] Answer Devpost's required submitter type, residence, category, repository
   URL, and feedback-session fields; add any plugin/developer-tool instructions
   if applicable.

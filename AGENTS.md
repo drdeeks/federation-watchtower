@@ -31,6 +31,8 @@ presentation with no source event.
 4. `docs/review/FEDERATION_SYSTEM_SPEC.md` gives the current expanded product
    context. `docs/review/HOST_SURFACE_CONTRACT.md` records current domain
    boundaries and explicit gaps.
+5. `docs/review/ACCESS_AND_ONBOARDING.md` defines the agent, owner,
+   organization-applicant, and administrator boundaries.
 
 Never change checklist state to make progress look better than it is.
 
@@ -38,7 +40,7 @@ Never change checklist state to make progress look better than it is.
 
 | Host | Audience | Purpose |
 | --- | --- | --- |
-| `https://watch.drdeeks.xyz` | Everyone | Public, read-only Watchtower: room view, public roster, public agent details, feed, onboarding documentation, hosted agent skill. |
+| `https://watch.drdeeks.xyz` | Everyone | Public, read-only Watchtower: room view, public roster, public agent details, feed, agent/organization onboarding documentation, hosted agent skill. |
 | `https://federation.drdeeks.xyz` | Approved members/operators | Reserved Federation/member area and token-protected operator console. Organization-scoped roles are not implemented yet. |
 | `https://fapi.drdeeks.xyz` | Agent hosts/integrations | Health, REST, signed event ingestion, MCP, WebSocket, and control-plane endpoints. |
 
@@ -51,7 +53,7 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
 | --- | --- |
 | `source/federation-serverless/` | Cloudflare Worker, Durable Objects, D1 schema/migrations, watchdog, control loop, MCP gateway. |
 | `source/federation-tv-widget/` | Static public Watchtower and embeddable browser widget. Keep `src/tv-widget.js` and `public/tv-widget.js` identical. |
-| `packages/watchtower-sdk/` | Optional Node/server-side signing SDK scaffold. |
+| `packages/watchtower-sdk/` | Published Node/server-side signing SDK and source/tests for `@federation-watchtower/sdk`. |
 | `source/federation-tv-package/` | Local demo package and legacy adapter/MCP material; useful for provenance and offline demos, not the production source of truth. |
 | `brand/` | Canonical wordmark, mark, theme tokens, and splash assets. Copy intentional changes into `source/federation-tv-widget/public/brand/`. |
 
@@ -66,7 +68,8 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
 - Event redaction, idempotency handling, runaway/duplicate/attempt/budget rules,
   watchdog incidents, cooperative leases, controlled-tool decisions, audit
   hashing, and operator evidence exports.
-- MCP organization credential handling and a server-side SDK scaffold.
+- MCP organization credential handling and a published server-side SDK at
+  `@federation-watchtower/sdk@0.1.0`.
 - Additive canonical owner/agent lifecycle endpoints: owner-issued scoped
   credentials, manifest validation, agent connect/heartbeat/event/disconnect,
   Durable Object watchdog expiry, and package-facing agent client support.
@@ -89,6 +92,27 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
 - Payments, subscriptions, x402 settlement, and tier enforcement.
 
 Do not describe any item in this second list as live or complete.
+
+## Submission truth
+
+Audited against the live Devpost OpenAI Build Week configuration on 2026-07-18:
+
+- Devpost project **Federation Watchtower** (`1346118`) is published as a
+  standalone project.
+- The Federation mark thumbnail is uploaded and publicly retrievable.
+- The project is **not yet submitted to OpenAI Build Week**.
+- No public demo video is attached yet; the submission requires a public
+  YouTube video under three minutes with audio explaining the build and the use
+  of Codex and GPT-5.6.
+- Required submission fields are submitter type, country of residence,
+  category (`Developer Tools`), repository URL, `/feedback` session ID, plus
+  the optional developer-tool testing instructions field.
+- The repository, Watchtower, API, Federation member page, and published npm
+  SDK are linked from the Devpost project.
+
+Do not mark the hackathon submission complete until the user has entered the
+required identity fields, attached the project to the `openai` challenge,
+added the video and `/feedback` ID, and pressed the final submission action.
 
 ## Current legacy registration shape
 

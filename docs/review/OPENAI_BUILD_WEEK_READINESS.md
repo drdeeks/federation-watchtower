@@ -1,6 +1,7 @@
 # OpenAI Build Week — Federation Watchtower Readiness Review
 
-_Reviewed against the live Devpost OpenAI Build Week configuration on 2026-07-17._
+_Reviewed against the live Devpost OpenAI Build Week configuration and project
+metadata on 2026-07-18._
 
 ## Submission positioning
 
@@ -23,7 +24,8 @@ _Reviewed against the live Devpost OpenAI Build Week configuration on 2026-07-17
 | --- | --- |
 | Working project made with Codex and GPT-5.6 | Working Worker, public Watchtower, local demonstration, and integration code exist. The submitter must accurately state how GPT-5.6 was used; no documentation should invent model use. |
 | One category | Select **Developer Tools**. |
-| Project description | Draft exists in `docs/review/OPENAI_SUBMISSION_NOTES.md`; revise it against the actual deployed/lifecycle state before publishing. |
+| Project description | Devpost project description updated to remove the false API-alias wording and reflect the member/operator surface. |
+| Project thumbnail | Federation mark uploaded successfully; public CDN asset returned HTTP 200. |
 | Public YouTube demo under three minutes | Required. The voiceover must explain what was built and how both Codex and GPT-5.6 were used. Use `OPENAI_SUBMISSION_VIDEO_SCRIPT.md` only after a real lifecycle demonstration has been prepared. |
 | Source repository URL | Required. A private repository must be shared with `testing@devpost.com` and `build-week-event@openai.com`; otherwise use the public repository URL and license. |
 | README | Required. Root `README.md` supplies live observation, local demo, Worker setup, security boundaries, and test commands. |
@@ -33,6 +35,23 @@ _Reviewed against the live Devpost OpenAI Build Week configuration on 2026-07-17
 The standalone `Federation Watchtower` Devpost project is currently published
 but not attached to the OpenAI Build Week challenge. Attaching/submitting it is
 a separate user-authorized Devpost action.
+
+## Live Devpost audit
+
+- Project: `Federation Watchtower`, Devpost ID `1346118`, published.
+- Thumbnail: Federation mark uploaded, processing completed, CDN asset
+  publicly retrievable.
+- Project links: repository, Watchtower, API, Federation member page, and
+  `@federation-watchtower/sdk` npm package are now present.
+- Video: missing. `video_url` is currently null.
+- Challenge relationship: none. The project has not been submitted to the
+  `openai` challenge.
+- Challenge state: submissions are open; the official deadline is July 21,
+  2026 at 5:00 PM Pacific Time.
+- Required submission fields: submitter type, country of residence, category,
+  repository URL, and `/feedback` Codex session ID. Developer-tool testing
+  instructions should include the live URL, local demo, supported platforms,
+  and safe credential boundary.
 
 ## Judging alignment
 
@@ -111,5 +130,9 @@ Devpost description.
 - [ ] `/feedback` session ID has been retrieved.
 - [ ] The published Devpost project is attached to OpenAI Build Week and all
   required form fields are complete.
+- [x] Federation thumbnail and project links are established.
+- [ ] Public YouTube demo under three minutes is attached.
+- [ ] `/feedback` session ID is entered.
+- [ ] Final Devpost submission action is completed.
 - [ ] All product claims distinguish current behavior from the planned
   owner/agent lifecycle.
