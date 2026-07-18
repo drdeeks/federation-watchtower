@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { WatchtowerEnv } from "./agent-registry";
+import { evaluateRunawayRules, sha256Hex, stableJson, type OperationalEvent } from "./watchtower";
 
 export interface ProjectSummary {
   projectId: string; name: string; track: string; color: string; emoji: string; prefix: string;
@@ -45,6 +46,23 @@ export interface MCPOrg {
   id: string; name: string; contactEmail: string; apiKeyHash: string;
   scopes: string; rateLimit: number; ipAllowlist: string;
   status: 'active' | 'suspended' | 'revoked'; createdAt: number; lastAccessAt?: number; metadata: string;
+}
+
+interface OperationalEventRow {
+  schema_version: string;
+  event_id: string;
+  idempotency_key: string;
+  project_id: string;
+  agent_id: string;
+  run_id: string | null;
+  parent_run_id: string | null;
+  chain_key: string | null;
+  event_type: string;
+  severity: OperationalEvent["severity"];
+  statement: string;
+  metadata: string;
+  occurred_at: number;
+  received_at: number;
 }
 
 export class FederationCoordinator extends DurableObject<WatchtowerEnv> {
@@ -276,6 +294,10 @@ export class FederationCoordinator extends DurableObject<WatchtowerEnv> {
   }
 
   async getMCPOrg(id: string): Promise<any | null> {
+    return this.db.prepare(`SELECT * FROM mcp_organizations WHERE id = ?`).bind(id).first<any>();
+  }
+
+  async getActiveMCPOrg(id: string): Promise<any | null> {
     return this.db.prepare(`SELECT * FROM mcp_organizations WHERE id = ? AND status = 'active'`).bind(id).first<any>();
   }
 
@@ -283,12 +305,39 @@ export class FederationCoordinator extends DurableObject<WatchtowerEnv> {
     await this.db.prepare(`UPDATE mcp_organizations SET last_access_at = ? WHERE id = ?`).bind(Date.now(), id).run();
   }
 
+  async rotateMCPOrgCredential(id: string, apiKeyHash: string, actor: string): Promise<any | null> {
+    const now = Date.now();
+    await this.db.batch([
+      this.db.prepare("UPDATE mcp_organizations SET api_key_hash = ?, last_access_at = ? WHERE id = ?").bind(apiKeyHash, now, id),
+      this.db.prepare("INSERT INTO mcp_token_history (org_id, action, scopes, issued_by, timestamp) SELECT id, 'rotated', scopes, ?, ? FROM mcp_organizations WHERE id = ?").bind(actor, now, id),
+    ]);
+    return this.getMCPOrg(id);
+  }
+
+  async setMCPOrgStatus(id: string, status: "active" | "suspended" | "revoked", actor: string): Promise<any | null> {
+    const now = Date.now();
+    await this.db.batch([
+      this.db.prepare("UPDATE mcp_organizations SET status = ? WHERE id = ?").bind(status, id),
+      this.db.prepare("INSERT INTO mcp_token_history (org_id, action, scopes, issued_by, timestamp) SELECT id, ?, scopes, ?, ? FROM mcp_organizations WHERE id = ?")
+        .bind(status === "active" ? "issued" : status, actor, now, id),
+    ]);
+    return this.getMCPOrg(id);
+  }
+
+  async isMCPRateLimited(orgId: string, rateLimit: number, now = Date.now()): Promise<boolean> {
+    const row = await this.db.prepare(`
+      SELECT COUNT(*) AS count FROM mcp_access_logs
+      WHERE org_id = ? AND tool_name = 'mcp.request' AND timestamp >= ?
+    `).bind(orgId, now - 60_000).first<{ count: number }>();
+    return (row?.count ?? 0) >= rateLimit;
+  }
+
   // Log MCP access
   async logMCPAccess(data: { orgId: string; toolName: string; params?: any; projectId?: string; agentId?: string; status?: string; errorMessage?: string; ipAddress?: string; userAgent?: string; requestId: string }): Promise<void> {
     await this.db.prepare(`
       INSERT INTO mcp_access_logs (org_id, tool_name, params, project_id, agent_id, status, error_message, ip_address, user_agent, request_id, timestamp)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(data.orgId, data.toolName, JSON.stringify(data.params || {}), data.projectId || null, data.agentId || null, data.status || 'success', data.errorMessage || null, data.ipAddress || null, data.userAgent || null, data.requestId, Date.now()).run();
+    `).bind(data.orgId, data.toolName, JSON.stringify(redactMcpAuditValue(data.params || {})), data.projectId || null, data.agentId || null, data.status || 'success', data.errorMessage || null, data.ipAddress || null, data.userAgent || null, data.requestId, Date.now()).run();
   }
 
   // Get MCP access logs
@@ -300,4 +349,101 @@ export class FederationCoordinator extends DurableObject<WatchtowerEnv> {
     const rows = await this.db.prepare(query).bind(...params).all();
     return rows.results as any[];
   }
+
+  async simulatePolicy(projectId: string, eventId: string): Promise<unknown> {
+    const row = await this.db.prepare(`
+      SELECT schema_version, event_id, idempotency_key, project_id, agent_id, run_id, parent_run_id,
+        chain_key, event_type, severity, statement, metadata, occurred_at, received_at
+      FROM operational_events WHERE project_id = ? AND event_id = ?
+    `).bind(projectId, eventId).first<OperationalEventRow>();
+    if (!row) throw new Error("historical event not found");
+    const event: OperationalEvent = {
+      schemaVersion: row.schema_version, eventId: row.event_id, idempotencyKey: row.idempotency_key,
+      projectId: row.project_id, agentId: row.agent_id, runId: row.run_id ?? undefined,
+      parentRunId: row.parent_run_id ?? undefined, chainKey: row.chain_key ?? undefined,
+      eventType: row.event_type, severity: row.severity, statement: row.statement,
+      occurredAt: new Date(row.occurred_at).toISOString(), metadata: parseJsonRecord(row.metadata),
+    };
+    const [failedRow, chainRow] = await Promise.all([
+      event.eventType === "validation.failed"
+        ? this.db.prepare("SELECT COUNT(*) AS count FROM operational_events WHERE project_id = ? AND agent_id = ? AND event_type = 'validation.failed' AND received_at >= ? AND received_at <= ?")
+          .bind(projectId, event.agentId, row.received_at - 15 * 60 * 1_000, row.received_at).first<{ count: number }>()
+        : Promise.resolve({ count: 0 }),
+      event.eventType === "run.started" && event.chainKey
+        ? this.db.prepare("SELECT COUNT(*) AS count FROM operational_events WHERE project_id = ? AND event_type = 'run.started' AND chain_key = ? AND received_at >= ? AND received_at <= ?")
+          .bind(projectId, event.chainKey, row.received_at - 15 * 60 * 1_000, row.received_at).first<{ count: number }>()
+        : Promise.resolve({ count: 0 }),
+    ]);
+    const decisions = evaluateRunawayRules(event, {
+      failedAttempts: failedRow?.count ?? 0,
+      matchingChainStarts: chainRow?.count ?? 0,
+    });
+    return { simulated: true, projectId, eventId, receivedAt: row.received_at, decisions };
+  }
+
+  async exportProjectEvidence(projectId: string, requestedBy: string, retentionDays = 30): Promise<unknown> {
+    if (!await this.getProjectSummary(projectId)) throw new Error("project not found");
+    const now = Date.now();
+    const expiresAt = now + Math.min(Math.max(retentionDays, 1), 365) * 24 * 60 * 60 * 1_000;
+    const exportId = `evidence_${crypto.randomUUID()}`;
+    const [events, audits, incidents, transitions] = await Promise.all([
+      this.db.prepare("SELECT event_id AS eventId, idempotency_key AS idempotencyKey, producer_id AS producerId, agent_id AS agentId, run_id AS runId, parent_run_id AS parentRunId, chain_key AS chainKey, event_type AS eventType, severity, statement, metadata, occurred_at AS occurredAt, received_at AS receivedAt, payload_digest AS payloadDigest, decision FROM operational_events WHERE project_id = ? ORDER BY received_at ASC LIMIT 5000").bind(projectId).all(),
+      this.db.prepare("SELECT sequence, id, operational_event_id AS operationalEventId, previous_hash AS previousHash, hash, decision, evidence_r2_key AS evidenceR2Key, created_at AS createdAt FROM audit_events WHERE project_id = ? ORDER BY sequence ASC LIMIT 5000").bind(projectId).all(),
+      this.db.prepare("SELECT id, dedupe_key AS dedupeKey, agent_id AS agentId, run_id AS runId, rule_id AS ruleId, severity, status, title, opened_at AS openedAt, acknowledged_at AS acknowledgedAt, resolved_at AS resolvedAt, updated_at AS updatedAt FROM incidents WHERE project_id = ? ORDER BY opened_at ASC LIMIT 1000").bind(projectId).all(),
+      this.db.prepare("SELECT t.incident_id AS incidentId, t.from_status AS fromStatus, t.to_status AS toStatus, t.actor, t.reason, t.created_at AS createdAt FROM incident_transitions t JOIN incidents i ON i.id = t.incident_id WHERE i.project_id = ? ORDER BY t.created_at ASC LIMIT 5000").bind(projectId).all(),
+    ]);
+    const evidence = {
+      schemaVersion: "2026-07-17", exportId, projectId, requestedBy, createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(expiresAt).toISOString(), events: events.results, auditEvents: audits.results,
+      incidents: incidents.results, incidentTransitions: transitions.results,
+    };
+    const payload = stableJson(evidence);
+    if (new TextEncoder().encode(payload).byteLength > 5 * 1024 * 1024) throw new Error("evidence export exceeds the 5 MiB release limit");
+    const digest = await sha256Hex(payload);
+    const r2Key = `watchtower/evidence/${projectId}/${now}-${exportId}.json`;
+    await this.env.VAULT.put(r2Key, payload, { httpMetadata: { contentType: "application/json" }, customMetadata: { exportId, projectId, sha256: digest } });
+    await this.db.prepare(`
+      INSERT INTO evidence_exports (id, project_id, requested_by, r2_key, sha256, status, event_count, audit_count, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, 'ready', ?, ?, ?, ?)
+    `).bind(exportId, projectId, requestedBy, r2Key, digest, events.results.length, audits.results.length, now, expiresAt).run();
+    return { exportId, projectId, sha256: digest, eventCount: events.results.length, auditCount: audits.results.length, expiresAt };
+  }
+
+  async getEvidenceExport(projectId: string, exportId: string): Promise<any | null> {
+    return this.db.prepare(`
+      SELECT id, project_id AS projectId, r2_key AS r2Key, sha256, status, event_count AS eventCount,
+        audit_count AS auditCount, created_at AS createdAt, expires_at AS expiresAt, purged_at AS purgedAt
+      FROM evidence_exports WHERE id = ? AND project_id = ?
+    `).bind(exportId, projectId).first<any>();
+  }
+
+  async purgeExpiredEvidence(now = Date.now()): Promise<number> {
+    const rows = await this.db.prepare("SELECT id, r2_key FROM evidence_exports WHERE status = 'ready' AND expires_at <= ? LIMIT 100").bind(now).all<{ id: string; r2_key: string }>();
+    for (const row of rows.results) {
+      await this.env.VAULT.delete(row.r2_key);
+      await this.db.prepare("UPDATE evidence_exports SET status = 'purged', purged_at = ? WHERE id = ?").bind(now, row.id).run();
+    }
+    return rows.results.length;
+  }
+}
+
+function parseJsonRecord(value: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+function redactMcpAuditValue(value: unknown, depth = 0): unknown {
+  if (depth > 4) return "[TRUNCATED]";
+  if (typeof value === "string") return value.length > 512 ? `${value.slice(0, 512)}…` : value;
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.slice(0, 32).map(entry => redactMcpAuditValue(entry, depth + 1));
+  const record = value as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(record).map(([key, entry]) => [
+    key,
+    /authorization|api[_-]?key|token|secret|password|cookie|credential/i.test(key) ? "[REDACTED]" : redactMcpAuditValue(entry, depth + 1),
+  ]));
 }

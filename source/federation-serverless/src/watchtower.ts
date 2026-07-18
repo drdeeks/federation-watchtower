@@ -1,6 +1,6 @@
 export const EVENT_TYPES = new Set([
   "run.started", "run.completed", "run.failed", "heartbeat",
-  "validation.passed", "validation.failed", "policy.blocked", "tool.denied", "lease.denied",
+  "validation.passed", "validation.failed", "policy.blocked", "tool.authorized", "tool.denied", "lease.denied",
   "loop.depth_exceeded", "loop.duplicate_detected", "attempt.threshold_exceeded",
   "fanout.threshold_exceeded", "heartbeat.missed", "duration.threshold_exceeded",
   "budget.warning", "budget.exceeded", "rate.threshold_exceeded",
@@ -30,6 +30,9 @@ export interface OperationalEvent {
 export interface RunawayContext {
   failedAttempts: number;
   matchingChainStarts: number;
+  projectBudgetUsd?: number;
+  budgetLimitUsd?: number;
+  budgetWarningUsd?: number;
 }
 
 export interface GuardrailDecision {
@@ -56,6 +59,28 @@ export interface CommandAcknowledgement {
 
 export interface LeaseValidationRequest {
   agentId: string;
+}
+
+export interface ControlledToolAuthorizationRequest {
+  projectId: string;
+  agentId: string;
+  leaseId: string;
+  toolName: string;
+  action: string;
+  requestId: string;
+  inputDigest: string;
+}
+
+export interface ValidationGateRequest {
+  projectId: string;
+  agentId: string;
+  runId: string;
+  leaseId?: string;
+  gateId: string;
+  requestId: string;
+  passed: boolean;
+  statement: string;
+  metadata: Record<string, unknown>;
 }
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -115,6 +140,37 @@ export function validateLeaseValidationRequest(value: unknown): LeaseValidationR
   return { agentId: requiredIdentifier(value.agentId, "agentId") };
 }
 
+export function validateControlledToolAuthorizationRequest(value: unknown): ControlledToolAuthorizationRequest {
+  if (!isRecord(value)) throw new Error("controlled tool authorization body must be a JSON object");
+  const inputDigest = requiredString(value.inputDigest, "inputDigest", 64).toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(inputDigest)) throw new Error("inputDigest must be a SHA-256 hexadecimal digest");
+  return {
+    projectId: requiredProjectId(value.projectId),
+    agentId: requiredIdentifier(value.agentId, "agentId"),
+    leaseId: requiredIdentifier(value.leaseId, "leaseId"),
+    toolName: requiredIdentifier(value.toolName, "toolName"),
+    action: requiredIdentifier(value.action, "action"),
+    requestId: requiredIdentifier(value.requestId, "requestId"),
+    inputDigest,
+  };
+}
+
+export function validateValidationGateRequest(value: unknown): ValidationGateRequest {
+  if (!isRecord(value)) throw new Error("validation gate body must be a JSON object");
+  if (typeof value.passed !== "boolean") throw new Error("passed must be a boolean");
+  return {
+    projectId: requiredProjectId(value.projectId),
+    agentId: requiredIdentifier(value.agentId, "agentId"),
+    runId: requiredIdentifier(value.runId, "runId"),
+    leaseId: optionalIdentifier(value.leaseId, "leaseId"),
+    gateId: requiredIdentifier(value.gateId, "gateId"),
+    requestId: requiredIdentifier(value.requestId, "requestId"),
+    passed: value.passed,
+    statement: requiredString(value.statement, "statement", 120),
+    metadata: redactMetadata(value.metadata),
+  };
+}
+
 export function validateProjectId(value: unknown): string {
   return requiredProjectId(value);
 }
@@ -126,7 +182,10 @@ export function validateAgentId(value: unknown): string {
 export function evaluateRunawayRules(event: OperationalEvent, context: RunawayContext): GuardrailDecision[] {
   const decisions: GuardrailDecision[] = [];
   const chainDepth = numberMetadata(event.metadata, "chainDepth");
-  const budgetUsd = numberMetadata(event.metadata, "budgetUsd");
+  const reportedBudgetUsd = numberMetadata(event.metadata, "budgetUsd");
+  const budgetUsd = Math.max(reportedBudgetUsd ?? 0, context.projectBudgetUsd ?? 0);
+  const budgetLimitUsd = context.budgetLimitUsd ?? 10;
+  const budgetWarningUsd = Math.min(context.budgetWarningUsd ?? budgetLimitUsd * 0.8, budgetLimitUsd);
 
   if (chainDepth !== undefined && chainDepth > 5) {
     decisions.push({ ruleId: "max-chain-depth-v1", action: "pause", severity: "critical", reason: `chain depth ${chainDepth} exceeds 5` });
@@ -134,8 +193,10 @@ export function evaluateRunawayRules(event: OperationalEvent, context: RunawayCo
   if (event.eventType === "validation.failed" && context.failedAttempts >= 3) {
     decisions.push({ ruleId: "failed-attempts-v1", action: "require_approval", severity: "error", reason: `${context.failedAttempts} validation failures in the retry window` });
   }
-  if (budgetUsd !== undefined && budgetUsd >= 10) {
-    decisions.push({ ruleId: "budget-limit-v1", action: "quarantine", severity: "critical", reason: `reported budget $${budgetUsd.toFixed(2)} meets or exceeds $10.00` });
+  if (budgetUsd >= budgetLimitUsd) {
+    decisions.push({ ruleId: "budget-limit-v1", action: "quarantine", severity: "critical", reason: `observed budget $${budgetUsd.toFixed(2)} meets or exceeds $${budgetLimitUsd.toFixed(2)}` });
+  } else if (budgetUsd >= budgetWarningUsd) {
+    decisions.push({ ruleId: "budget-warning-v1", action: "alert", severity: "warning", reason: `observed budget $${budgetUsd.toFixed(2)} is approaching the $${budgetLimitUsd.toFixed(2)} limit` });
   }
   if (event.eventType === "run.started" && event.chainKey && context.matchingChainStarts >= 2) {
     decisions.push({ ruleId: "duplicate-chain-v1", action: "pause", severity: "error", reason: `duplicate chain key ${event.chainKey} has ${context.matchingChainStarts} concurrent starts` });

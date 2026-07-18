@@ -4,6 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/Worker-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Local_runtime-Node.js_20%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![MCP](https://img.shields.io/badge/Integration-MCP-6e56cf)](https://modelcontextprotocol.io/)
+[![Socket](https://img.shields.io/badge/Supply--chain-Socket-6f46f5)](https://socket.dev/)
 [![License](https://img.shields.io/badge/license-MIT-2f855a)](LICENSE)
 
 Federation Watchtower is the observable front door for a broader autonomous-systems control plane: an agent-operations command center presented as an embeddable sitcom. It brings together agent registration, MCP/API/widget access, guardrail monitoring, validation gates, runaway-chain detection, failure reporting, and human-readable operational telemetry. Machine events become visible, memorable status bubbles without losing their structured audit trail.
@@ -40,6 +41,7 @@ The sitcom is the interface layer. The real product is a shared observability an
 | Endpoint | Use |
 | --- | --- |
 | `https://watch.drdeeks.xyz/` | Public Watchtower TV wall and widget demo. |
+| `https://watch.drdeeks.xyz/operator.html` | Operator console; it prompts for an admin token and keeps it only in the open tab. |
 | `https://fapi.drdeeks.xyz/health` | Primary API health check. |
 | `https://fapi.drdeeks.xyz/api/projects` | List registered projects. |
 | `https://federation.drdeeks.xyz/health` | API alias health check. |
@@ -70,6 +72,20 @@ node source/federation-tv-package/federation-core/demo-verify.js
 ```
 
 The adapter is intentionally in-memory and dependency-free. It is for local demonstrations and contract checks, not the persistent public service.
+
+### Local operator console
+
+Run the production-shaped Worker locally when you want the real session,
+budget, incident, and controlled-tool surfaces rather than the in-memory demo:
+
+```bash
+cd source/federation-serverless
+npx wrangler dev --local --port 8787
+```
+
+Open `http://localhost:8787/operator.html?api=http://localhost:8787`, paste an
+admin token from the ignored local `.dev.vars` file, and choose a project. The
+page keeps that token in memory only; it never writes browser storage.
 
 ## Cloudflare deployment
 
@@ -105,7 +121,9 @@ npm run deploy      # deploy Worker, assets, and custom domains
 npm run schema      # apply src/schema.sql to the remote D1 database
 npm run migrate:watchtower # apply the additive Watchtower enforcement tables
 npm run migrate:control-loop # apply cooperative leases, receipts, and alert delivery tables
+npm run migrate:access-gateway # apply sessions, budgets, controlled tools, and evidence exports
 npm test             # validate the event contract and core runaway rules
+npm run security:socket # create a Socket dependency-policy report after socket login
 ```
 
 The checked-in `wrangler.toml` is the source of truth for the current bindings and hostnames. Do not replace its live D1 ID with a placeholder when editing the file.
@@ -161,6 +179,23 @@ curl -X POST 'https://fapi.drdeeks.xyz/api/projects/autopilot/agents' \
   -d '{"agentId":"demo-agent-01","name":"Demo Agent","role":"coding","capabilities":["tests"]}'
 ```
 
+### Control loop at a glance
+
+| Need | Watchtower control |
+| --- | --- |
+| Agent / run visibility | Durable `agent_sessions` registry updated by leases, lifecycle events, and heartbeats. |
+| Credit / budget guard | Signed event metadata may include `creditCostUsd`; Watchtower appends it to a project ledger and warns or quarantines at the configured threshold. |
+| Runaway / duplicate / attempts | Deterministic chain-depth, duplicate-chain, and fifteen-minute validation-failure rules. |
+| Watchdog stop recommendation | A missed heartbeat marks the agent offline, opens an incident, and issues an alert command. |
+| Validation gate | The signed `validation-gates` route returns `allowed=false` for a failure or inactive lease; the Loop Enforcer adapter exits 3. |
+| Controlled external action | `tools/authorize` checks the active, scoped lease before the client touches its external target and records an immutable allow/deny event. |
+| Audit / evidence | Per-project hash-chained decisions, incident transitions, MCP access logs, and bounded R2 exports. |
+
+The pre-action gateway deliberately does not proxy an arbitrary URL. A client
+calls it immediately before its configured tool and must stop on a non-201
+result. This makes enforcement truthful without turning Watchtower into an
+SSRF-capable generic proxy.
+
 ## Branding
 
 The canonical brand kit is in [`brand/`](brand/). It includes:
@@ -180,6 +215,7 @@ The widget’s `public/brand/` directory is the deployment copy of those assets;
 - [`docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md`](docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md) — audited gap map and phased enforcement architecture.
 - [`docs/review/BUILD_PLAN.md`](docs/review/BUILD_PLAN.md) — staged implementation plan.
 - [`docs/review/SOURCE_INVENTORY.md`](docs/review/SOURCE_INVENTORY.md) — provenance and source map.
+- [`docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md`](docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md) — two-and-a-half-minute recording plan using the actual control loop.
 - [`source/federation-serverless/agents-skill.md`](source/federation-serverless/agents-skill.md) — agent registration and integration contract.
 - [`source/federation-tv-package/mcp-skill/tv-sitcom-mcp/SKILL.md`](source/federation-tv-package/mcp-skill/tv-sitcom-mcp/SKILL.md) — MCP tool and resource surface.
 
@@ -191,6 +227,7 @@ The widget’s `public/brand/` directory is the deployment copy of those assets;
 - Prefer the Cloudflare Worker path for production behavior; use the local adapter for fast demos and tests.
 - Production secrets must be set before deployment: `WATCHTOWER_INGESTION_SECRET` signs telemetry and `WATCHTOWER_ADMIN_TOKEN` protects administrative routes. Do not treat CORS as access control.
 - Incident webhooks are off until `WATCHTOWER_ALERT_WEBHOOK_URL` is configured. Until then, Watchtower records the alert as safely suppressed; it does not send to an unchosen destination.
+- Socket scanning is opt-in: run `socket login` (or configure `SOCKET_SECURITY_API_TOKEN` and an organization slug) outside the repository, then run `npm run security:socket`. Socket scans dependency manifests and lockfiles, not application source code.
 
 ## License
 

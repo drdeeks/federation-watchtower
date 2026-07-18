@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Federation Watchtower — Operator Console</title>
+  <link rel="stylesheet" href="/brand/tokens.css">
+  <style>
+    :root { color-scheme: dark; font-family: var(--fed-mono, ui-monospace, SFMono-Regular, Menlo, monospace); background:#111718; color:#eef5ee; }
+    * { box-sizing:border-box; } body { margin:0; min-width:320px; background:linear-gradient(140deg,#101819,#152325 48%,#131718); }
+    header { display:flex; gap:16px; align-items:center; padding:18px clamp(16px,4vw,48px); border-bottom:2px solid #90cbbc; background:#172324; }
+    header img { width:48px; height:48px; } h1 { margin:0; font:800 clamp(1.25rem,4vw,2rem)/1 var(--fed-display,system-ui); letter-spacing:.04em; text-transform:uppercase; } .sub { color:#a4c8c3; font-size:.76rem; margin-top:5px; }
+    main { width:min(1400px,100%); margin:auto; padding:18px clamp(14px,3vw,40px) 52px; }
+    .connect, .toolbar, .card { border:1px solid #547f78; background:#192727; box-shadow:5px 5px 0 #050909; }
+    .connect { display:grid; grid-template-columns:minmax(160px,1fr) minmax(160px,1fr) auto; gap:10px; padding:12px; margin-bottom:20px; }
+    label { display:grid; gap:5px; color:#b9d4cf; font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; }
+    input, select, button { min-height:38px; border:1px solid #84b8ad; border-radius:0; font:inherit; }
+    input, select { width:100%; color:#eff8f4; background:#0e1717; padding:7px 9px; } input[type=password] { letter-spacing:.08em; }
+    button { cursor:pointer; color:#11201d; background:#f4c842; padding:7px 12px; font-weight:800; } button:hover { background:#ffe179; } button.secondary { background:#9bd4c7; } button.danger { background:#e57967; } button:disabled { opacity:.55; cursor:wait; }
+    .toolbar { display:flex; gap:10px; align-items:end; padding:12px; margin-bottom:20px; } .toolbar label { flex:1; max-width:420px; } #status { color:#b8d8d4; font-size:.76rem; margin-left:auto; }
+    .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:20px; }
+    .metric { min-height:112px; padding:16px; border:1px solid #3f7168; background:#1a2928; } .metric span { display:block; color:#9fc5bd; font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; } .metric strong { display:block; margin-top:10px; font:800 clamp(1.35rem,4vw,2.3rem)/1 var(--fed-display,system-ui); color:#f4c842; }
+    .grid { display:grid; grid-template-columns:1.1fr .9fr; gap:20px; align-items:start; } .card { overflow:hidden; } .card h2 { margin:0; padding:12px 14px; border-bottom:1px solid #527f76; font-size:.83rem; text-transform:uppercase; letter-spacing:.08em; background:#213433; } .body { padding:12px; }
+    .row { padding:11px 0; border-bottom:1px solid #35554f; } .row:last-child { border:0; } .row h3 { font-size:.82rem; margin:0 0 5px; } .row p { margin:0; color:#b7cac5; font-size:.75rem; line-height:1.45; overflow-wrap:anywhere; } .meta { display:flex; flex-wrap:wrap; gap:7px; margin-top:8px; color:#9cb9b3; font-size:.67rem; } .badge { border:1px solid currentColor; padding:2px 5px; text-transform:uppercase; } .critical,.failed,.denied,.blocked { color:#ff9582; } .open,.warning { color:#f5ce62; } .active,.authorized,.contained,.completed { color:#91dcaf; }
+    .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; } .actions button { min-height:28px; font-size:.68rem; padding:4px 7px; } .empty { color:#9ab6b0; padding:16px 3px; font-size:.78rem; }
+    .budget { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:end; } .session-list { max-height:510px; overflow:auto; } .stack { display:grid; gap:20px; }
+    dialog { max-width:min(530px,calc(100% - 30px)); border:2px solid #f4c842; color:#ecf5ef; background:#172626; box-shadow:8px 8px 0 #000; } dialog::backdrop { background:#000b; } dialog form { display:grid; gap:12px; } dialog h2 { margin:0; color:#f4c842; } dialog menu { display:flex; justify-content:end; gap:8px; margin:0; padding:0; }
+    @media (max-width:850px) { .connect { grid-template-columns:1fr; } .metrics { grid-template-columns:repeat(2,1fr); } .grid { grid-template-columns:1fr; } .toolbar { flex-wrap:wrap; } #status { width:100%; margin:0; } }
+    @media (max-width:480px) { .metrics { grid-template-columns:1fr 1fr; gap:8px; } .metric { padding:12px; } .budget { grid-template-columns:1fr 1fr; } .budget button { grid-column:1/-1; } }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="/brand/federation-f-mark.svg" alt="Federation Watchtower">
+    <div><h1>Watchtower Operator Console</h1><div class="sub">Private control surface · credentials stay in this tab only</div></div>
+  </header>
+  <main>
+    <section class="connect" aria-label="Connection settings">
+      <label>API endpoint <input id="api" autocomplete="url" spellcheck="false"></label>
+      <label>Admin bearer token <input id="token" type="password" autocomplete="off" placeholder="Never stored"></label>
+      <button id="connect">Connect</button>
+    </section>
+    <section class="toolbar">
+      <label>Project <select id="project" disabled><option>Connect first</option></select></label>
+      <button id="refresh" class="secondary" disabled>Refresh</button>
+      <button id="export" class="secondary" disabled>Export evidence</button>
+      <span id="status" role="status">Disconnected</span>
+    </section>
+    <section class="metrics" aria-live="polite">
+      <div class="metric"><span>Observed spend</span><strong id="spend">—</strong></div>
+      <div class="metric"><span>Remaining credit</span><strong id="remaining">—</strong></div>
+      <div class="metric"><span>Live / blocked sessions</span><strong id="sessions">—</strong></div>
+      <div class="metric"><span>Open incidents</span><strong id="incidents">—</strong></div>
+    </section>
+    <section class="grid">
+      <div class="stack">
+        <article class="card"><h2>Incident queue</h2><div id="incidentList" class="body"><div class="empty">Connect to load incidents.</div></div></article>
+        <article class="card"><h2>Controlled tool decisions</h2><div id="toolList" class="body"><div class="empty">No data yet.</div></div></article>
+      </div>
+      <div class="stack">
+        <article class="card"><h2>Credit / budget guard</h2><div class="body"><form id="budgetForm" class="budget"><label>Limit USD <input id="limit" type="number" min="0.01" step="0.01" required></label><label>Warning USD <input id="warning" type="number" min="0" step="0.01" required></label><button>Save guard</button></form><p id="budgetNote" class="empty"></p></div></article>
+        <article class="card"><h2>Agent / run session registry</h2><div id="sessionList" class="body session-list"><div class="empty">No data yet.</div></div></article>
+      </div>
+    </section>
+  </main>
+  <dialog id="reasonDialog"><form method="dialog"><h2 id="dialogTitle">Incident action</h2><p class="sub">Record why this transition is appropriate. It becomes durable incident evidence.</p><label>Reason <input id="reason" maxlength="240" required></label><menu><button value="cancel" class="secondary">Cancel</button><button id="confirmAction" value="confirm">Confirm</button></menu></form></dialog>
+  <script>
+    const $ = id => document.getElementById(id);
+    const state = { projects: [], current: null, action: null };
+    const api = $('api'), token = $('token'), project = $('project'), status = $('status');
+    api.value = new URLSearchParams(location.search).get('api') || (location.hostname === 'localhost' ? 'http://localhost:8787' : 'https://fapi.drdeeks.xyz');
+    const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[char]);
+    const cls = value => esc(value).toLowerCase().replace(/[^a-z0-9_-]/g,'-');
+    const money = value => `$${Number(value || 0).toFixed(2)}`;
+    const date = value => value ? new Date(value).toLocaleString() : '—';
+    async function request(path, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (token.value.trim()) headers.Authorization = `Bearer ${token.value.trim()}`;
+      if (options.body) headers['Content-Type'] = 'application/json';
+      const response = await fetch(`${api.value.replace(/\/$/,'')}${path}`, { ...options, headers });
+      const contentType = response.headers.get('content-type') || '';
+      const body = contentType.includes('application/json') ? await response.json() : await response.text();
+      if (!response.ok) throw new Error(typeof body === 'object' ? (body.error || `HTTP ${response.status}`) : body || `HTTP ${response.status}`);
+      return body;
+    }
+    function setStatus(message, isError = false) { status.textContent = message; status.style.color = isError ? '#ff9582' : '#b8d8d4'; }
+    function requireConnection() { if (!state.current || !token.value.trim()) throw new Error('Connect with an admin token first.'); }
+    async function connect() {
+      $('connect').disabled = true; setStatus('Connecting…');
+      try {
+        const data = await request('/api/projects');
+        state.projects = data; project.innerHTML = data.map(p => `<option value="${esc(p.projectId)}">${esc(p.emoji)} ${esc(p.name)} · ${esc(p.projectId)}</option>`).join('');
+        project.disabled = false; $('refresh').disabled = false; $('export').disabled = false; state.current = project.value;
+        await refresh(); setStatus(`Connected · ${data.length} registered projects`);
+      } catch (error) { setStatus(error.message, true); }
+      finally { $('connect').disabled = false; }
+    }
+    function renderBudget(budget) { $('spend').textContent = money(budget.spentUsd); $('remaining').textContent = money(budget.remainingUsd); $('limit').value = Number(budget.limitUsd).toFixed(2); $('warning').value = Number(budget.warningUsd).toFixed(2); $('budgetNote').textContent = `Warning at ${money(budget.warningUsd)} · hard limit ${money(budget.limitUsd)}. Cost enters the ledger only from signed creditCostUsd event metadata.`; }
+    function renderIncidents(incidents) {
+      const open = incidents.filter(item => ['open','acknowledged'].includes(item.status)).length; $('incidents').textContent = open;
+      $('incidentList').innerHTML = incidents.length ? incidents.map(item => `<div class="row"><h3 class="${cls(item.severity)}">${esc(item.title)}</h3><p>${esc(item.id)} · agent ${esc(item.agentId || 'project')}</p><div class="meta"><span class="badge ${cls(item.status)}">${esc(item.status)}</span><span>${date(item.updatedAt)}</span><span>${esc(item.ruleId)}</span></div><div class="actions">${item.status === 'open' ? `<button data-action="acknowledge" data-id="${esc(item.id)}">Acknowledge</button>` : ''}${item.status === 'contained' ? `<button data-action="resolve" data-id="${esc(item.id)}">Resolve</button>` : ''}${['open','acknowledged','contained'].includes(item.status) ? `<button class="danger" data-action="dismiss" data-id="${esc(item.id)}">Dismiss</button>` : ''}</div></div>`).join('') : '<div class="empty">No incidents for this project.</div>';
+    }
+    function renderSessions(sessions) { const live = sessions.filter(item => item.status === 'active').length, blocked = sessions.filter(item => item.status === 'blocked').length; $('sessions').textContent = `${live} / ${blocked}`; $('sessionList').innerHTML = sessions.length ? sessions.map(item => `<div class="row"><h3>${esc(item.agentId)} <span class="badge ${cls(item.status)}">${esc(item.status)}</span></h3><p>run ${esc(item.runId)} · lease ${esc(item.leaseId || 'none')}</p><div class="meta"><span>${esc(item.controlState || 'no control hold')}</span><span>${date(item.updatedAt)}</span></div></div>`).join('') : '<div class="empty">No sessions recorded.</div>'; }
+    function renderTools(invocations) { $('toolList').innerHTML = invocations.length ? invocations.map(item => `<div class="row"><h3>${esc(item.toolName)}:${esc(item.action)} <span class="badge ${cls(item.status)}">${esc(item.status)}</span></h3><p>agent ${esc(item.agentId)} · request ${esc(item.requestId)}</p><div class="meta"><span>${esc(item.reason || 'active scoped lease')}</span><span>${date(item.createdAt)}</span></div></div>`).join('') : '<div class="empty">No controlled tool decisions yet.</div>'; }
+    async function refresh() {
+      try {
+        requireConnection(); state.current = project.value; setStatus(`Refreshing ${state.current}…`);
+        const base = `/api/v1/projects/${encodeURIComponent(state.current)}`;
+        const [budget, sessions, incidents, tools] = await Promise.all([request(`${base}/budget`), request(`${base}/sessions?limit=100`), request(`${base}/incidents?limit=100`), request(`${base}/tools/invocations?limit=100`)]);
+        renderBudget(budget.budget); renderSessions(sessions.sessions); renderIncidents(incidents.incidents); renderTools(tools.invocations); setStatus(`Live · refreshed ${new Date().toLocaleTimeString()}`);
+      } catch (error) { setStatus(error.message, true); }
+    }
+    $('connect').addEventListener('click', connect); $('refresh').addEventListener('click', refresh); project.addEventListener('change', refresh);
+    $('budgetForm').addEventListener('submit', async event => { event.preventDefault(); try { requireConnection(); const base = `/api/v1/projects/${encodeURIComponent(state.current)}`; await request(`${base}/budget`, { method:'PUT', body: JSON.stringify({ limitUsd:Number($('limit').value), warningUsd:Number($('warning').value) }) }); await refresh(); } catch (error) { setStatus(error.message, true); } });
+    $('export').addEventListener('click', async () => { try { requireConnection(); const base = `/api/v1/projects/${encodeURIComponent(state.current)}`; const result = await request(`${base}/evidence/exports`, { method:'POST', body: JSON.stringify({ retentionDays:30 }) }); setStatus(`Evidence export ${result.exportId} retained through ${date(result.expiresAt)}.`); } catch (error) { setStatus(error.message, true); } });
+    $('incidentList').addEventListener('click', event => { const button = event.target.closest('button[data-action]'); if (!button) return; state.action = { action: button.dataset.action, id: button.dataset.id }; $('dialogTitle').textContent = `${state.action.action} ${state.action.id}`; $('reason').value=''; $('reasonDialog').showModal(); });
+    $('reasonDialog').addEventListener('close', async () => { if ($('reasonDialog').returnValue !== 'confirm' || !state.action) return; try { requireConnection(); const base = `/api/v1/projects/${encodeURIComponent(state.current)}`; await request(`${base}/incidents/${encodeURIComponent(state.action.id)}/${state.action.action}`, { method:'POST', body: JSON.stringify({ reason:$('reason').value }) }); await refresh(); } catch (error) { setStatus(error.message, true); } finally { state.action = null; } });
+  </script>
+</body>
+</html>

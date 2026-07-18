@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   constantTimeEqual, evaluateRunawayRules, validateCommandAcknowledgement,
-  validateLeaseRequest, validateLeaseValidationRequest, validateOperationalEvent,
+  validateLeaseRequest, validateLeaseValidationRequest, validateOperationalEvent, validateValidationGateRequest,
 } from "./watchtower.ts";
 
 const now = Date.parse("2026-07-17T16:00:00.000Z");
@@ -54,6 +54,16 @@ test("creates an alert decision when a watchdog reports a missed heartbeat", () 
   }]);
 });
 
+test("uses accumulated ledger spend for a warning and a hard credit guard", () => {
+  const parsed = validateOperationalEvent(event({ eventType: "run.started", severity: "info", metadata: { creditCostUsd: 1 } }), now);
+  assert.deepEqual(evaluateRunawayRules(parsed, {
+    failedAttempts: 0, matchingChainStarts: 0, projectBudgetUsd: 8.5, budgetWarningUsd: 8, budgetLimitUsd: 10,
+  }).map(decision => decision.ruleId), ["budget-warning-v1"]);
+  assert.deepEqual(evaluateRunawayRules(parsed, {
+    failedAttempts: 0, matchingChainStarts: 0, projectBudgetUsd: 10, budgetWarningUsd: 8, budgetLimitUsd: 10,
+  }).map(decision => decision.ruleId), ["budget-limit-v1"]);
+});
+
 test("validates bounded cooperative lease and command acknowledgement bodies", () => {
   assert.deepEqual(validateLeaseRequest({
     projectId: "watchtower", agentId: "build-goblin-01", runId: "run-1",
@@ -66,7 +76,15 @@ test("validates bounded cooperative lease and command acknowledgement bodies", (
   assert.deepEqual(validateCommandAcknowledgement({ commandId: "cmd-1", agentId: "build-goblin-01", outcome: "contained" }), {
     commandId: "cmd-1", agentId: "build-goblin-01", outcome: "contained", note: undefined,
   });
+  assert.deepEqual(validateValidationGateRequest({
+    projectId: "watchtower", agentId: "build-goblin-01", runId: "run-1", leaseId: "lease-1",
+    gateId: "preflight", requestId: "gate-1", passed: true, statement: "Checks passed.", metadata: { token: "nope" },
+  }), {
+    projectId: "watchtower", agentId: "build-goblin-01", runId: "run-1", leaseId: "lease-1",
+    gateId: "preflight", requestId: "gate-1", passed: true, statement: "Checks passed.", metadata: { token: "[REDACTED]" },
+  });
   assert.throws(() => validateLeaseRequest({ projectId: "watchtower", agentId: "a", runId: "run", ttlSeconds: 5 }), /ttlSeconds/);
+  assert.throws(() => validateValidationGateRequest({ projectId: "watchtower", agentId: "a", runId: "run", gateId: "gate", passed: true, statement: "okay", metadata: {} }), /requestId/);
 });
 
 test("compares signatures without early return", () => {

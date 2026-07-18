@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Small stdlib-only Loop Enforcer adapter for Federation Watchtower.
 
-It obtains and checks a renewable work lease before a protected step. A nonzero
-exit from ``lease`` or ``validate`` means the caller must not start the next
-side effect. The adapter deliberately does not execute tools or shell commands.
+It obtains, validates, and records a renewable work lease before a protected
+step. A nonzero exit from ``lease``, ``validate``, ``gate``, or ``authorize``
+means the caller must not start the next side effect. The adapter deliberately
+does not execute tools or shell commands.
 """
 
 from __future__ import annotations
@@ -66,6 +67,33 @@ def command_validate(client: WatchtowerClient, args: argparse.Namespace) -> int:
     result = client.request("POST", f"/api/v1/projects/{args.project}/leases/{args.lease}/validate", {"agentId": args.agent})
     print_result(result)
     return 0 if result.get("status") == "active" else 3
+
+
+def command_gate(client: WatchtowerClient, args: argparse.Namespace) -> int:
+    try:
+        metadata = json.loads(args.metadata)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("--metadata must be a JSON object") from error
+    if not isinstance(metadata, dict):
+        raise RuntimeError("--metadata must be a JSON object")
+    result = client.request("POST", f"/api/v1/projects/{args.project}/validation-gates", {
+        "projectId": args.project, "agentId": args.agent, "runId": args.run,
+        "leaseId": args.lease, "gateId": args.gate_id,
+        "requestId": args.request_id or f"gate-{uuid.uuid4()}",
+        "passed": args.passed, "statement": args.statement, "metadata": metadata,
+    })
+    print_result(result)
+    return 0 if result.get("allowed") is True else 3
+
+
+def command_authorize(client: WatchtowerClient, args: argparse.Namespace) -> int:
+    result = client.request("POST", f"/api/v1/projects/{args.project}/tools/authorize", {
+        "projectId": args.project, "agentId": args.agent, "leaseId": args.lease,
+        "toolName": args.tool, "action": args.action,
+        "requestId": args.request_id or f"tool-{uuid.uuid4()}", "inputDigest": args.input_digest.lower(),
+    })
+    print_result(result)
+    return 0 if result.get("status") == "authorized" else 3
 
 
 def command_heartbeat(client: WatchtowerClient, args: argparse.Namespace) -> int:
@@ -135,6 +163,24 @@ def parser() -> argparse.ArgumentParser:
     validate = commands.add_parser("validate", help="Check a lease immediately before the next side effect")
     validate.add_argument("--lease", required=True)
     validate.set_defaults(handler=command_validate)
+
+    gate = commands.add_parser("gate", help="Record a pass/fail validation gate before a controlled step")
+    gate.add_argument("--run", required=True)
+    gate.add_argument("--lease", required=True)
+    gate.add_argument("--gate-id", required=True)
+    gate.add_argument("--passed", action="store_true", help="Mark the validation gate as passed; omit to deny it")
+    gate.add_argument("--statement", required=True)
+    gate.add_argument("--metadata", default="{}")
+    gate.add_argument("--request-id")
+    gate.set_defaults(handler=command_gate)
+
+    authorize = commands.add_parser("authorize", help="Require an active scoped lease before an external controlled action")
+    authorize.add_argument("--lease", required=True)
+    authorize.add_argument("--tool", required=True)
+    authorize.add_argument("--action", required=True)
+    authorize.add_argument("--input-digest", required=True, help="SHA-256 hex digest of the external tool input, never the raw input")
+    authorize.add_argument("--request-id")
+    authorize.set_defaults(handler=command_authorize)
 
     heartbeat = commands.add_parser("heartbeat", help="Record a heartbeat and arm the per-agent watchdog")
     heartbeat.add_argument("--expected-heartbeat-seconds", type=int, default=120)
