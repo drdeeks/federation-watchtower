@@ -4,6 +4,11 @@ Small, dependency-free ESM client for the signed Federation Watchtower producer 
 
 It is designed for server-side agents, Workers, and Node.js services that need to emit operational events and honor cooperative control decisions. It does **not** provide browser authentication, administrator APIs, agent registration, billing, x402 payments, or the prototype access/monetization roadmap.
 
+It now also includes `FederationAgentClient`, the package-facing runtime client
+for an owner-issued `fw_agent_` credential. It lets an agent connect, send
+webhook-style heartbeats/events, disconnect, and return later without holding a
+WebSocket open or carrying the shared ingestion secret.
+
 ## Install
 
 ```bash
@@ -65,6 +70,32 @@ The client signs the exact UTF-8 JSON body with HMAC-SHA-256 and sends `X-Watcht
 - `sha256Hex(value)` — calculate a local input digest suitable for `authorizeAction`.
 
 `WatchtowerApiError` exposes `status` and a parsed `body` for denied or malformed responses.
+
+### Scoped agent lifecycle
+
+After an owner registers a canonical agent at `POST /api/v1/agents`, persist the
+returned credential in that agent host’s secret store. It is not a browser
+token. A heartbeat resets the durable watchdog deadline; absence transitions the
+same agent offline, while a later `connect` or `heartbeat` resumes it.
+
+```js
+import { FederationAgentClient } from "@federation-watchtower/sdk";
+
+const agent = new FederationAgentClient({
+  projectId: "autopilot",
+  agentId: "build-01",
+  agentToken: process.env.FEDERATION_AGENT_TOKEN,
+});
+
+await agent.connect();
+await agent.heartbeat();
+await agent.emit({
+  eventType: "run.started",
+  severity: "info",
+  statement: "Starting the bounded build run.",
+  metadata: { chainDepth: 1 },
+});
+```
 
 ## Publishing checklist
 

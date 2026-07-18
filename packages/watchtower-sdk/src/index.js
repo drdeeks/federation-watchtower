@@ -134,6 +134,39 @@ export class WatchtowerClient {
   }
 }
 
+/**
+ * Per-agent lifecycle client. Unlike WatchtowerClient, this never receives the
+ * shared ingestion secret: it uses the agent-scoped credential returned once
+ * by canonical registration. Keep it on the agent host, not in a browser.
+ */
+export class FederationAgentClient {
+  constructor(options) {
+    if (!options || typeof options.agentToken !== "string" || !options.agentToken.startsWith("fw_agent_")) throw new TypeError("an fw_agent_ scoped agent token is required");
+    if (typeof options.projectId !== "string" || typeof options.agentId !== "string") throw new TypeError("projectId and agentId are required");
+    this.gateway = (options.gateway ?? DEFAULT_GATEWAY).replace(/\/+$/, "");
+    this.agentToken = options.agentToken;
+    this.projectId = options.projectId;
+    this.agentId = options.agentId;
+    this.fetch = options.fetch ?? globalThis.fetch;
+    if (typeof this.fetch !== "function") throw new TypeError("a fetch implementation is required");
+  }
+
+  connect(input = {}) { return this.request("connect", input); }
+  heartbeat(input = {}) { return this.request("heartbeat", input); }
+  disconnect(input = {}) { return this.request("disconnect", input); }
+  emit(input) { return this.request("events", input); }
+
+  async request(action, payload) {
+    const body = stableJson({ projectId: this.projectId, ...payload });
+    const response = await this.fetch(`${this.gateway}/api/v1/agents/${encodeURIComponent(this.agentId)}/${action}`, {
+      method: "POST", headers: { "Authorization": `Bearer ${this.agentToken}`, "Content-Type": "application/json" }, body,
+    });
+    const responseBody = await parseResponse(response);
+    if (!response.ok) throw new WatchtowerApiError(response.status, responseBody);
+    return responseBody;
+  }
+}
+
 async function parseResponse(response) {
   const text = await response.text();
   if (!text) return undefined;

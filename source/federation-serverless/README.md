@@ -66,6 +66,7 @@ npm run schema
 npm run migrate:watchtower
 npm run migrate:control-loop
 npm run migrate:access-gateway
+npm run migrate:lifecycle
 ```
 
 The Watchtower migration is additive and must be applied once to the existing
@@ -121,6 +122,7 @@ curl https://watch.drdeeks.xyz/
 | `npm run migrate:watchtower` | Apply the additive Watchtower event/incident migration to remote D1. |
 | `npm run migrate:control-loop` | Apply leases, command receipts, and notification-delivery tables to remote D1. |
 | `npm run migrate:access-gateway` | Apply sessions, budget ledger, controlled-tool, and R2-export tables to remote D1. |
+| `npm run migrate:lifecycle` | Apply owner, scoped agent credential, lifecycle, and normalized organization-application tables. |
 | `npm test` | Run event validation and runaway-policy tests. |
 | `npm run security:socket` | Create a Socket supply-chain policy report after Socket CLI authentication is configured. |
 | `npx wrangler dev --local` | Run the Worker locally with simulated bindings. |
@@ -181,6 +183,31 @@ command for a runaway-policy result. A `heartbeat` event arms a per-agent
 Durable Object alarm; if no new signed heartbeat replaces it before the stated
 deadline, Watchtower marks the registered agent `offline` and emits a
 deduplicated `heartbeat.missed` event.
+
+### Canonical agent lifecycle
+
+The additive lifecycle API is the package/webhook path for agents that should
+remain observable without holding a persistent connection. It uses an
+owner-issued, per-agent `fw_agent_` credential; it never returns or requires
+the shared ingestion secret.
+
+| Method | Path | Credential | Purpose |
+| --- | --- | --- | --- |
+| `POST` | `/api/v1/owners` | none, once | Create an owner and return its one-time `fw_owner_` credential. |
+| `POST` | `/api/v1/organizations/applications` | owner | Submit a bound organization application with exactly five technical answers. |
+| `POST` | `/api/v1/agents` | owner | Validate/register a canonical manifest, project it into the public registry, and issue one scoped credential. |
+| `POST` | `/api/v1/agents/{agentId}/connect` | agent | Mark the agent connected and arm its durable liveness deadline. |
+| `POST` | `/api/v1/agents/{agentId}/heartbeat` | agent | Reset the deadline without a persistent socket. |
+| `POST` | `/api/v1/agents/{agentId}/events` | agent | Submit a validated operational event through the guardrail path. |
+| `POST` | `/api/v1/agents/{agentId}/disconnect` | agent | Gracefully mark the agent offline and cancel its watchdog alarm. |
+
+Every lifecycle request includes `projectId` in its JSON body and uses
+`Authorization: Bearer fw_owner_…` or `Authorization: Bearer fw_agent_…`.
+The manifest includes owner identity, stable avatar/palette metadata,
+public-projection consent, and a 30–3600 second heartbeat interval. The
+Watchdog persists the latest deadline in a per-agent Durable Object, so an
+agent can report through periodic package or webhook calls and later reconnect
+with the same identity/history.
 
 ### Cooperative containment
 

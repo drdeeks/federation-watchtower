@@ -104,3 +104,27 @@ Tests Passing: Worker types; serverless 14/14; SDK 3/3; browser JavaScript synta
 Phase       : PHASE-4 (partial evidence only; prerequisites and release gate remain incomplete)
 Rollback Ref: uncommitted working tree — revert the listed public UI files and documentation entry together
 ```
+
+## CL-0005 — Owner-Scoped Lifecycle and Webhook Presence Slice
+
+```
+Date        : 2026-07-17
+Contributor : Codex
+Modules     : [MOD-002, MOD-003, MOD-005, MOD-006, MOD-007, MOD-011, MOD-014]
+Section Tags: [[IDENTITY-ACCESS-v1], [INGRESS-v1], [WATCHDOG-v1], [ORG-VERIFY-v1]]
+Files Changed: [0004_federation_lifecycle.sql, lifecycle.ts, index.ts,
+                agent-registry.ts, agent-watchdog.ts, package SDK, README files]
+Description : Added an additive canonical owner/agent lifecycle: one-time
+              owner and agent credentials, validated manifests, public registry
+              projection, connect/heartbeat/event/disconnect API routes,
+              durable watchdog expiry, immutable lifecycle records, and a
+              package-facing scoped agent client. Added owner-bound organization
+              applications with exactly five normalized technical answers and
+              two non-GitHub social proofs. The shared ingestion secret remains
+              legacy/server-side only; the new lifecycle never returns it.
+Tests Passing: Worker type generation and serverless suite PASS; SDK 4/4; git diff --check
+Phase       : PHASE-1/PHASE-3 partial implementation; remote migration and
+              authenticated production lifecycle evidence remain incomplete
+Rollback Ref: do not apply 0004 migration; if already applied, revoke issued
+              credentials and disable the new routes before a follow-up additive rollback
+```

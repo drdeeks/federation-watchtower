@@ -1,136 +1,195 @@
 # Federation Watchtower
 
+[![OpenAI Build Week](https://img.shields.io/badge/OpenAI-Build%20Week-412991?logo=openai&logoColor=white)](https://openai.devpost.com/)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-f38020?logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/workers/)
-[![TypeScript](https://img.shields.io/badge/Worker-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Local_runtime-Node.js_20%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![MCP](https://img.shields.io/badge/Integration-MCP-6e56cf)](https://modelcontextprotocol.io/)
-[![Socket](https://img.shields.io/badge/Supply--chain-Socket-6f46f5)](https://socket.dev/)
-[![License](https://img.shields.io/badge/license-MIT-2f855a)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-2f855a)](LICENSE)
 
-Federation Watchtower is the observable front door for a broader autonomous-systems control plane: an agent-operations command center presented as an embeddable sitcom. It brings together agent registration, MCP/API/widget access, guardrail monitoring, validation gates, runaway-chain detection, failure reporting, and human-readable operational telemetry. Machine events become visible, memorable status bubbles without losing their structured audit trail.
+**Federation Watchtower is a developer tool that makes autonomous work visible
+before it becomes expensive.** It is an agent-operations control plane with a
+security-camera sitcom presentation: real agents, heartbeats, events,
+guardrails, validation decisions, and watchdog signals are made readable for
+humans without turning the operational record into theater.
 
-The public Watchtower is live at [watch.drdeeks.xyz](https://watch.drdeeks.xyz). The production API is available at [fapi.drdeeks.xyz](https://fapi.drdeeks.xyz), with [federation.drdeeks.xyz](https://federation.drdeeks.xyz) configured as the human-facing API alias.
+Live public Watchtower: [watch.drdeeks.xyz](https://watch.drdeeks.xyz)
 
-## What is here
+Machine/API ingress: [fapi.drdeeks.xyz](https://fapi.drdeeks.xyz)
+Member/operator surface: [federation.drdeeks.xyz](https://federation.drdeeks.xyz)
 
-| Path | Purpose |
+> Operational truth is the product. Theatrical presentation makes it watchable.
+
+## Why it exists
+
+This began with a costly and familiar failure mode: while building another
+hackathon project, autonomous coding work repeatedly scaffolded projects with
+very little visible progress. Roughly **25,000 credits** disappeared before
+there was a clear, shared answer to four basic questions:
+
+1. What is currently running?
+2. What is it trying to do repeatedly?
+3. What is it costing, failing, or waiting on?
+4. What should stop before the next side effect?
+
+Normal logs can contain the evidence but are hard to monitor during a fast,
+multi-agent build. Federation Watchtower turns that evidence into an observable
+runtime surface: a human can see a real agent's presence and event trail, while
+the system can record a validation denial, budget warning, duplicate/runaway
+signal, or missed heartbeat that an agent is expected to honor.
+
+The colorful TV presentation is intentionally a hook, not a substitute for
+controls. A sparse, labelled ambient cameo may appear in an empty public room;
+it is never an agent, an event, or audit evidence.
+
+## The Build Week fit
+
+**Track: Developer Tools.** Watchtower is for developers operating agentic
+workflows, CI/CD, testing, DevOps, and guarded automation. It combines a
+Cloudflare Worker control plane, an integration surface, a public read-only
+Watchtower, and a local-friendly operator workflow.
+
+It is being built with Codex during OpenAI Build Week. The project is designed
+to make Codex-enabled and other autonomous workflows safer to operate; it does
+not claim that Watchtower controls a model provider itself.
+
+| Build Week criterion | Repository evidence |
 | --- | --- |
-| `source/federation-serverless/` | Production Cloudflare Worker, Durable Objects, D1 schema, R2 binding, and deployed host configuration. |
-| `source/federation-tv-widget/` | Embeddable TV widget and the public Watchtower static site. |
-| `source/federation-tv-package/` | Dependency-backed local Node gateway, MCP skill, command center, and legacy adapter package. |
-| `brand/` | Canonical Federation Watchtower logo, palette tokens, wordmark, and splash screen. |
-| `docs/review/` | Product blueprint, build plan, packet specification, source inventory, and submission notes. |
-| `skills-reference/` | Supporting autonomous-crew, blueprint, and integration references. |
+| Non-trivial working implementation | Worker, Durable Objects, D1, R2, Queue/DLQ, REST, WebSocket, static Watchtower, tests, and a local demo path. |
+| Coherent product experience | Public Watchtower room/agent/feed view plus the reserved operator/member surface. |
+| Specific problem and audience | Developers and teams supervising autonomous runs that can recurse, duplicate work, fail quietly, or spend beyond expectations. |
+| Novel idea | An observability/control plane where evidence is presented as a compact agent-ops sitcom without fabricating operational state. |
+| How Codex accelerated the work | Codex was used to consolidate the repository, wire and test the Worker surfaces, shape domain boundaries, build the camera-style Watchtower, and document the operational lifecycle. |
 
-The repository keeps the local adapter and the Cloudflare deployment side by side deliberately: the local path is the fastest offline demo, while the Worker path is the persistent production architecture.
+The exact model-use narrative and `/feedback` session ID must be added by the
+submitter in Devpost; this repository intentionally does not invent either.
+See [the submission notes](docs/review/OPENAI_SUBMISSION_NOTES.md) and [the
+three-minute demo plan](docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md).
 
-## The larger purpose
+## What is working now
 
-Watchtower is meant to incorporate the surrounding operational systems already represented in this repository, not replace them with a dashboard:
+- A Cloudflare Worker backed by Durable Objects, D1, R2, and an alert Queue/DLQ.
+- Public, read-only room, roster, agent-detail, event-feed, and WebSocket
+  observation surfaces.
+- Administrative project/agent registration and heartbeat/status routes.
+- Signed, idempotent operational event ingress with timestamp/replay checks and
+  secret-shaped metadata redaction.
+- Runtime-neutral liveness: a signed `heartbeat` event can arrive from an
+  agent package, CI runner, webhook adapter, or MCP/REST integration; no
+  persistent WebSocket connection is required for an agent to remain present.
+- Guardrail decisions for duplicate/runaway chains, validation failures,
+  budgets, cooperative leases, controlled tool authorization, and heartbeat
+  expiry/watchdog incidents.
+- Hash-chained audit decisions, incident records, bounded evidence exports, and
+  an embeddable dependency-free JavaScript widget.
+- A standard-library Loop Enforcer adapter that treats a denied lease, gate, or
+  controlled-tool decision as a stop result (`exit 3`).
 
-- **Federation registry** — organizations, projects, agents, rooms, identities, heartbeats, and live events.
-- **Guardrail monitoring** — runaway loops, duplicate chains, budget pressure, invalid states, and blocked work become explicit events.
-- **Validation and enforcement** — blueprint gates, policy checks, source verification, bounded work leases, watchdog heartbeats, and structured review signals can report into the same feed.
-- **MCP/API/widget access** — humans see the broadcast, agents use MCP or REST, and embedded widgets provide a lightweight status surface.
-- **Enterprise operations** — the referenced crew, self-healing, audit, memory, and integration systems provide the deeper control-plane patterns behind the visible Watchtower.
+## Deliberate current boundaries
 
-The sitcom is the interface layer. The real product is a shared observability and governance surface for autonomous systems.
+Watchtower is not represented as more complete than it is. The following are
+now available as an additive API lifecycle, but still need browser onboarding,
+credential rotation/revocation UI, and production migration/release evidence:
 
-## Live endpoints
+- Owner credentials and per-agent scoped credentials returned once at
+  registration; credentials stay on the owner/agent host, never on `watch`.
+- Canonical manifests plus owner → credential → connect → heartbeat/event →
+  watchdog offline → reconnect lifecycle endpoints.
+- Normalized organization application questions/answers and secure
+  applicant/reviewer roles. The legacy five-question application record exists,
+  but it is not the finished organization product.
+- Payments, x402 settlement, subscriptions, or tier enforcement.
 
-| Endpoint | Use |
-| --- | --- |
-| `https://watch.drdeeks.xyz/` | Public Watchtower TV wall and widget demo. |
-| `https://watch.drdeeks.xyz/operator.html` | Operator console; it prompts for an admin token and keeps it only in the open tab. |
-| `https://fapi.drdeeks.xyz/health` | Primary API health check. |
-| `https://fapi.drdeeks.xyz/api/projects` | List registered projects. |
-| `https://federation.drdeeks.xyz/health` | API alias health check. |
-| `https://fapi.drdeeks.xyz/ws?projectId=autopilot` | WebSocket feed for a project. |
+The public `watch` host remains read-only. It does not host credential entry,
+webhook, MCP, or mutation endpoints. See [AGENTS.md](AGENTS.md) for the
+authoritative current-state boundaries and
+[the execution checklist](docs/blueprint/federation-watchtower/checklist.md)
+for work that may actually be marked complete.
 
-The `watch` host is static-only at the application layer. API calls from the public page go to `fapi`; the public host does not expose the Worker API routes itself.
+## Architecture
 
-## Fastest local demo
+```text
+agents, integrations, MCP clients
+              |
+              v
+      fapi.drdeeks.xyz (REST / WebSocket / control plane)
+              |
+              v
+       Cloudflare Worker: federation-gateway
+        |         |          |          |
+        v         v          v          v
+      D1       Durable      R2      Queue + DLQ
+     records    Objects    evidence  owner alerts
+        |
+        v
+watch.drdeeks.xyz (public, read-only Watchtower)
+```
 
-Requirements: Node.js 20 or newer. The local adapter uses Node’s standard library and does not require an install.
+| Host | Audience | Purpose |
+| --- | --- | --- |
+| `watch.drdeeks.xyz` | Everyone | Public Watchtower: real public rooms, agent detail, and public event feed. |
+| `fapi.drdeeks.xyz` | Agents and integrations | Health, REST, signed ingestion, WebSocket, MCP, and control-plane routes. |
+| `federation.drdeeks.xyz` | Approved members/operators | Reserved member area and the current token-protected operator console. |
 
-Start the gateway:
+## Judge quickstart
+
+### Live observation
+
+1. Open [watch.drdeeks.xyz](https://watch.drdeeks.xyz).
+2. Pick a room and select an agent from the roster.
+3. Inspect the public event terminal and agent detail drawer.
+4. Open [fapi.drdeeks.xyz](https://fapi.drdeeks.xyz) for API discovery or
+   [fapi.drdeeks.xyz/health](https://fapi.drdeeks.xyz/health) for a health
+   response.
+
+The public view intentionally exposes no operational credential and does not
+create demo agents or fake events.
+
+### Local demo (no cloud account required)
+
+Requirements: Node.js 20+.
 
 ```bash
 node source/federation-tv-package/federation-core/demo-gateway.js
 ```
 
-Open [http://localhost:41207/](http://localhost:41207/) or run the terminal view:
-
-```bash
-node source/federation-tv-package/federation-core/demo-terminal.js
-```
-
-Run the contract verification in another terminal:
+Open `http://localhost:41207/`, then run the contract check in another shell:
 
 ```bash
 node source/federation-tv-package/federation-core/demo-verify.js
 ```
 
-The adapter is intentionally in-memory and dependency-free. It is for local demonstrations and contract checks, not the persistent public service.
+This adapter is an in-memory demonstration path, not the persistent production
+service.
 
-### Local operator console
-
-Run the production-shaped Worker locally when you want the real session,
-budget, incident, and controlled-tool surfaces rather than the in-memory demo:
-
-```bash
-cd source/federation-serverless
-npx wrangler dev --local --port 8787
-```
-
-Open `http://localhost:8787/operator.html?api=http://localhost:8787`, paste an
-admin token from the ignored local `.dev.vars` file, and choose a project. The
-page keeps that token in memory only; it never writes browser storage.
-
-## Cloudflare deployment
-
-The deployed Worker lives in `source/federation-serverless/` and uses:
-
-- Cloudflare Workers for the HTTP and WebSocket edge runtime.
-- Durable Objects for per-project registries and the global federation coordinator.
-- D1 for projects, rooms, agents, feed events, federation applications, and access records.
-- R2 for the federation vault.
-- Worker static assets for the public Watchtower bundle.
-
-Install the deployment toolchain:
+### Production-shaped Worker locally
 
 ```bash
 cd source/federation-serverless
 npm install
+npx wrangler dev --local --port 8787
 ```
 
-Authenticate without committing a credential:
+For protected operator functions, use an ignored local `.dev.vars` file; never
+commit it. Open `http://localhost:8787/operator.html?api=http://localhost:8787`
+and provide the admin credential only in the current tab. The full server
+reference is in [source/federation-serverless/README.md](source/federation-serverless/README.md).
+
+## Verify the repository
 
 ```bash
-export CLOUDFLARE_API_TOKEN='your-token'
+cd source/federation-serverless && npm run types && npm test
+cd ../../packages/watchtower-sdk && npm test
+node --check ../../source/federation-tv-widget/public/tv-widget.js
+node --check ../../source/federation-tv-widget/src/tv-widget.js
+git diff --check
 ```
 
-The token needs Worker script deployment and zone Worker-route permissions. Do not put it in `.env`, source files, Wrangler config, or shell history that is checked into the project.
+`npm run check` is not currently a valid verification gate with the installed
+Wrangler version; do not treat it as passing project validation.
 
-Useful commands:
+## Integration highlights
 
-```bash
-npm run types       # regenerate Worker binding types
-npm run check       # run Wrangler's installed validation command
-npm run deploy      # deploy Worker, assets, and custom domains
-npm run schema      # apply src/schema.sql to the remote D1 database
-npm run migrate:watchtower # apply the additive Watchtower enforcement tables
-npm run migrate:control-loop # apply cooperative leases, receipts, and alert delivery tables
-npm run migrate:access-gateway # apply sessions, budgets, controlled tools, and evidence exports
-npm test             # validate the event contract and core runaway rules
-npm run security:socket # create a Socket dependency-policy report after socket login
-```
-
-The checked-in `wrangler.toml` is the source of truth for the current bindings and hostnames. Do not replace its live D1 ID with a placeholder when editing the file.
-
-## Widget embed
-
-The widget is a plain browser script with no runtime dependency:
+### Public widget
 
 ```html
 <div id="federation-tv"></div>
@@ -141,94 +200,81 @@ The widget is a plain browser script with no runtime dependency:
 </script>
 ```
 
-Or initialize it directly:
+### Guarded operation
 
-```js
-const tv = new FederationTV({
-  projectId: 'autopilot',
-  container: '#federation-tv',
-  gatewayUrl: 'https://fapi.drdeeks.xyz'
-});
-```
-
-The widget exposes project agents, feed events, status changes, and speech-line submission. Use the public site for the visual demo and the API for agent integrations.
-
-## API shape
-
-### System routes
-
-| Method | Route | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Worker health. |
-| `GET` | `/api/status` | Global project, room, and agent status. |
-| `GET` | `/api/projects` | List projects. |
-| `GET` | `/api/feed` | Global event feed. |
-| `GET` | `/api/search?q=...` | Search federation state. |
-| `GET` | `/api/health` | Health across projects. |
-| `GET` | `/api/rooms` | Rooms across projects. |
-| `GET` | `/ws?projectId=...` | Live WebSocket feed. |
-
-Project-scoped routes use `/api/projects/{projectId}/...` and cover agent registration, heartbeats, status, rooms, feed, summaries, memory, daily notes, entities, and search. Mutating legacy routes require the administrative bearer token in production. The complete route table is maintained in [`source/federation-serverless/README.md`](source/federation-serverless/README.md).
-
-Example registration:
+The integration path is deliberately cooperative and pre-action rather than a
+generic proxy. Before a consequential tool call, an agent validates its bounded
+lease or requests a scoped tool decision. A denial means the agent must stop;
+the adapter exits with code `3` and Watchtower retains the denial as evidence.
 
 ```bash
-curl -X POST 'https://fapi.drdeeks.xyz/api/projects/autopilot/agents' \
-  -H 'Authorization: Bearer YOUR_WATCHTOWER_ADMIN_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{"agentId":"demo-agent-01","name":"Demo Agent","role":"coding","capabilities":["tests"]}'
+export WATCHTOWER_INGESTION_SECRET='set-outside-the-repository'
+python3 source/federation-tv-package/mcp-skill/federation-agent/watchtower_loop.py \
+  --project autopilot --agent build-01 lease --run deploy-42 --scope deploy
 ```
 
-### Control loop at a glance
+The shared ingestion secret remains an administrative/integration boundary and
+is never a browser credential. Canonical lifecycle clients use per-agent scoped
+credentials instead; the legacy signed producer API remains available for
+existing integrations.
 
-| Need | Watchtower control |
-| --- | --- |
-| Agent / run visibility | Durable `agent_sessions` registry updated by leases, lifecycle events, and heartbeats. |
-| Credit / budget guard | Signed event metadata may include `creditCostUsd`; Watchtower appends it to a project ledger and warns or quarantines at the configured threshold. |
-| Runaway / duplicate / attempts | Deterministic chain-depth, duplicate-chain, and fifteen-minute validation-failure rules. |
-| Watchdog stop recommendation | A missed heartbeat marks the agent offline, opens an incident, and issues an alert command. |
-| Validation gate | The signed `validation-gates` route returns `allowed=false` for a failure or inactive lease; the Loop Enforcer adapter exits 3. |
-| Controlled external action | `tools/authorize` checks the active, scoped lease before the client touches its external target and records an immutable allow/deny event. |
-| Audit / evidence | Per-project hash-chained decisions, incident transitions, MCP access logs, and bounded R2 exports. |
+### Webhook-first presence and alerting
 
-The pre-action gateway deliberately does not proxy an arbitrary URL. A client
-calls it immediately before its configured tool and must stop on a non-201
-result. This makes enforcement truthful without turning Watchtower into an
-SSRF-capable generic proxy.
+Watchtower has two independent webhook roles:
 
-## Branding
+| Direction | Purpose | Current behavior |
+| --- | --- | --- |
+| **Inbound presence/event webhook** | An agent package, CI job, scheduler, or integration posts a signed operational event such as `heartbeat`, `run.started`, `run.failed`, or a validation result. | The existing signed `/api/v1/events` ingress validates the timestamp and HMAC, deduplicates the event, persists it, and arms the per-agent watchdog when the event is a heartbeat. |
+| **Outbound incident webhook** | Watchtower notifies an organization’s chosen endpoint about a watchdog, budget, validation, or control incident. | A Durable Object records the notification, a Queue delivers it, and optional HMAC signing adds delivery, timestamp, and signature headers. No configured destination means a safely recorded `suppressed` delivery, not an accidental outbound request. |
 
-The canonical brand kit is in [`brand/`](brand/). It includes:
+Canonical registration stores a per-agent heartbeat deadline from 30–3600
+seconds (use 1800 seconds for a 30-minute async grace). Every accepted
+heartbeat resets the Durable Object alarm; expiry marks the same identity
+offline, retains a real `heartbeat.missed` watchdog event, and can notify the
+configured outbound incident webhook. A later connect or heartbeat resumes the
+same identity and history. Browser onboarding and owner-controlled liveness
+profiles are the remaining UX/management work.
 
-- [`federation-f-mark.svg`](brand/federation-f-mark.svg) — square broadcast mark.
-- [`federation-wordmark.svg`](brand/federation-wordmark.svg) — header lockup.
-- [`tokens.css`](brand/tokens.css) — shared themes and typography tokens.
-- [`splash.html`](brand/splash.html) — lightweight branded loading/splash screen.
+## Documentation
 
-The widget’s `public/brand/` directory is the deployment copy of those assets; the two locations are currently byte-identical. Update the canonical kit first, then copy the changed assets into the public bundle before deploying.
+- [AGENTS.md](AGENTS.md) — operational truth, domain boundaries, and required
+  next lifecycle.
+- [Execution checklist](docs/blueprint/federation-watchtower/checklist.md) —
+  authoritative completion state.
+- [System specification](docs/review/FEDERATION_SYSTEM_SPEC.md) — expanded
+  product context.
+- [Host surface contract](docs/review/HOST_SURFACE_CONTRACT.md) — public,
+  member, and machine host boundaries.
+- [Serverless gateway README](source/federation-serverless/README.md) — route,
+  signing, local deployment, and operational reference.
+- [Submission notes](docs/review/OPENAI_SUBMISSION_NOTES.md) — Devpost draft
+  and evidence plan.
+- [Build Week readiness review](docs/review/OPENAI_BUILD_WEEK_READINESS.md) —
+  current Devpost requirements, evidence mapping, and remaining submission
+  actions.
+- [Demo script](docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md) — a real,
+  under-three-minute control-loop demonstration.
 
-## Documentation map
+## Build Week submission checklist
 
-- [`docs/README.md`](docs/README.md) — documentation index.
-- [`docs/review/FEDERATION_WATCHTOWER_BLUEPRINT.md`](docs/review/FEDERATION_WATCHTOWER_BLUEPRINT.md) — product and architecture blueprint.
-- [`docs/review/SUPER_STATEMENT_PACKET_SPEC.md`](docs/review/SUPER_STATEMENT_PACKET_SPEC.md) — event packet contract.
-- [`docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md`](docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md) — audited gap map and phased enforcement architecture.
-- [`docs/review/BUILD_PLAN.md`](docs/review/BUILD_PLAN.md) — staged implementation plan.
-- [`docs/review/SOURCE_INVENTORY.md`](docs/review/SOURCE_INVENTORY.md) — provenance and source map.
-- [`docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md`](docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md) — two-and-a-half-minute recording plan using the actual control loop.
-- [`source/federation-serverless/agents-skill.md`](source/federation-serverless/agents-skill.md) — agent registration and integration contract.
-- [`source/federation-tv-package/mcp-skill/tv-sitcom-mcp/SKILL.md`](source/federation-tv-package/mcp-skill/tv-sitcom-mcp/SKILL.md) — MCP tool and resource surface.
+- [ ] Select **Developer Tools** in Devpost.
+- [ ] Add the public repository URL (or share a private repository with both
+  `testing@devpost.com` and `build-week-event@openai.com`).
+- [ ] Record a public YouTube video under three minutes that shows the project
+  working and explains both Codex and GPT-5.6 use.
+- [ ] Add the `/feedback` Codex session ID for the session that built the
+  majority of the core functionality.
+- [ ] Provide judge testing instructions; this README supplies live and local
+  paths above.
+- [ ] Answer Devpost's required submitter type, residence, category, repository
+  URL, and feedback-session fields; add any plugin/developer-tool instructions
+  if applicable.
+- [ ] Submit the **Federation Watchtower** Devpost project to OpenAI Build Week
+  rather than leaving it only as a published standalone project.
 
-## Development notes
-
-- Keep secrets out of the repository; use environment variables or Wrangler secrets.
-- Keep `brand/` canonical and treat the public copy as a deployment artifact.
-- Keep generated dependencies, Wrangler state, logs, and release archives ignored.
-- Prefer the Cloudflare Worker path for production behavior; use the local adapter for fast demos and tests.
-- Production secrets must be set before deployment: `WATCHTOWER_INGESTION_SECRET` signs telemetry and `WATCHTOWER_ADMIN_TOKEN` protects administrative routes. Do not treat CORS as access control.
-- Incident webhooks are off until `WATCHTOWER_ALERT_WEBHOOK_URL` is configured. Until then, Watchtower records the alert as safely suppressed; it does not send to an unchosen destination.
-- Socket scanning is opt-in: run `socket login` (or configure `SOCKET_SECURITY_API_TOKEN` and an organization slug) outside the repository, then run `npm run security:socket`. Socket scans dependency manifests and lockfiles, not application source code.
+The last item is currently outstanding: the existing Federation Watchtower
+Devpost project is published but is not yet attached to OpenAI Build Week.
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+MIT. See [LICENSE](LICENSE).
