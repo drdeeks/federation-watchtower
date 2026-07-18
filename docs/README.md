@@ -7,6 +7,7 @@ Federation Watchtower documentation is grouped by purpose:
 - [`review/FEDERATION_WATCHTOWER_BLUEPRINT.md`](review/FEDERATION_WATCHTOWER_BLUEPRINT.md) — product statement, system boundaries, and current implementation map.
 - [`review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md`](review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md) — audited gaps, implementation status, and the phased control-loop design.
 - [`review/BUILD_PLAN.md`](review/BUILD_PLAN.md) — phased build and demo gates.
+- [`review/FEDERATION_ACCESS_MONETIZATION_ROADMAP.md`](review/FEDERATION_ACCESS_MONETIZATION_ROADMAP.md) — prototype-only open-participation, tiering, monetization, and future-feature roadmap.
 - [`review/SOURCE_INVENTORY.md`](review/SOURCE_INVENTORY.md) — source provenance and important implementation files.
 
 ## Protocols and submission material
