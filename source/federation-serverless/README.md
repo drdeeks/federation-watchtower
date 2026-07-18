@@ -158,7 +158,8 @@ the original decision without another side effect. An accepted event is
 projected into the existing feed and can open an advisory incident/control
 command for a runaway-policy result. A `heartbeat` event arms a per-agent
 Durable Object alarm; if no new signed heartbeat replaces it before the stated
-deadline, Watchtower emits a deduplicated `heartbeat.missed` event.
+deadline, Watchtower marks the registered agent `offline` and emits a
+deduplicated `heartbeat.missed` event.
 
 ### Cooperative containment
 
