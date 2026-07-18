@@ -67,6 +67,8 @@ Still required for a complete owner-to-agent product path:
 - Subscription, x402 settlement, usage ledger, and tier enforcement.
 - Licensed sprite/scene asset pipeline and browser acceptance evidence for
   moving agents.
+- Federation root redirect to the explicit member page is now part of the
+  host-boundary contract so edge caching cannot confuse it with Watch `/`.
 
 ## Ordered next steps
 

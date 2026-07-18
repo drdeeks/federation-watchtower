@@ -242,3 +242,22 @@ Phase       : PHASE-4 partial implementation; browser cadence acceptance and
 Rollback Ref: revert widget cadence/navigation and documentation changes;
               backend evidence and RoomScene storage are unaffected
 ```
+
+## CL-0011 — Explicit Federation Root Boundary
+
+```
+Date        : 2026-07-18
+Contributor : Codex
+Modules     : [MOD-015]
+Section Tags: [[HOST-SURFACE-v1], [QUALITY-v1]]
+Files Changed: [index.ts, NEXT_DEVELOPMENT_TRACK.md]
+Description : Made federation.drdeeks.xyz/ redirect explicitly to its member
+              page instead of relying on a cached root asset path shared with
+              watch.drdeeks.xyz/. The Federation host now has a deterministic
+              page boundary while the public Watch root remains universal.
+Tests Passing: pending Worker type, unit, and public route verification
+Phase       : PHASE-4 partial implementation; organization identity and role
+              controls remain incomplete
+Rollback Ref: revert the host-specific redirect and restore the prior asset
+              selection behavior
+```

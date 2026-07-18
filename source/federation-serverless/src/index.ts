@@ -180,10 +180,10 @@ export default {
     // actual role model is a later checklist phase; meanwhile the only live
     // privileged surface is the token-protected operator console.
     if (isFederationHost) {
+      if (path === "/") return Response.redirect(new URL("/federation.html", request.url), 302);
       const allowed = path === "/" || path === "/federation.html" || path === "/operator.html" || path.startsWith("/brand/");
       if ((method !== "GET" && method !== "HEAD") || !allowed) return error("not found", 404);
-      const assetPath = path === "/" ? "/federation.html" : path;
-      return env.ASSETS.fetch(new Request(new URL(assetPath, request.url), request));
+      return env.ASSETS.fetch(new Request(new URL(path, request.url), request));
     }
 
     if (!isApiHost && !isDevelopmentHost) return error("unknown Federation host", 404);
