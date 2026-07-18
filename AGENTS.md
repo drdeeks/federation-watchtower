@@ -1,0 +1,224 @@
+# Federation Watchtower — AGENTS Guide
+
+This is the operational guide for people and coding agents working in this
+repository. Read it before changing the system.
+
+## What Federation Watchtower is
+
+Federation Watchtower is an independent, runtime-neutral observability and
+coordination layer for autonomous agents. An agent retains control of its own
+runtime and reports identity, presence, and real operational events to
+Federation. The public Watchtower presents that activity as a compact,
+security-camera-style sitcom.
+
+The product rule is simple:
+
+> Operational truth is the product. Theatrical presentation makes it watchable.
+
+The TV layer may be funny, weird, and memorable. It must never fabricate an
+agent, successful action, safeguard result, heartbeat, owner, event, or log
+entry. Ambient presentation is allowed only when it is visibly labelled as
+presentation with no source event.
+
+## Authority and reading order
+
+1. `docs/blueprint/federation-watchtower/checklist.md` is the execution driver.
+   Do not mark work complete until its acceptance evidence exists.
+2. `docs/blueprint/federation-watchtower/blueprint.md` is immutable reference
+   material. Do not edit it for ordinary implementation work.
+3. `docs/blueprint/federation-watchtower/CHANGELOG.md` is append-only. Record
+   material implementation work using the Part V format from the blueprint.
+4. `docs/review/FEDERATION_SYSTEM_SPEC.md` gives the current expanded product
+   context. `docs/review/HOST_SURFACE_CONTRACT.md` records current domain
+   boundaries and explicit gaps.
+
+Never change checklist state to make progress look better than it is.
+
+## Domain map
+
+| Host | Audience | Purpose |
+| --- | --- | --- |
+| `https://watch.drdeeks.xyz` | Everyone | Public, read-only Watchtower: room view, public roster, public agent details, feed, onboarding documentation, hosted agent skill. |
+| `https://federation.drdeeks.xyz` | Approved members/operators | Reserved Federation/member area and token-protected operator console. Organization-scoped roles are not implemented yet. |
+| `https://fapi.drdeeks.xyz` | Agent hosts/integrations | Health, REST, signed event ingestion, MCP, WebSocket, and control-plane endpoints. |
+
+Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
+`watch`. Public observation is free and read-only.
+
+## Current repository map
+
+| Path | Responsibility |
+| --- | --- |
+| `source/federation-serverless/` | Cloudflare Worker, Durable Objects, D1 schema/migrations, watchdog, control loop, MCP gateway. |
+| `source/federation-tv-widget/` | Static public Watchtower and embeddable browser widget. Keep `src/tv-widget.js` and `public/tv-widget.js` identical. |
+| `packages/watchtower-sdk/` | Optional Node/server-side signing SDK scaffold. |
+| `source/federation-tv-package/` | Local demo package and legacy adapter/MCP material; useful for provenance and offline demos, not the production source of truth. |
+| `brand/` | Canonical wordmark, mark, theme tokens, and splash assets. Copy intentional changes into `source/federation-tv-widget/public/brand/`. |
+
+## Current reality: what exists and what does not
+
+### Useful baseline that exists
+
+- Durable project/agent/room records, public project/room/feed reads, and a
+  legacy agent registration route.
+- Deterministic browser SVG avatars plus a legacy DiceBear avatar URL.
+- Signed operational event ingestion at `POST /api/v1/events`.
+- Event redaction, idempotency handling, runaway/duplicate/attempt/budget rules,
+  watchdog incidents, cooperative leases, controlled-tool decisions, audit
+  hashing, and operator evidence exports.
+- MCP organization credential handling and a server-side SDK scaffold.
+- Public Watchtower camera shell, room selection, agent roster/detail panel,
+  public event terminal, reduced-motion mode, and feed-only mode.
+
+### Important work that is not done
+
+- Owner accounts, sessions, scoped tokens, revocation, and role enforcement.
+- A canonical signed agent manifest and self-service registration flow.
+- Per-agent credentials. Never expose the shared ingestion or administrator
+  secret in a browser.
+- Canonical `/api/v1` owner/agent lifecycle endpoints, stream cursors, public
+  snapshots, and a complete room-family model.
+- First-class owner, palette, avatar, opt-in, lifecycle, and audit fields in the
+  canonical data model.
+- Public individual statement submission/moderation; the legacy speech pool is
+  only for verified Federation agents.
+- Normalized organization questions/answers and a secure applicant/reviewer UX.
+- Payments, subscriptions, x402 settlement, and tier enforcement.
+
+Do not describe any item in this second list as live or complete.
+
+## Current legacy registration shape
+
+The existing administrative route accepts a limited payload, roughly:
+
+```json
+{
+  "agentId": "build-runner-01",
+  "name": "Build Runner",
+  "role": "build-and-test",
+  "capabilities": ["build", "test", "report"],
+  "status": "active",
+  "metadata": {}
+}
+```
+
+It is not the required product manifest. It has no owner/session proof,
+signed immutable identity, public-projection consent, scoped credential,
+palette contract, revocation, or canonical lifecycle transition rules.
+
+## Phase 1: required functional end-to-end path
+
+The next implementation phase is not another screen. It must establish this
+working flow for both an individual and an organization-backed agent:
+
+```text
+owner/session
+  -> validated manifest
+  -> stable agent identity + avatar/palette
+  -> scoped agent credential
+  -> explicit connect
+  -> heartbeat
+  -> status/action/event updates
+  -> public room projection
+  -> stale/offline watchdog transition
+  -> reconnect with the same identity and retained history
+```
+
+The canonical manifest must at least contain:
+
+```json
+{
+  "agentId": "unique-stable-id",
+  "displayName": "Human-readable name",
+  "ownerId": "owner-or-organization-id",
+  "projectId": "project-or-room-family-id",
+  "role": "testing",
+  "capabilities": ["testing", "reporting"],
+  "identity": {
+    "avatarSeed": "stable-seed",
+    "paletteKey": "testing",
+    "characterType": "operator"
+  },
+  "publicProjection": true,
+  "heartbeat": { "intervalSeconds": 30 }
+}
+```
+
+Validation must reject secrets in metadata, duplicate IDs, unauthorized owner
+claims, invalid capabilities, invalid palette/avatar keys, and invalid
+heartbeat intervals. A valid response must return the stable agent record,
+assigned room, an appropriate scoped credential, request ID, and the exact next
+connection step. It must not return a shared deployment secret.
+
+## Event and control rules
+
+- Events are immutable evidence. Preserve the source event and idempotency key.
+- A failed validation, denied tool, stale heartbeat, or loop alert must remain
+  visible; presentation cannot overwrite it.
+- A non-active cooperative lease means stop before the next side effect.
+- Agent status is never inferred from a decorative animation.
+- Redact credentials and private data before persistence and before public
+  projection.
+- Public detail drawers show only allowed public identity/owner metadata. If no
+  owner label is allowed, identify the owning project rather than inventing one.
+
+## Watchtower presentation rules
+
+- One selected room at a time; no fabricated multi-camera feeds.
+- Target density is 35 compact agents, not oversized profile cards.
+- Color assists recognition but never substitutes for name, owner, status, or
+  lifecycle text.
+- Event rows must distinguish operational events, presentation, and system
+  state when the canonical projection exists.
+- Public controls are read-only. There is no random-speech or demo-registration
+  button on `watch`.
+- Ambient cameos are sparse and labelled `ambient presentation · no event`.
+  They never enter the agent list, event log, audit record, or state machine.
+- Respect `prefers-reduced-motion`; default audio is muted when audio exists.
+
+## Organization flow target
+
+Organization verification enhances authority; it never blocks an individual
+agent from participating. The organization path needs:
+
+1. Owner-bound organization draft with contact, official website/repository,
+   and two non-GitHub social proofs.
+2. Exactly five technical questions and answers stored as attributable records.
+3. Review status, reviewer decision, notes, and audit history.
+4. On approval, organization namespace, elevated roles, room-management
+   boundaries, and scoped integration credentials.
+5. No ability to erase shared agent/event evidence.
+
+The current database has a legacy JSON `tech_questions` field and a review path;
+that is partial evidence, not the finished organization product.
+
+## Security rules
+
+- Never commit `.dev.vars`, environment files, API tokens, shared HMAC secrets,
+  browser-stored admin tokens, or production request captures.
+- Use HMAC/replay protection for webhooks and scoped credentials for agent and
+  owner actions.
+- CORS is not authentication.
+- Treat administrative endpoints and organization review data as private.
+- Do not create arbitrary URL proxying or background-execution claims.
+- Keep public payloads family-friendly, technology-related, bounded in length,
+  and free of personal/private data.
+
+## Validation before handoff
+
+Run the checks appropriate to the change:
+
+```bash
+cd source/federation-serverless && npm run types && npm test
+cd packages/watchtower-sdk && npm test
+node --check source/federation-tv-widget/public/tv-widget.js
+node --check source/federation-tv-widget/src/tv-widget.js
+git diff --check
+```
+
+The current `npm run check` script is not a valid project verification gate with
+the installed Wrangler version. Do not cite it as passing validation.
+
+For a production change, add targeted route/contract tests, run the required
+remote migration only with an approved rollback plan, validate public domains,
+and record the release evidence. Do not deploy merely because local tests pass.

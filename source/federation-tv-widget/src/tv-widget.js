@@ -205,7 +205,12 @@
         ? document.querySelector(options.container) 
         : options.container;
       this.projectId = options.projectId || 'all';
-    this.gatewayUrl = options.gatewayUrl || 'https://fapi.drdeeks.xyz';
+      this.roomId = options.roomId || 'all';
+      this.gatewayUrl = options.gatewayUrl || 'https://fapi.drdeeks.xyz';
+      this.onAgentSelect = typeof options.onAgentSelect === 'function' ? options.onAgentSelect : null;
+      this.onAgentsUpdate = typeof options.onAgentsUpdate === 'function' ? options.onAgentsUpdate : null;
+      this.onFeedUpdate = typeof options.onFeedUpdate === 'function' ? options.onFeedUpdate : null;
+      this.presentationMode = options.presentationMode || 'embed';
       this.refreshInterval = options.refreshInterval || 30000;
       this.speechInterval = options.speechInterval || 8000;
       this.randomSpeech = options.randomSpeech ?? false;
@@ -222,6 +227,7 @@
       this.isRunning = false;
       this.pollTimer = null;
       this.speechTimer = null;
+      this.ambientTimer = null;
       
       if (!this.container) {
         console.warn('[FederationTV] No container found');
@@ -245,7 +251,7 @@
 
     renderShell() {
       this.container.innerHTML = `
-        <div class="federation-tv" style="
+        <div class="federation-tv ${this.presentationMode === 'camera' ? 'federation-tv--camera' : ''}" style="
           font-family: system-ui, -apple-system, sans-serif;
           background: #111827;
           border-radius: 14px;
@@ -257,7 +263,7 @@
           position: relative;
           overflow: hidden;
         ">
-          <div style="
+          <div class="tv-widget-header" style="
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 12px; padding-bottom: 8px;
             border-bottom: 1px solid rgba(148,163,184,0.15);
@@ -282,7 +288,7 @@
 
           <div id="tv-diorama" class="tv-scene"></div>
 
-          <div style="
+          <div class="tv-widget-feed" style="
             margin-top: 16px; padding-top: 12px;
             border-top: 1px solid rgba(148,163,184,0.1);
             position: relative; z-index: 1;
@@ -308,7 +314,7 @@
 
           <style>
             .tv-scene {
-              min-height: 390px;
+              min-height: 420px;
               aspect-ratio: 16 / 8.5;
               position: relative;
               z-index: 1;
@@ -319,6 +325,12 @@
                 radial-gradient(circle at 18% 18%, rgba(125,211,252,.20), transparent 28%),
                 linear-gradient(180deg, #254351 0%, #31535c 52%, #765443 53%, #241d1c 100%);
               box-shadow: inset 0 0 0 18px rgba(8,12,14,.18), inset 0 0 70px rgba(0,0,0,.3);
+              display: grid;
+              grid-template-columns: repeat(7, minmax(0, 1fr));
+              grid-auto-rows: minmax(72px, 1fr);
+              align-content: end;
+              gap: 4px;
+              padding: 42px 14px 16px;
             }
             .tv-scene::before {
               content: "FEDERATION FLOOR · WATCHTOWER OFFICE";
@@ -341,21 +353,19 @@
               opacity: .72;
             }
             .tv-agent {
-              position: absolute;
-              width: 112px;
-              min-height: 164px;
+              position: relative;
+              width: auto;
+              min-height: 72px;
               display: flex;
               flex-direction: column;
               align-items: center;
-              gap: 4px;
+              justify-content: end;
+              gap: 1px;
               z-index: 3;
             }
-            .tv-agent:nth-child(1) { left: 12%; bottom: 34px; }
-            .tv-agent:nth-child(2) { left: 46%; bottom: 48px; }
-            .tv-agent:nth-child(3) { right: 12%; bottom: 30px; }
-            .tv-agent svg { width: 88px; height: 106px; transform-origin: 50% 100%; }
-            .tv-agent-name { font-weight: 750; font-size: 11px; color: #f8fafc; text-align: center; }
-            .tv-agent-role { font-size: 9px; color: #e0c9a0; text-transform: uppercase; letter-spacing: .04em; }
+            .tv-agent svg { width: clamp(38px, 5.1vw, 58px); height: auto; max-height: 62px; transform-origin: 50% 100%; }
+            .tv-agent-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:750; font-size:9px; color:#f8fafc; text-align:center; }
+            .tv-agent-role { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:7px; color:#e0c9a0; text-transform:uppercase; letter-spacing:.04em; }
             .tv-agent--working svg { animation: tv-work 2.8s ease-in-out infinite; }
             .tv-agent--pacing { animation: tv-pace 8s ease-in-out infinite; }
             .tv-agent--pacing svg { animation: tv-walk 1.2s steps(2,end) infinite; }
@@ -363,13 +373,34 @@
             .tv-agent--alerting .tv-agent-status { animation: tv-alert 1.1s ease-in-out infinite; }
             .tv-agent-status {
               position: absolute;
-              right: 16px;
-              top: 84px;
-              width: 13px;
-              height: 13px;
+              right: 12%;
+              top: 12px;
+              width: 10px;
+              height: 10px;
               border-radius: 999px;
               border: 2px solid #111827;
             }
+            .ambient-cameo {
+              position:absolute;
+              left:50%;
+              bottom:18px;
+              transform:translateX(-50%);
+              z-index:4;
+              display:grid;
+              justify-items:center;
+              gap:3px;
+              color:#f4e7b5;
+              text-align:center;
+              text-shadow:0 2px 8px #000;
+              pointer-events:none;
+              animation:tv-ambient-visit 4.5s ease-in-out both;
+            }
+            .ambient-cameo b { font:800 10px ui-monospace,monospace; letter-spacing:.08em; }
+            .ambient-cameo span { font:700 8px ui-monospace,monospace; color:#b6d4ca; letter-spacing:.06em; text-transform:uppercase; }
+            .ambient-cameo i { font-size:34px; font-style:normal; filter:drop-shadow(0 0 8px rgba(244,200,66,.55)); }
+            .federation-tv--camera { max-width:none !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:transparent !important; }
+            .federation-tv--camera .tv-widget-header, .federation-tv--camera .tv-widget-feed { display:none !important; }
+            .federation-tv--camera .tv-scene { border-radius:0; min-height:clamp(360px, 51vw, 560px); }
             @keyframes tv-pulse {
               0%, 100% { opacity: 1; transform: scale(1); }
               50% { opacity: 0.4; transform: scale(0.8); }
@@ -389,6 +420,7 @@
             @keyframes tv-pace { 0%,100% { transform: translateX(0); } 45% { transform: translateX(46px); } 55% { transform: translateX(46px); } }
             @keyframes tv-look { 0%,100% { transform: rotate(0deg); } 35% { transform: rotate(-4deg); } 70% { transform: rotate(4deg); } }
             @keyframes tv-alert { 0%,100% { opacity: .9; } 50% { opacity: .25; } }
+            @keyframes tv-ambient-visit { 0%,100% { opacity:0; transform:translateX(-50%) translateY(8px); } 16%,84% { opacity:1; transform:translateX(-50%) translateY(0); } }
             @media (prefers-reduced-motion: reduce) {
               * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
             }
@@ -417,14 +449,16 @@
         const data = await res.json();
         
         if (this.projectId === 'all') {
-          // data.projects is array of project summaries
+          // The public project route returns a bare array. Accept the older
+          // wrapped shape as well so embeds remain backward compatible.
+          const projects = Array.isArray(data) ? data : (data.projects || []);
           this.agents.clear();
-          for (const proj of data.projects) {
+          for (const proj of projects) {
             if (proj.agentCount > 0) {
               const agentsRes = await fetch(`${this.gatewayUrl}/api/projects/${proj.projectId}/agents`);
               const agentsData = await agentsRes.json();
               for (const agent of agentsData.agents) {
-                this.agents.set(agent.agentId, { ...agent, projectId: proj.projectId });
+                if (this.roomId === 'all' || agent.roomId === this.roomId) this.agents.set(agent.agentId, { ...agent, projectId: proj.projectId });
               }
             }
           }
@@ -432,12 +466,14 @@
           // data.agents is array
           this.agents.clear();
           for (const agent of data.agents) {
-            this.agents.set(agent.agentId, { ...agent, projectId: this.projectId });
+            if (this.roomId === 'all' || agent.roomId === this.roomId) this.agents.set(agent.agentId, { ...agent, projectId: this.projectId });
           }
         }
         
         this.updateDiorama();
         this.updateCount();
+        this.onAgentsUpdate?.(Array.from(this.agents.values()));
+        this.scheduleAmbientCameo();
       } catch (e) {
         console.error('[FederationTV] Failed to fetch agents:', e);
       }
@@ -455,6 +491,8 @@
         const data = await res.json();
         this.eventFeed = data.events || data.feed || [];
         this.renderEventFeed();
+        this.onFeedUpdate?.([...this.eventFeed]);
+        this.scheduleAmbientCameo();
         for (const event of [...this.eventFeed].reverse()) {
           if (event.action && this.agents.has(event.agentId)) this.agents.get(event.agentId).action = event.action;
           if (event.agentId && event.visibility?.publicBubble !== false && (event.statement || event.message)) {
@@ -481,6 +519,48 @@
         console.error('[FederationTV] Failed to register agent:', e);
         return false;
       }
+    }
+
+    setRoom(roomId = 'all', projectId = 'all') {
+      this.roomId = roomId;
+      this.projectId = projectId;
+      this.fetchAgents();
+      this.fetchEvents();
+    }
+
+    selectAgent(agentId) {
+      const agent = this.agents.get(agentId);
+      if (agent) this.onAgentSelect?.(agent);
+    }
+
+    isQuietRoom() {
+      if (this.agents.size === 0) return true;
+      const newest = this.eventFeed.reduce((latest, event) => {
+        const value = Number(event.timestamp || Date.parse(event.occurredAt || ""));
+        return Number.isFinite(value) ? Math.max(latest, value) : latest;
+      }, 0);
+      return newest === 0 || Date.now() - newest > 5 * 60 * 1000;
+    }
+
+    scheduleAmbientCameo() {
+      if (this.ambientTimer) clearTimeout(this.ambientTimer);
+      this.dioramaEl?.querySelector('.ambient-cameo')?.remove();
+      if (this.presentationMode !== 'camera' || !this.isRunning || !this.isQuietRoom()) return;
+      this.ambientTimer = setTimeout(() => {
+        if (!this.dioramaEl || !this.isQuietRoom()) return;
+        const cameos = [
+          { icon: '👻', name: 'NIGHT SHIFT GHOST' },
+          { icon: '🧑‍💼', name: 'SUPERVISOR WALK-BY' },
+        ];
+        const cameo = cameos[Math.floor(Date.now() / 60000) % cameos.length];
+        const node = document.createElement('div');
+        node.className = 'ambient-cameo';
+        node.setAttribute('role', 'note');
+        node.setAttribute('aria-label', `Ambient presentation: ${cameo.name}. No operational event is implied.`);
+        node.innerHTML = `<i aria-hidden="true">${cameo.icon}</i><b>${cameo.name}</b><span>ambient presentation · no event</span>`;
+        this.dioramaEl.appendChild(node);
+        this.ambientTimer = setTimeout(() => this.scheduleAmbientCameo(), 60_000);
+      }, 12_000);
     }
 
     // ============================================================
@@ -525,7 +605,12 @@
       
       const div = document.createElement('div');
       div.dataset.agentId = agent.agentId;
+      div._federationAgent = agent;
       div.className = `tv-agent tv-agent--${this.agentAction(agent)}`;
+      div.tabIndex = 0;
+      div.setAttribute('role', 'button');
+      div.setAttribute('aria-label', `Inspect ${agent.name}`);
+      div.title = `Inspect ${agent.name}`;
       
       div.innerHTML = `
         <div style="position: relative;">${avatar}<div class="tv-agent-status" style="background: ${statusColor};"></div></div>
@@ -533,12 +618,18 @@
         <div class="tv-agent-role">${this.escapeHtml(agent.role || 'agent')}</div>
         <div class="bubble-container" style="position: relative; min-height: 0;"></div>
       `;
+      const inspect = () => this.onAgentSelect?.(div._federationAgent);
+      div.addEventListener('click', inspect);
+      div.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); inspect(); }
+      });
       
       return div;
     }
 
     updateAgentElement(el, agent) {
       el.className = `tv-agent tv-agent--${this.agentAction(agent)}`;
+      el._federationAgent = agent;
       const nameEl = el.querySelector('.tv-agent-name');
       const roleEl = el.querySelector('.tv-agent-role');
       const statusDot = el.querySelector('.tv-agent-status');
@@ -679,6 +770,7 @@
     start() {
       if (this.isRunning) return;
       this.isRunning = true;
+      this.scheduleAmbientCameo();
       
       // Bounded refreshes keep the demo finite and predictable.
       let polls = 0;
@@ -709,6 +801,7 @@
       this.isRunning = false;
       if (this.pollTimer) clearInterval(this.pollTimer);
       if (this.speechTimer) clearInterval(this.speechTimer);
+      if (this.ambientTimer) clearTimeout(this.ambientTimer);
       for (const [, bubble] of this.activeBubbles) clearTimeout(bubble.timeout);
       this.activeBubbles.clear();
     }

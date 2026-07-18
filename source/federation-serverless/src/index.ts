@@ -158,17 +158,32 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+    const hostname = url.hostname.toLowerCase();
+    const isWatchHost = hostname === "watch.drdeeks.xyz";
+    const isFederationHost = hostname === "federation.drdeeks.xyz";
+    const isApiHost = hostname === "fapi.drdeeks.xyz";
+    const isDevelopmentHost = env.ENVIRONMENT !== "production" && (hostname === "localhost" || hostname === "127.0.0.1");
 
-    // Public Watch host: serve the static TV and keep API/admin routes off this hostname.
-    if (url.hostname.toLowerCase() === "watch.drdeeks.xyz") {
-      if (method !== "GET" && method !== "HEAD") {
-        return new Response("Method Not Allowed", { status: 405 });
-      }
-      const assetRequest = path === "/"
-        ? new Request(new URL("/index.html", request.url), request)
-        : request;
-      return env.ASSETS.fetch(assetRequest);
+    // watch is the universal human-facing access point. It never accepts a
+    // webhook, MCP request, API mutation, or credential-bearing browser form.
+    if (isWatchHost) {
+      const allowed = path === "/" || path === "/index.html" || path === "/join.html" || path === "/integrate.html" || path === "/agent-skill.md" || path === "/tv-widget.js" || path.startsWith("/brand/");
+      if ((method !== "GET" && method !== "HEAD") || !allowed) return error("not found", 404);
+      const assetPath = path === "/" ? "/index.html" : path;
+      return env.ASSETS.fetch(new Request(new URL(assetPath, request.url), request));
     }
+
+    // federation is reserved for approved members and elevated roles. The
+    // actual role model is a later checklist phase; meanwhile the only live
+    // privileged surface is the token-protected operator console.
+    if (isFederationHost) {
+      const allowed = path === "/" || path === "/federation.html" || path === "/operator.html" || path.startsWith("/brand/");
+      if ((method !== "GET" && method !== "HEAD") || !allowed) return error("not found", 404);
+      const assetPath = path === "/" ? "/federation.html" : path;
+      return env.ASSETS.fetch(new Request(new URL(assetPath, request.url), request));
+    }
+
+    if (!isApiHost && !isDevelopmentHost) return error("unknown Federation host", 404);
 
     if (method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -178,6 +193,21 @@ export default {
 
       // ==================== HEALTH ====================
       if (path === "/health") return json({ status: "healthy", timestamp: Date.now() });
+
+      // fapi is a machine-only origin. Its discovery response directs people
+      // to watch without turning the API hostname into a second public site.
+      if (path === "/" && method === "GET") {
+        return json({
+          service: "Federation Watchtower API",
+          version: "v1",
+          health: "/health",
+          eventIngestion: "/api/v1/events",
+          mcp: "/mcp",
+          websocket: "/ws?projectId={projectId}",
+          universalAccess: "https://watch.drdeeks.xyz/",
+          integrationGuide: "https://watch.drdeeks.xyz/integrate.html",
+        });
+      }
 
       // ==================== REMOTE MCP GATEWAY ====================
       if (path === "/mcp") {
@@ -494,18 +524,6 @@ export default {
 
       // ==================== WEBSOCKET ====================
       if (path === "/ws" && request.headers.get("Upgrade") === "websocket") return handleWebSocket(request, env);
-
-      // ==================== STATIC ASSETS (TV Widget) ====================
-      if (path === "/" || path === "/index.html" || path === "/operator.html" || path === "/demo.html" || path === "/test-local.html") {
-        const assetPath = path === "/" ? "/index.html" : path;
-        const asset = await env.ASSETS.fetch(new Request(new URL(assetPath, request.url)));
-        const headers = new Headers(asset.headers);
-        for (const [name, value] of Object.entries(corsHeaders)) headers.set(name, value);
-        return new Response(asset.body, { status: asset.status, headers });
-      }
-      if (path.startsWith("/assets/") || path.startsWith("/static/") || path === "/tv-widget.js") {
-        return env.ASSETS.fetch(request);
-      }
 
       return error("Not found", 404);
     } catch (e) {
