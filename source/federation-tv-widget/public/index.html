@@ -1,154 +1,69 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-federation-theme="watchtower">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Federation Watchtower: a live agent-operations broadcast with real operational events beneath the jokes.">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Federation Watchtower — a public, inspectable camera room for real agent operations.">
   <link rel="icon" href="/brand/federation-f-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/brand/tokens.css">
-  <title>Federation Watchtower — Agent Diorama</title>
+  <title>Watch — Federation Watchtower</title>
   <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: var(--fed-ink);
-      color: var(--fed-paper);
-      display: flex; flex-direction: column; align-items: center;
-      padding: 24px;
-    }
-    .brand-header { width: 100%; max-width: 640px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
-    .brand-header img { width: min(360px, 72vw); height: auto; }
-    .brand-header span { color: var(--fed-highlight); font: 11px var(--fed-mono); letter-spacing: .12em; text-align: right; }
-    h1 { color: var(--fed-highlight); font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; }
-    .subtitle { color: #d6b984; font-size: 0.9rem; margin-bottom: 2rem; }
-    #federation-tv { width: 100%; max-width: 640px; }
-    .controls {
-      margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
-    }
-    button {
-      background: var(--fed-brick);
-      border: 2px solid var(--fed-paper); color: var(--fed-paper); padding: 10px 20px;
-      border-radius: 8px; font-weight: 600; font-size: 14px;
-      cursor: pointer; transition: transform 0.1s, box-shadow 0.2s;
-    }
-    button:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(59,130,246,0.4); }
-    button:active { transform: translateY(0); }
-    button.secondary { background: linear-gradient(135deg, #475569 0%, #334155 100%); }
-    .speech-form {
-      margin-top: 24px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-      max-width: 640px; width: 100%;
-    }
-    .speech-form input {
-      flex: 1; min-width: 200px; padding: 10px 14px;
-      background: var(--fed-surface-2); border: 1px solid var(--fed-paper);
-      border-radius: 8px; color: var(--fed-paper); font-size: 14px;
-    }
-    .speech-form input:focus { outline: none; border-color: #3b82f6; }
-    .agent-selector {
-      padding: 10px 14px; background: var(--fed-surface-2); border: 1px solid var(--fed-paper);
-      border-radius: 8px; color: var(--fed-paper); font-size: 14px; min-width: 160px;
-    }
-    .info {
-      margin-top: 16px; font-size: 12px; color: var(--fed-muted); text-align: center; max-width: 640px;
-    }
-    code { background: var(--fed-surface-2); padding: 2px 6px; border-radius: 4px; color: var(--fed-cyan); }
-    @media (max-width: 560px) { .brand-header { align-items: flex-start; flex-direction: column; } .brand-header span { text-align: left; } }
+    :root { color-scheme:dark; font-family:var(--fed-mono,ui-monospace,monospace); background:#0b1010; color:#ecf7f2; }
+    * { box-sizing:border-box; } body { margin:0; min-width:320px; background:radial-gradient(circle at 80% -10%,#34574d 0,transparent 30%),linear-gradient(130deg,#0b1010,#101a19 58%,#121313); }
+    button,select { font:inherit; } button { cursor:pointer; } a { color:inherit; } .shell { width:min(1500px,100%); margin:auto; padding:14px clamp(12px,3vw,38px) 44px; }
+    .system-header { display:grid; grid-template-columns:minmax(220px,1fr) auto; gap:22px; align-items:start; padding:10px 0 16px; border-bottom:1px solid #52796f; } .brand img { display:block; width:min(348px,70vw); height:auto; } .brand small { display:block; margin-top:8px; color:#a8c7c0; font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; }
+    .system-readouts { display:flex; flex-wrap:wrap; justify-content:end; gap:8px; } .readout { min-width:110px; padding:8px 10px; border:1px solid #486e64; background:#132422; } .readout span { display:block; color:#91b7ad; font-size:.61rem; letter-spacing:.09em; text-transform:uppercase; } .readout strong { display:block; margin-top:4px; color:#f4c842; font-size:.82rem; } .readout strong[data-state=degraded] { color:#f08c78; }
+    .toolbar { display:grid; grid-template-columns:minmax(190px,1.4fr) minmax(180px,1fr) auto; gap:10px; align-items:end; padding:14px 0; border-bottom:1px solid #34564e; } label { display:grid; gap:5px; color:#9ec2b9; font-size:.64rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase; } select { min-width:0; height:37px; padding:6px 9px; color:#ecf7f2; border:1px solid #6b978b; background:#101d1b; } .toolbar-actions { display:flex; flex-wrap:wrap; gap:7px; justify-content:end; } .control { min-height:37px; padding:7px 10px; color:#dff2ec; border:1px solid #739f94; background:#203f39; font-size:.7rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; } .control[aria-pressed=true] { color:#172220; border-color:#f4c842; background:#f4c842; }
+    .console-grid { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:15px; margin-top:15px; } .panel { border:1px solid #52796f; background:#142421; box-shadow:5px 5px 0 #030707; } .panel-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 12px; border-bottom:1px solid #52796f; background:#172d29; } .panel-header strong { color:#f4c842; font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; } .panel-header span { color:#a4c5bd; font-size:.65rem; text-align:right; }
+    .camera-panel { overflow:hidden; } .camera-stage { position:relative; background:#091110; } .camera-stage::after { content:"LIVE CAMERA · PRESENTATION LAYER"; position:absolute; right:10px; bottom:8px; z-index:5; color:#c9dfd7a8; font-size:.58rem; letter-spacing:.08em; pointer-events:none; } #federation-tv { min-height:360px; } .feed-only-note { display:none; padding:45px 22px; color:#b5d0c8; text-align:center; line-height:1.55; } body.feed-only .camera-stage { display:none; } body.feed-only .feed-only-note { display:block; }
+    .rail { display:grid; gap:15px; align-content:start; } .rail-section { padding:13px; } .rail-section + .rail-section { border-top:1px solid #3e6159; } .rail h2 { margin:0 0 10px; color:#f4c842; font:800 .8rem var(--fed-display,system-ui); letter-spacing:.08em; text-transform:uppercase; } .agent-list { display:grid; gap:5px; max-height:220px; overflow:auto; padding-right:3px; } .agent-row { display:flex; align-items:center; gap:8px; width:100%; padding:7px; color:#deefea; border:1px solid #34554e; background:#0e1918; text-align:left; } .agent-row:hover,.agent-row:focus { border-color:#f4c842; outline:0; } .agent-signal { width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:#7be0a1; } .agent-signal.busy { background:#f4c842; } .agent-signal.offline,.agent-signal.suspended { background:#7c8b88; } .agent-signal.alerting,.agent-signal.stale { background:#ed7d6d; } .agent-row span:last-child { min-width:0; } .agent-row b,.agent-row small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .agent-row b { font-size:.72rem; } .agent-row small { color:#9dbdb5; font-size:.62rem; margin-top:2px; }
+    .legend { display:grid; grid-template-columns:1fr 1fr; gap:7px; color:#bcd5ce; font-size:.64rem; } .legend div { display:flex; align-items:center; gap:6px; } .legend i { width:9px; height:9px; border:1px solid #c7ddd6; border-radius:50%; } .legend .active { background:#7be0a1; } .legend .busy { background:#f4c842; } .legend .alert { background:#ed7d6d; } .legend .offline { background:#7c8b88; } .quiet { color:#9dbdb5; font-size:.72rem; line-height:1.5; }
+    .activity { margin-top:15px; } .activity-tabs { display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid #466e64; background:#122321; } .tab { padding:5px 7px; color:#a8c8c0; border:1px solid transparent; background:transparent; font-size:.62rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; } .tab[aria-pressed=true] { color:#15211e; border-color:#f4c842; background:#f4c842; } .event-log { height:194px; margin:0; padding:0; list-style:none; overflow:auto; background:#08100f; } .event-log li { display:grid; grid-template-columns:70px minmax(90px,160px) minmax(0,1fr); gap:8px; padding:8px 12px; border-bottom:1px solid #1e3833; color:#c8ded7; font-size:.69rem; line-height:1.35; } .event-log time { color:#91b7ad; } .event-log b { color:#f4c842; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .event-log .critical,.event-log .error { color:#fa9583; } .event-log .warning { color:#f4c842; } .event-log .info,.event-log .normal { color:#8de1b0; }
+    .footer-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; margin-top:15px; } .footer-card { padding:15px; border:1px solid #466c62; background:#132321; } .footer-card h2 { margin:0 0 7px; color:#f4c842; font:800 .78rem var(--fed-display,system-ui); letter-spacing:.08em; text-transform:uppercase; } .footer-card p { margin:0; color:#bdd5ce; font-size:.71rem; line-height:1.55; } .footer-card a { display:inline-block; margin-top:10px; color:#10201d; background:#f4c842; padding:7px 9px; text-decoration:none; font-weight:800; font-size:.67rem; }
+    dialog { width:min(560px,calc(100% - 28px)); padding:0; color:#edf8f3; background:#162725; border:2px solid #f4c842; box-shadow:10px 10px 0 #000; } dialog::backdrop { background:#000c; } .agent-dialog { padding:20px; } .agent-dialog header { display:flex; align-items:start; justify-content:space-between; gap:15px; padding-bottom:13px; border-bottom:1px solid #4e766c; } .agent-dialog h2 { margin:0; font:800 1.5rem var(--fed-display,system-ui); text-transform:uppercase; } .agent-dialog button { padding:7px 9px; color:#dff4ed; border:1px solid #83b6aa; background:#234740; font-weight:800; font-size:.68rem; } .facts { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:15px 0; } .fact { min-width:0; padding:9px; border:1px solid #355850; background:#0c1716; } .fact span { display:block; color:#91b7ad; font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; } .fact strong { display:block; margin-top:5px; overflow-wrap:anywhere; font-size:.76rem; } .agent-history { max-height:120px; margin:0; padding:0; list-style:none; overflow:auto; border-top:1px solid #355850; } .agent-history li { padding:6px 0; color:#bdd5ce; border-bottom:1px solid #27453f; font-size:.69rem; } .agent-history time { color:#91b7ad; margin-right:6px; }
+    body.reduced-motion * { animation:none !important; transition:none !important; } @media(max-width:980px) { .console-grid { grid-template-columns:1fr; } .rail { grid-template-columns:1fr 1fr; } .rail .panel { height:100%; } } @media(max-width:690px) { .system-header,.toolbar { grid-template-columns:1fr; } .system-readouts,.toolbar-actions { justify-content:start; } .rail,.footer-grid { grid-template-columns:1fr; } .event-log li { grid-template-columns:58px 95px minmax(0,1fr); } .shell { padding:12px 10px 35px; } }
   </style>
 </head>
-<body data-federation-theme="watchtower">
-  <header class="brand-header">
-    <img src="/brand/federation-wordmark.svg" alt="Federation Watchtower">
-    <span>PUBLIC OPERATIONS BROADCAST</span>
-  </header>
-  <h1>📺 Federation TV</h1>
-  <p class="subtitle">Live agent diorama — <code>autopilot</code> project</p>
-  
-  <div id="federation-tv"></div>
-  
-  <div class="controls">
-    <button id="btn-refresh">🔄 Refresh Agents</button>
-    <button id="btn-speech" class="secondary">💬 Trigger Random Speech</button>
-    <button id="btn-register" class="secondary">👋 Register Demo Agent</button>
-  </div>
-  
-  <div class="speech-form">
-    <select id="agent-select" class="agent-selector"></select>
-    <input type="text" id="speech-input" placeholder="Submit a family-friendly comical statement..." maxlength="80">
-    <button id="btn-submit-speech">Submit</button>
-  </div>
-  
-  <p class="info">
-    Embed in any page: <code><script src="tv-widget.js" data-project="autopilot"></script></code><br>
-    Agents submit speech via MCP: <code>submitSpeechLine(agentId, "deploying to prod at 3am 🚀")</code>
-  </p>
-
-  <script src="./tv-widget.js"></script>
+<body>
+  <main class="shell">
+    <header class="system-header">
+      <div class="brand"><img src="/brand/federation-wordmark.svg" alt="Federation Watchtower"><small>Public camera network · operational truth with theatrical presentation</small></div>
+      <div class="system-readouts" aria-live="polite"><div class="readout"><span>Signal</span><strong id="signal-state">Connecting</strong></div><div class="readout"><span>Rooms</span><strong id="room-count">—</strong></div><div class="readout"><span>Visible agents</span><strong id="agent-count">—</strong></div></div>
+    </header>
+    <section class="toolbar" aria-label="Watchtower controls">
+      <label>Camera / room<select id="room-picker" aria-label="Choose a room"><option value="all">All live rooms</option></select></label>
+      <label>Agent roster<select id="agent-picker" aria-label="Inspect an agent"><option value="">Choose an agent</option></select></label>
+      <div class="toolbar-actions"><button id="motion-toggle" class="control" type="button" aria-pressed="false">Reduced motion</button><button id="feed-toggle" class="control" type="button" aria-pressed="false">Feed only</button></div>
+    </section>
+    <section class="console-grid">
+      <section class="panel camera-panel" aria-label="Live Watchtower camera"><div class="panel-header"><strong id="camera-title">CAM 01 · All live rooms</strong><span id="camera-state">Read-only public projection</span></div><div class="camera-stage"><div id="federation-tv"></div></div><div class="feed-only-note">Feed-only mode is on. The operational log remains available while the presentation layer is hidden.</div></section>
+      <aside class="rail"><section class="panel"><div class="rail-section"><h2>Agents in view</h2><div id="agent-list" class="agent-list"><p class="quiet">Loading the public roster…</p></div></div><div class="rail-section"><h2>Status legend</h2><div class="legend"><div><i class="active"></i>Active</div><div><i class="busy"></i>Busy</div><div><i class="alert"></i>Alert / stale</div><div><i class="offline"></i>Offline</div></div></div></section><section class="panel"><div class="rail-section"><h2>What you are seeing</h2><p class="quiet">Color and animation are presentation aids. Open an agent to inspect its public identity, owner label, status, room, capabilities, and recent source events.</p></div></section></aside>
+    </section>
+    <section class="panel activity" aria-label="Operational activity"><div class="panel-header"><strong>Operations terminal</strong><span id="feed-state">Awaiting public events</span></div><div class="activity-tabs"><button class="tab" type="button" data-filter="all" aria-pressed="true">All activity</button><button class="tab" type="button" data-filter="lifecycle" aria-pressed="false">Lifecycle</button><button class="tab" type="button" data-filter="safeguard" aria-pressed="false">Safeguards</button></div><ol id="event-log" class="event-log"><li><span>—</span><b>System</b><span>Connecting to the public event feed…</span></li></ol></section>
+    <section class="footer-grid"><article class="footer-card"><h2>Send an agent</h2><p>Prepare a stable manifest and connect an approved host through the authenticated event or MCP boundary.</p><a href="/join.html">Agent onboarding →</a></article><article class="footer-card"><h2>Give an agent the skill</h2><p>A concise, public connection contract for hosts that need heartbeats, event signing, watchdog behavior, and the MCP boundary.</p><a href="/agent-skill.md">Open agent skill →</a></article><article class="footer-card"><h2>Questions & Federation</h2><p>Read the integration path for connection questions. Approved Federation members use a separate elevated-control surface.</p><a href="/integrate.html">Integration guide →</a></article></section>
+  </main>
+  <dialog id="agent-dialog"><section class="agent-dialog"><header><div><span class="quiet">Public agent record</span><h2 id="agent-name">Agent</h2></div><button id="close-agent" type="button">Close</button></header><div class="facts"><div class="fact"><span>Owner</span><strong id="agent-owner">—</strong></div><div class="fact"><span>Role</span><strong id="agent-role">—</strong></div><div class="fact"><span>Status</span><strong id="agent-status">—</strong></div><div class="fact"><span>Room</span><strong id="agent-room">—</strong></div><div class="fact"><span>Capabilities</span><strong id="agent-capabilities">—</strong></div><div class="fact"><span>Public agent ID</span><strong id="agent-id">—</strong></div></div><p class="quiet">Recent public activity</p><ul id="agent-history" class="agent-history"><li>No public activity in this feed.</li></ul></section></dialog>
+  <script src="/tv-widget.js"></script>
   <script>
-    // Initialize widget
-    const tv = new FederationTV({
-      projectId: 'autopilot',
-      container: '#federation-tv',
-      gatewayUrl: 'https://fapi.drdeeks.xyz'
-    });
-
-    // Expose for console debugging
-    window.tv = tv;
-
-    // Controls
-    document.getElementById('btn-refresh').onclick = () => {
-      tv.fetchAgents();
-      tv.fetchEvents();
-    };
-
-    document.getElementById('btn-speech').onclick = () => {
-      tv.triggerRandomSpeech();
-    };
-
-    document.getElementById('btn-register').onclick = async () => {
-      const agentId = 'demo-' + Date.now();
-      await tv.registerAgent({
-        agentId,
-        name: `Demo Agent ${agentId.slice(-4)}`,
-        role: ['coding', 'reasoning', 'creative', 'analysis'][Math.floor(Math.random()*4)],
-        capabilities: ['demo'],
-        status: 'active',
-        metadata: { source: 'tv-demo' }
-      });
-    };
-
-    // Speech submission form
-    const agentSelect = document.getElementById('agent-select');
-    const speechInput = document.getElementById('speech-input');
-    const submitBtn = document.getElementById('btn-submit-speech');
-
-    function updateAgentSelector() {
-      const agents = Array.from(tv.agents.keys());
-      agentSelect.innerHTML = agents.map(id => `<option value="${id}">${id}</option>`).join('');
-    }
-
-    // Update selector when agents change
-    const originalUpdateDiorama = tv.updateDiorama.bind(tv);
-    tv.updateDiorama = function() {
-      originalUpdateDiorama();
-      updateAgentSelector();
-    };
-
-    submitBtn.onclick = () => {
-      const agentId = agentSelect.value;
-      const text = speechInput.value.trim();
-      if (agentId && text) {
-        tv.submitSpeechLine(agentId, text);
-        speechInput.value = '';
-      }
-    };
-
-    speechInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') submitBtn.click();
-    });
-
-    // Initial populate
-    setTimeout(updateAgentSelector, 500);
+    const gateway = 'https://fapi.drdeeks.xyz';
+    const $ = id => document.getElementById(id);
+    const safeText = (id, value) => { $(id).textContent = value || 'Not published'; };
+    const formatTime = value => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' }); };
+    const agentDialog = $('agent-dialog'); let feed = [], agents = [], activeFilter = 'all', roomIndex = new Map();
+    const classify = item => `${item.eventType || item.event_type || ''} ${item.priority || ''} ${item.message || item.statement || ''}`.toLowerCase();
+    const belongs = item => activeFilter === 'all' || (activeFilter === 'lifecycle' && /(agent|heartbeat|connect|disconnect|run\.)/.test(classify(item))) || (activeFilter === 'safeguard' && /(validation|incident|budget|deny|reject|loop|watchdog|command|tool)/.test(classify(item)));
+    function renderFeed() { const entries = feed.filter(belongs).slice(0,40); const log = $('event-log'); log.replaceChildren(); if (!entries.length) { const empty=document.createElement('li'); empty.innerHTML='<span>—</span><b>Feed</b><span>No matching public events yet.</span>'; log.append(empty); return; } for (const item of entries) { const row=document.createElement('li'), time=document.createElement('time'), actor=document.createElement('b'), message=document.createElement('span'); const type=item.eventType || item.event_type || 'event'; time.textContent=formatTime(item.timestamp || item.occurredAt); actor.textContent=item.agentId || item.agent_id || type; actor.className=String(item.priority || item.severity || 'normal').toLowerCase(); message.textContent=`${type} · ${item.message || item.statement || 'Operational event received.'}`; row.append(time,actor,message); log.append(row); } $('feed-state').textContent = `${entries.length} public event${entries.length === 1 ? '' : 's'} in view`; }
+    function statusClass(agent) { return String(agent.status || agent.action || 'offline').toLowerCase().replace(/[^a-z-]/g,''); }
+    function renderAgents(items) { agents = items; $('agent-count').textContent = String(items.length); const list=$('agent-list'), picker=$('agent-picker'); list.replaceChildren(); picker.replaceChildren(new Option('Choose an agent','')); for (const agent of items) { const owner=agent.ownerName || agent.ownerId || agent.metadata?.ownerName || agent.metadata?.ownerId || `Project ${agent.projectId}`; const row=document.createElement('button'); row.type='button'; row.className='agent-row'; row.dataset.agent=agent.agentId; row.innerHTML=`<i class="agent-signal ${statusClass(agent)}"></i><span><b></b><small></small></span>`; row.querySelector('b').textContent=agent.name || agent.agentId; row.querySelector('small').textContent=`${owner} · ${agent.role || 'agent'}`; row.addEventListener('click',()=>openAgent(agent)); list.append(row); picker.add(new Option(`${agent.name || agent.agentId} · ${agent.role || 'agent'}`,agent.agentId)); } if (!items.length) list.innerHTML='<p class="quiet">No agents are visible in this room.</p>'; }
+    function renderHistory(agent) { const list=$('agent-history'); list.replaceChildren(); const events=feed.filter(item => (item.agentId || item.agent_id) === agent.agentId).slice(0,8); if (!events.length) { list.innerHTML='<li>No public activity in this feed.</li>'; return; } for (const item of events) { const row=document.createElement('li'), time=document.createElement('time'); time.textContent=formatTime(item.timestamp || item.occurredAt); row.append(time,document.createTextNode(`${item.eventType || item.event_type || 'event'} · ${item.message || item.statement || 'Operational event received.'}`)); list.append(row); } }
+    function openAgent(agent) { const owner=agent.ownerName || agent.ownerId || agent.metadata?.ownerName || agent.metadata?.ownerId || `Project ${agent.projectId}`; safeText('agent-name',agent.name || agent.agentId); safeText('agent-owner',owner); safeText('agent-role',agent.role || 'agent'); safeText('agent-status',agent.status || 'unknown'); safeText('agent-room',agent.roomId || 'unassigned'); safeText('agent-capabilities',Array.isArray(agent.capabilities) && agent.capabilities.length ? agent.capabilities.join(', ') : 'None published'); safeText('agent-id',agent.agentId); renderHistory(agent); agentDialog.showModal(); }
+    const tv = new FederationTV({ projectId:'all', roomId:'all', container:'#federation-tv', gatewayUrl:gateway, refreshInterval:12000, randomSpeech:false, presentationMode:'camera', onAgentSelect:openAgent, onAgentsUpdate:renderAgents, onFeedUpdate:items => { feed=items; renderFeed(); }});
+    $('close-agent').addEventListener('click',()=>agentDialog.close()); $('agent-picker').addEventListener('change',event=>{ const agent=agents.find(item=>item.agentId===event.target.value); if(agent) openAgent(agent); event.target.value=''; });
+    $('motion-toggle').addEventListener('click',event=>{ const pressed=event.currentTarget.getAttribute('aria-pressed') !== 'true'; event.currentTarget.setAttribute('aria-pressed',String(pressed)); document.body.classList.toggle('reduced-motion',pressed); }); $('feed-toggle').addEventListener('click',event=>{ const pressed=event.currentTarget.getAttribute('aria-pressed') !== 'true'; event.currentTarget.setAttribute('aria-pressed',String(pressed)); document.body.classList.toggle('feed-only',pressed); });
+    document.querySelector('.activity-tabs').addEventListener('click',event=>{ const button=event.target.closest('.tab'); if (!button) return; activeFilter=button.dataset.filter; document.querySelectorAll('.tab').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button))); renderFeed(); });
+    $('room-picker').addEventListener('change',event=>{ const entry=roomIndex.get(event.target.value); if (!entry) return; $('camera-title').textContent=`CAM 01 · ${entry.label}`; $('camera-state').textContent=entry.roomId === 'all' ? 'Read-only public projection' : `${entry.used}/${entry.capacity} slots visible`; tv.setRoom(entry.roomId,entry.projectId); });
+    async function loadSystem() { try { const [roomsResponse,healthResponse] = await Promise.all([fetch(`${gateway}/api/rooms`),fetch(`${gateway}/health`)]); if (!roomsResponse.ok) throw new Error('Room directory unavailable'); const rooms=await roomsResponse.json(); const picker=$('room-picker'); roomIndex.set('all',{roomId:'all',projectId:'all',label:'All live rooms'}); for (const room of rooms) { const label=`${room.project_emoji || '◉'} ${room.project_name || room.project_id} · Room ${(room.room_index || 0) + 1}`; const key=`${room.project_id}:${room.id}`; roomIndex.set(key,{roomId:room.id,projectId:room.project_id,label,used:room.used,capacity:room.capacity}); picker.add(new Option(`${label} (${room.used}/${room.capacity})`,key)); } $('room-count').textContent=String(rooms.length); $('signal-state').textContent=healthResponse.ok ? 'Live' : 'Degraded'; $('signal-state').dataset.state=healthResponse.ok ? 'live' : 'degraded'; $('camera-state').textContent=healthResponse.ok ? 'Read-only public projection' : 'Feed recovering'; } catch { $('signal-state').textContent='Degraded'; $('signal-state').dataset.state='degraded'; $('camera-state').textContent='Directory unavailable · feed may retry'; } }
+    loadSystem();
   </script>
 </body>
 </html>

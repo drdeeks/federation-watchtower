@@ -1,0 +1,20 @@
+{
+  "project": "Federation Watchtower",
+  "slug": "federation-watchtower",
+  "phases": [
+    "Phase 0: Existing State & Contract",
+    "Phase 1: Identity & Access",
+    "Phase 2: Persistence & Room Families",
+    "Phase 3: Ingress & Integrations",
+    "Phase 4: Watchtower UI & Choreography",
+    "Phase 5: Statement Induction & Payments",
+    "Phase 6: Governance & Safety",
+    "Phase 7: Verification & Release"
+  ],
+  "version": "1.0",
+  "created_at": "2026-07-18T04:40:00.876945+00:00",
+  "blueprint": "/home/drdeek/projects/federation/docs/blueprint/federation-watchtower/blueprint.md",
+  "checklist": "/home/drdeek/projects/federation/docs/blueprint/federation-watchtower/checklist.md",
+  "changelog": "/home/drdeek/projects/federation/docs/blueprint/federation-watchtower/CHANGELOG.md",
+  "assignments": "/home/drdeek/projects/federation/docs/blueprint/federation-watchtower/assignments.json"
+}
