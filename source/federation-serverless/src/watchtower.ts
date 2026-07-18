@@ -39,6 +39,25 @@ export interface GuardrailDecision {
   reason: string;
 }
 
+export interface LeaseRequest {
+  projectId: string;
+  agentId: string;
+  runId: string;
+  ttlSeconds: number;
+  scopes: string[];
+}
+
+export interface CommandAcknowledgement {
+  commandId: string;
+  agentId: string;
+  outcome: "contained" | "rejected" | "failed";
+  note?: string;
+}
+
+export interface LeaseValidationRequest {
+  agentId: string;
+}
+
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const PROJECT_IDENTIFIER = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const SEVERITIES = new Set<EventSeverity>(["info", "success", "warning", "error", "critical"]);
@@ -70,6 +89,40 @@ export function validateOperationalEvent(value: unknown, now = Date.now()): Oper
   return event;
 }
 
+export function validateLeaseRequest(value: unknown): LeaseRequest {
+  if (!isRecord(value)) throw new Error("lease body must be a JSON object");
+  const rawScopes = value.scopes === undefined ? [] : value.scopes;
+  if (!Array.isArray(rawScopes) || rawScopes.length > 16) throw new Error("scopes must contain at most 16 entries");
+  return {
+    projectId: requiredProjectId(value.projectId),
+    agentId: requiredIdentifier(value.agentId, "agentId"),
+    runId: requiredIdentifier(value.runId, "runId"),
+    ttlSeconds: requiredBoundedInteger(value.ttlSeconds, "ttlSeconds", 30, 900),
+    scopes: rawScopes.map(scope => requiredIdentifier(scope, "scope")),
+  };
+}
+
+export function validateCommandAcknowledgement(value: unknown): CommandAcknowledgement {
+  if (!isRecord(value)) throw new Error("command acknowledgement must be a JSON object");
+  const outcome = value.outcome;
+  if (outcome !== "contained" && outcome !== "rejected" && outcome !== "failed") throw new Error("command outcome is invalid");
+  const note = value.note === undefined ? undefined : requiredString(value.note, "note", 240);
+  return { commandId: requiredIdentifier(value.commandId, "commandId"), agentId: requiredIdentifier(value.agentId, "agentId"), outcome, note };
+}
+
+export function validateLeaseValidationRequest(value: unknown): LeaseValidationRequest {
+  if (!isRecord(value)) throw new Error("lease validation body must be a JSON object");
+  return { agentId: requiredIdentifier(value.agentId, "agentId") };
+}
+
+export function validateProjectId(value: unknown): string {
+  return requiredProjectId(value);
+}
+
+export function validateAgentId(value: unknown): string {
+  return requiredIdentifier(value, "agentId");
+}
+
 export function evaluateRunawayRules(event: OperationalEvent, context: RunawayContext): GuardrailDecision[] {
   const decisions: GuardrailDecision[] = [];
   const chainDepth = numberMetadata(event.metadata, "chainDepth");
@@ -86,6 +139,9 @@ export function evaluateRunawayRules(event: OperationalEvent, context: RunawayCo
   }
   if (event.eventType === "run.started" && event.chainKey && context.matchingChainStarts >= 2) {
     decisions.push({ ruleId: "duplicate-chain-v1", action: "pause", severity: "error", reason: `duplicate chain key ${event.chainKey} has ${context.matchingChainStarts} concurrent starts` });
+  }
+  if (event.eventType === "heartbeat.missed") {
+    decisions.push({ ruleId: "heartbeat-missed-v1", action: "alert", severity: "warning", reason: "agent missed its Watchtower heartbeat deadline" });
   }
   return decisions;
 }
@@ -150,6 +206,11 @@ function requiredProjectId(value: unknown): string {
 function requiredSeverity(value: unknown): EventSeverity {
   if (typeof value !== "string" || !SEVERITIES.has(value as EventSeverity)) throw new Error("severity is invalid");
   return value as EventSeverity;
+}
+
+function requiredBoundedInteger(value: unknown, field: string, min: number, max: number): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) throw new Error(`${field} must be an integer between ${min} and ${max}`);
+  return value;
 }
 
 function requiredDate(value: unknown, now: number): string {

@@ -1,14 +1,29 @@
 # Federation Watchtower agent contract
 
-Default gateway: `http://localhost:41207`; override with `FEDERATION_GATEWAY`.
+Production gateway: `https://fapi.drdeeks.xyz`; override with
+`FEDERATION_GATEWAY`. The public TV wall at `watch.drdeeks.xyz` is static-only
+and cannot accept API calls.
 
-Choose a unique `agentId`, `name`, `role`, and `capabilities` string array. Status: `active|busy|idle|offline`. Action: `working|pacing|watching|alerting`.
-
-Implemented routes: `POST /api/projects/watchtower/agents`, `POST /api/projects/watchtower/agents/{agentId}/heartbeat`, `PATCH /api/projects/watchtower/agents/{agentId}/status`, `POST /api/federation/statement`, `GET /api/projects/watchtower/agents`, `GET /api/feed`.
+Use the included `watchtower_loop.py` adapter to make a runner cooperative:
 
 ```bash
-curl -X POST "${FEDERATION_GATEWAY:-http://localhost:41207}/api/projects/watchtower/agents" -H 'Content-Type: application/json' -d '{"agentId":"my-agent-01","name":"My Agent","role":"builder","capabilities":["coding","tests"]}'
-curl -X POST "${FEDERATION_GATEWAY:-http://localhost:41207}/api/federation/statement" -H 'Content-Type: application/json' -d '{"agentId":"my-agent-01","eventType":"task_completed","severity":"success","statement":"Task complete.","action":"working"}'
+export WATCHTOWER_INGESTION_SECRET='set-this-outside-the-repository'
+python3 watchtower_loop.py --project autopilot --agent build-01 heartbeat
+python3 watchtower_loop.py --project autopilot --agent build-01 lease --run run-42 --scope deployment
+python3 watchtower_loop.py --project autopilot --agent build-01 event --type run.started --severity info --statement "Deployment gate opened." --run run-42 --metadata '{"chainDepth":1}'
+# Store leaseId from JSON, then check immediately before each external side effect.
+python3 watchtower_loop.py --project autopilot --agent build-01 validate --lease lease_example
 ```
 
-Statement packets require `agentId`, `eventType`, `severity`, and a 1–120 character `statement`; `action` is optional. Organization verification with exactly five technical questions is a future/production workflow, not part of this local adapter.
+The adapter exits `3` if the lease is not active. Treat that as a hard stop,
+poll `commands`, contain the local runner, then acknowledge the command:
+
+```bash
+python3 watchtower_loop.py --project autopilot --agent build-01 commands
+python3 watchtower_loop.py --project autopilot --agent build-01 ack --command cmd_example --outcome contained
+```
+
+Every request is HMAC-signed with `WATCHTOWER_INGESTION_SECRET` using
+`<timestamp>.<exact body>`. See
+`source/federation-serverless/agents-skill.md` for the complete event and API
+contract.

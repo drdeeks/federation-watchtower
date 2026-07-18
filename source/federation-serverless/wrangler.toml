@@ -15,6 +15,10 @@ class_name = "FederationCoordinator"
 name = "PROJECT_GUARDRAIL"
 class_name = "ProjectGuardrail"
 
+[[durable_objects.bindings]]
+name = "AGENT_WATCHDOG"
+class_name = "AgentWatchdog"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "federation-db"
@@ -30,6 +34,25 @@ binding = "ASSETS"
 
 [vars]
 ENVIRONMENT = "production"
+
+[secrets]
+required = ["WATCHTOWER_INGESTION_SECRET", "WATCHTOWER_ADMIN_TOKEN"]
+
+[[queues.producers]]
+binding = "WATCHTOWER_ALERTS"
+queue = "watchtower-alerts"
+
+[[queues.consumers]]
+queue = "watchtower-alerts"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "watchtower-alerts-dlq"
+
+[[queues.consumers]]
+queue = "watchtower-alerts-dlq"
+max_batch_size = 10
+max_batch_timeout = 30
 
 [observability]
 enabled = true
@@ -56,5 +79,9 @@ type = "durable-object"
 storage = "sqlite"
 
 [exports.ProjectGuardrail]
+type = "durable-object"
+storage = "sqlite"
+
+[exports.AgentWatchdog]
 type = "durable-object"
 storage = "sqlite"

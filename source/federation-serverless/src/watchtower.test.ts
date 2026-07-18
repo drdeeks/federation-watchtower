@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { constantTimeEqual, evaluateRunawayRules, validateOperationalEvent } from "./watchtower.ts";
+import {
+  constantTimeEqual, evaluateRunawayRules, validateCommandAcknowledgement,
+  validateLeaseRequest, validateLeaseValidationRequest, validateOperationalEvent,
+} from "./watchtower.ts";
 
 const now = Date.parse("2026-07-17T16:00:00.000Z");
 
@@ -40,6 +43,30 @@ test("requires approval after three validation failures", () => {
   const parsed = validateOperationalEvent(event(), now);
   const decisions = evaluateRunawayRules(parsed, { failedAttempts: 3, matchingChainStarts: 0 });
   assert.equal(decisions[0]?.action, "require_approval");
+});
+
+test("creates an alert decision when a watchdog reports a missed heartbeat", () => {
+  const parsed = validateOperationalEvent(event({ eventType: "heartbeat.missed", severity: "warning", metadata: {} }), now);
+  const decisions = evaluateRunawayRules(parsed, { failedAttempts: 0, matchingChainStarts: 0 });
+  assert.deepEqual(decisions, [{
+    ruleId: "heartbeat-missed-v1", action: "alert", severity: "warning",
+    reason: "agent missed its Watchtower heartbeat deadline",
+  }]);
+});
+
+test("validates bounded cooperative lease and command acknowledgement bodies", () => {
+  assert.deepEqual(validateLeaseRequest({
+    projectId: "watchtower", agentId: "build-goblin-01", runId: "run-1",
+    ttlSeconds: 120, scopes: ["deploy"],
+  }), {
+    projectId: "watchtower", agentId: "build-goblin-01", runId: "run-1",
+    ttlSeconds: 120, scopes: ["deploy"],
+  });
+  assert.deepEqual(validateLeaseValidationRequest({ agentId: "build-goblin-01" }), { agentId: "build-goblin-01" });
+  assert.deepEqual(validateCommandAcknowledgement({ commandId: "cmd-1", agentId: "build-goblin-01", outcome: "contained" }), {
+    commandId: "cmd-1", agentId: "build-goblin-01", outcome: "contained", note: undefined,
+  });
+  assert.throws(() => validateLeaseRequest({ projectId: "watchtower", agentId: "a", runId: "run", ttlSeconds: 5 }), /ttlSeconds/);
 });
 
 test("compares signatures without early return", () => {

@@ -31,6 +31,11 @@ For local development, override it with the FEDERATION_GATEWAY environment varia
    Body: { "schemaVersion": "2026-07-17", "eventId": "evt-unique", "idempotencyKey": "run-1-attempt-1", "projectId": "autopilot", "agentId": "your-agent-id", "runId": "run-1", "eventType": "validation.failed", "severity": "error", "occurredAt": "2026-07-17T16:00:00Z", "statement": "The gate said no in YAML.", "metadata": { "attempt": 3 } }
    Sign the exact body as HMAC-SHA-256 of "<timestamp>.<body>" with WATCHTOWER_INGESTION_SECRET.
 
+   For a cooperative agent, emit a `heartbeat` at least once before the
+   `metadata.expectedHeartbeatSeconds` deadline. Then acquire a work lease and
+   validate that lease immediately before every consequential external action.
+   A non-active lease means STOP; it is not a warning to ignore.
+
 2. WATCH LIVE FEED
    WS /ws?projectId={projectId}
    Receives: { type: "feed_update", events: [...] }
@@ -130,9 +135,42 @@ Embeddable agent diorama showing:
 ### Watchtower Operations
 - `POST /api/v1/events` — Signed, idempotent operational-event ingestion
 - `GET /api/v1/projects/{projectId}/incidents` — Incident list (admin)
+- `POST /api/v1/projects/{projectId}/leases` — Acquire or renew a 30–900 second work lease
+- `POST /api/v1/projects/{projectId}/leases/{leaseId}/validate` — Gate the next side effect
+- `GET /api/v1/projects/{projectId}/agents/{agentId}/commands` — Read containment commands
+- `POST /api/v1/projects/{projectId}/commands/acknowledge` — Report `contained`, `rejected`, or `failed`
 - Approved event types include `run.*`, `heartbeat`, `validation.*`,
   `loop.*`, `budget.*`, and containment/incident lifecycle events. See
   `docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md` for the contract.
+
+### Cooperative Loop Enforcer contract
+
+The repository ships a no-dependency adapter at
+`source/federation-tv-package/mcp-skill/federation-agent/watchtower_loop.py`.
+It exits with code `3` when a lease is denied, revoked, or expired; the calling
+agent must not begin the next tool call in that case.
+
+```bash
+ADAPTER=source/federation-tv-package/mcp-skill/federation-agent/watchtower_loop.py
+
+# Before beginning or renewing a run. Save leaseId from the JSON response.
+python3 "$ADAPTER" --project autopilot --agent build-01 lease --run run-42 --scope deployment
+
+# Surround local pre/loop/post gates with their durable operational events.
+python3 "$ADAPTER" --project autopilot --agent build-01 event --type run.started --severity info --statement "Deployment gate opened." --run run-42 --metadata '{"chainDepth":1}'
+
+# Immediately before every external side effect. Exit 3 means stop.
+python3 "$ADAPTER" --project autopilot --agent build-01 validate --lease lease_example
+
+# Poll and acknowledge control commands after containment.
+python3 "$ADAPTER" --project autopilot --agent build-01 commands
+python3 "$ADAPTER" --project autopilot --agent build-01 ack --command cmd_example --outcome contained --note "Runner stopped before deploy."
+```
+
+The adapter uses the same `WATCHTOWER_INGESTION_SECRET` as event ingestion.
+For a signed `GET`, the HMAC input is `<timestamp>.` because the body is empty.
+Rejected and failed containment receipts remain blocking and visible until a
+later contained receipt or command expiry.
 
 ### MCP Access (Cross-Org)
 - `POST /api/mcp/organizations` — Register org (admin)
@@ -205,6 +243,7 @@ npx wrangler d1 create federation-db
 npx wrangler r2 bucket create federation-vault
 npx wrangler d1 execute federation-db --remote --file=src/schema.sql
 npx wrangler d1 execute federation-db --remote --file=src/migrations/0001_watchtower_enforcement.sql
+npx wrangler d1 execute federation-db --remote --file=src/migrations/0002_watchtower_control_loop.sql
 npx wrangler secret put WATCHTOWER_INGESTION_SECRET
 npx wrangler secret put WATCHTOWER_ADMIN_TOKEN
 npx wrangler deploy
@@ -221,6 +260,8 @@ cd source/federation-serverless
 ## Security
 
 - Signed events use a five-minute replay window and bounded, redacted JSON metadata.
+- Work leases are cooperative enforcement: every adapted runner must validate before side effects. A non-integrated process cannot be truthfully claimed as stopped.
+- Heartbeat lapses create auditable incidents. Owner delivery is not enabled until `WATCHTOWER_ALERT_WEBHOOK_URL` is configured; absent that secret, alerts are recorded as suppressed rather than sent anywhere.
 - Legacy mutations, MCP records, and incident reads require the administrative bearer token in production.
 - Put the admin/MCP hostname behind Cloudflare Access before broad exposure. Per-agent credentials, rate limits, and scoped MCP principals are the next hardening release.
 - CORS is for browser interoperability; it is not authentication.

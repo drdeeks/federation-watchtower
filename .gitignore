@@ -24,6 +24,8 @@ coverage/
 .turbo/
 *.log
 *.pid
+__pycache__/
+*.py[cod]
 tmp/
 temp/
 
@@ -37,4 +39,3 @@ Thumbs.db
 
 # Generated release bundles; keep intentional releases in a release store.
 federation-*.tar.gz
-

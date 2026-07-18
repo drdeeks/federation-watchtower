@@ -8,6 +8,7 @@
     "deploy": "wrangler deploy",
     "schema": "wrangler d1 execute federation-db --remote --file=src/schema.sql",
     "migrate:watchtower": "wrangler d1 execute federation-db --remote --file=src/migrations/0001_watchtower_enforcement.sql",
+    "migrate:control-loop": "wrangler d1 execute federation-db --remote --file=src/migrations/0002_watchtower_control_loop.sql",
     "test": "node --experimental-strip-types src/watchtower.test.ts"
   },
   "devDependencies": {
