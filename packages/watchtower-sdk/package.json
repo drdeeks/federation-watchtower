@@ -1,0 +1,40 @@
+{
+  "name": "@federation-watchtower/sdk",
+  "version": "0.1.0",
+  "description": "Signed producer client for Federation Watchtower operational control loops.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    }
+  },
+  "types": "./src/index.d.ts",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "npm test && npm run pack:check"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "federation",
+    "watchtower",
+    "agents",
+    "mcp",
+    "guardrails",
+    "cloudflare"
+  ]
+}

@@ -40,3 +40,4 @@ Thumbs.db
 
 # Generated release bundles; keep intentional releases in a release store.
 federation-*.tar.gz
+packages/*/*.tgz
