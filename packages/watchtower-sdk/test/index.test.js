@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { WatchtowerApiError, WatchtowerClient, hmacSha256Hex, stableJson } from "../src/index.js";
+import { FederationAgentClient, WatchtowerApiError, WatchtowerClient, hmacSha256Hex, stableJson } from "../src/index.js";
 
 test("stableJson is deterministic and rejects non-JSON values", () => {
   assert.equal(stableJson({ z: [true, 2], a: "one" }), '{"a":"one","z":[true,2]}');
@@ -32,4 +32,13 @@ test("client turns rejected Watchtower responses into structured errors", async 
     () => client.validateLease({ projectId: "autopilot", agentId: "build-01", leaseId: "lease-1" }),
     error => error instanceof WatchtowerApiError && error.status === 409 && error.message === "lease blocked",
   );
+});
+
+test("agent lifecycle client uses only its scoped credential", async () => {
+  const requests = [];
+  const client = new FederationAgentClient({ projectId: "autopilot", agentId: "build-01", agentToken: "fw_agent_test", fetch: async (url, init) => { requests.push({ url, init }); return new Response(JSON.stringify({ accepted: true })); } });
+  await client.heartbeat({ idempotencyKey: "heartbeat-1" });
+  assert.equal(requests[0].url, "https://fapi.drdeeks.xyz/api/v1/agents/build-01/heartbeat");
+  assert.equal(requests[0].init.headers.Authorization, "Bearer fw_agent_test");
+  assert.equal(requests[0].init.body, '{"idempotencyKey":"heartbeat-1","projectId":"autopilot"}');
 });

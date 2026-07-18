@@ -17,6 +17,13 @@ export class AgentWatchdog extends DurableObject<WatchtowerEnv> {
     await this.ctx.storage.setAlarm(heartbeat.deadlineAt);
   }
 
+  async disconnect(input: Pick<HeartbeatDeadline, "projectId" | "agentId">): Promise<void> {
+    const current = await this.ctx.storage.get<HeartbeatDeadline>("heartbeat");
+    if (current && (current.projectId !== input.projectId || current.agentId !== input.agentId)) return;
+    await this.ctx.storage.delete("heartbeat");
+    await this.ctx.storage.deleteAlarm();
+  }
+
   async alarm(): Promise<void> {
     const heartbeat = await this.ctx.storage.get<HeartbeatDeadline>("heartbeat");
     if (!heartbeat) return;
@@ -37,6 +44,11 @@ export class AgentWatchdog extends DurableObject<WatchtowerEnv> {
       this.env.AGENT_REGISTRY.idFromName(`${heartbeat.projectId}-registry`)
     ) as DurableObjectStub<AgentRegistry>;
     await registry.setAgentStatus(heartbeat.agentId, "offline");
+    const now = Date.now();
+    await this.env.DB.prepare("UPDATE federation_agents SET lifecycle_state = 'offline', disconnected_at = ?, updated_at = ? WHERE id = ?")
+      .bind(now, now, `${heartbeat.projectId}:${heartbeat.agentId}`).run();
+    await this.env.DB.prepare("INSERT OR IGNORE INTO federation_lifecycle_events (id, agent_id, event_type, idempotency_key, detail, occurred_at) VALUES (?, ?, 'heartbeat.missed', ?, ?, ?)")
+      .bind(`life-${crypto.randomUUID()}`, `${heartbeat.projectId}:${heartbeat.agentId}`, `watchdog-${heartbeat.deadlineAt}`, JSON.stringify({ deadlineAt: heartbeat.deadlineAt }), now).run();
     if (result.alerts.length > 0) await this.env.WATCHTOWER_ALERTS.sendBatch(result.alerts.map(alert => ({ body: alert })));
 
     // Do not delete a newer heartbeat that arrived while the alert path awaited I/O.

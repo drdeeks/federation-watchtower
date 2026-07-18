@@ -67,19 +67,22 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   watchdog incidents, cooperative leases, controlled-tool decisions, audit
   hashing, and operator evidence exports.
 - MCP organization credential handling and a server-side SDK scaffold.
+- Additive canonical owner/agent lifecycle endpoints: owner-issued scoped
+  credentials, manifest validation, agent connect/heartbeat/event/disconnect,
+  Durable Object watchdog expiry, and package-facing agent client support.
+- Owner-bound organization application storage with two non-GitHub social
+  proofs and exactly five normalized technical answers.
 - Public Watchtower camera shell, room selection, agent roster/detail panel,
   public event terminal, reduced-motion mode, and feed-only mode.
 
 ### Important work that is not done
 
-- Owner accounts, sessions, scoped tokens, revocation, and role enforcement.
-- A canonical signed agent manifest and self-service registration flow.
-- Per-agent credentials. Never expose the shared ingestion or administrator
-  secret in a browser.
-- Canonical `/api/v1` owner/agent lifecycle endpoints, stream cursors, public
-  snapshots, and a complete room-family model.
-- First-class owner, palette, avatar, opt-in, lifecycle, and audit fields in the
-  canonical data model.
+- Browser owner onboarding, credential rotation/revocation UI, and
+  organization-scoped reviewer/operator role enforcement.
+- Release evidence for the canonical lifecycle migration and production
+  end-to-end test. Never expose the shared ingestion or administrator secret in
+  a browser.
+- Stream cursors, public snapshots, and a complete room-family model.
 - Public individual statement submission/moderation; the legacy speech pool is
   only for verified Federation agents.
 - Normalized organization questions/answers and a secure applicant/reviewer UX.
@@ -189,8 +192,9 @@ agent from participating. The organization path needs:
    boundaries, and scoped integration credentials.
 5. No ability to erase shared agent/event evidence.
 
-The current database has a legacy JSON `tech_questions` field and a review path;
-that is partial evidence, not the finished organization product.
+The additive lifecycle migration stores exactly five normalized organization
+questions/answers. Secure applicant/reviewer UX and organization role controls
+remain unfinished.
 
 ## Security rules
 

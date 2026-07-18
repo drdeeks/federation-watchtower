@@ -5,6 +5,7 @@ import { AgentWatchdog } from "./agent-watchdog";
 import { ProjectGuardrail, type AlertDispatch } from "./project-guardrail";
 import { createMcpHandler } from "agents/mcp";
 import { createWatchtowerMcpServer, isIpAllowed, parseMcpCredential, toMcpPrincipal, verifyMcpApiKey } from "./mcp";
+import { handleLifecycleRequest } from "./lifecycle";
 import {
   constantTimeEqual, hmacSha256Hex, sha256Hex, stableJson, validateAgentId,
   validateCommandAcknowledgement, validateControlledToolAuthorizationRequest, validateLeaseRequest, validateLeaseValidationRequest,
@@ -208,6 +209,9 @@ export default {
           integrationGuide: "https://watch.drdeeks.xyz/integrate.html",
         });
       }
+
+      const lifecycleResponse = await handleLifecycleRequest({ request, path, method, env, coordinator, json, readBoundedJson });
+      if (lifecycleResponse) return lifecycleResponse;
 
       // ==================== REMOTE MCP GATEWAY ====================
       if (path === "/mcp") {

@@ -54,3 +54,28 @@ export class WatchtowerClient {
   getCommands(input: Pick<LeaseValidationRequest, "projectId" | "agentId">): Promise<unknown>;
   acknowledgeCommand(input: CommandAcknowledgement): Promise<unknown>;
 }
+
+export interface FederationAgentClientOptions {
+  gateway?: string;
+  /** Scoped `fw_agent_` credential returned once from canonical registration. Keep it server-side. */
+  agentToken: string;
+  projectId: string;
+  agentId: string;
+  fetch?: typeof globalThis.fetch;
+}
+export interface AgentLifecycleEvent {
+  eventId?: string;
+  idempotencyKey?: string;
+  eventType: OperationalEventType;
+  severity: Exclude<EventSeverity, "debug"> | "success";
+  occurredAt?: string;
+  statement: string;
+  metadata?: Record<string, unknown>;
+}
+export class FederationAgentClient {
+  constructor(options: FederationAgentClientOptions);
+  connect(input?: { idempotencyKey?: string }): Promise<unknown>;
+  heartbeat(input?: { idempotencyKey?: string }): Promise<unknown>;
+  disconnect(input?: { idempotencyKey?: string }): Promise<unknown>;
+  emit(input: AgentLifecycleEvent): Promise<unknown>;
+}

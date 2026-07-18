@@ -56,7 +56,7 @@ export class AgentRegistry extends DurableObject<WatchtowerEnv> {
 
   constructor(ctx: DurableObjectState, env: WatchtowerEnv) {
     super(ctx, env);
-    this.projectId = ctx.id.name.split('-')[0];
+    this.projectId = ctx.id.name.replace(/-registry$/, "");
     this.db = env.DB;
   }
 
@@ -134,6 +134,10 @@ export class AgentRegistry extends DurableObject<WatchtowerEnv> {
 
   async heartbeat(agentId: string): Promise<Agent | null> {
     return this.updateAgent(agentId, { lastHeartbeat: Date.now(), status: 'active' });
+  }
+
+  async recordPublicEvent(event: Omit<FeedEvent, 'id' | 'projectId' | 'timestamp'>): Promise<void> {
+    await this.emitFeedEvent({ ...event, projectId: this.projectId });
   }
 
   async unregisterAgent(agentId: string): Promise<boolean> {
