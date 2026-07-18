@@ -9,10 +9,19 @@
     "schema": "wrangler d1 execute federation-db --remote --file=src/schema.sql",
     "migrate:watchtower": "wrangler d1 execute federation-db --remote --file=src/migrations/0001_watchtower_enforcement.sql",
     "migrate:control-loop": "wrangler d1 execute federation-db --remote --file=src/migrations/0002_watchtower_control_loop.sql",
-    "test": "node --experimental-strip-types src/watchtower.test.ts"
+    "migrate:access-gateway": "wrangler d1 execute federation-db --remote --file=src/migrations/0003_watchtower_access_gateway.sql",
+    "test": "node --experimental-strip-types --test src/*.test.ts",
+    "security:socket": "socket scan create --report --no-interactive .",
+    "security:socket:dry-run": "socket scan create --dry-run --no-interactive ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "agents": "^0.17.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "socket": "^1.1.143",
     "wrangler": "^4.0.0"
   }
 }

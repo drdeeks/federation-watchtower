@@ -58,6 +58,9 @@ max_batch_timeout = 30
 enabled = true
 head_sampling_rate = 1
 
+[triggers]
+crons = ["17 4 * * *"]
+
 [[routes]]
 pattern = "fapi.drdeeks.xyz"
 custom_domain = true

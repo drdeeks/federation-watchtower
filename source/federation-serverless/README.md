@@ -65,12 +65,14 @@ Apply the schema to a remote database:
 npm run schema
 npm run migrate:watchtower
 npm run migrate:control-loop
+npm run migrate:access-gateway
 ```
 
 The Watchtower migration is additive and must be applied once to the existing
 production D1 database before `/api/v1/events` is enabled. The control-loop
 migration is also additive; apply it before deploying leases, watchdogs, or
-alert delivery.
+alert delivery. The access-gateway migration is additive; apply it before
+deploying controlled tools, sessions, budgets, evidence exports, or remote MCP.
 
 Configure production credentials as Worker secrets, never as `vars` in
 `wrangler.toml`:
@@ -118,7 +120,9 @@ curl https://watch.drdeeks.xyz/
 | `npm run schema` | Execute `src/schema.sql` against remote D1. |
 | `npm run migrate:watchtower` | Apply the additive Watchtower event/incident migration to remote D1. |
 | `npm run migrate:control-loop` | Apply leases, command receipts, and notification-delivery tables to remote D1. |
+| `npm run migrate:access-gateway` | Apply sessions, budget ledger, controlled-tool, and R2-export tables to remote D1. |
 | `npm test` | Run event validation and runaway-policy tests. |
+| `npm run security:socket` | Create a Socket supply-chain policy report after Socket CLI authentication is configured. |
 | `npx wrangler dev --local` | Run the Worker locally with simulated bindings. |
 | `npx wrangler tail federation-gateway` | Follow production Worker logs. |
 
@@ -146,8 +150,15 @@ curl https://watch.drdeeks.xyz/
 | `GET` | `/api/v1/projects/{projectId}/incidents` | Read incidents; administrator authorization required. |
 | `POST` | `/api/v1/projects/{projectId}/leases` | Acquire or renew a bounded cooperative work lease. |
 | `POST` | `/api/v1/projects/{projectId}/leases/{leaseId}/validate` | Check a lease immediately before the next side effect. |
+| `POST` | `/api/v1/projects/{projectId}/validation-gates` | Signed pass/fail gate; returns `allowed=false` for a failed gate or inactive lease. |
+| `POST` | `/api/v1/projects/{projectId}/tools/authorize` | Signed pre-action lease/scope decision; `201` means authorized and `409` means deny. |
 | `GET` | `/api/v1/projects/{projectId}/agents/{agentId}/commands` | Read still-blocking containment commands. |
 | `POST` | `/api/v1/projects/{projectId}/commands/acknowledge` | Record `contained`, `rejected`, or `failed` command outcome. |
+| `GET` | `/api/v1/projects/{projectId}/sessions` | Administrator view of durable agent/run sessions. |
+| `GET`, `PUT` | `/api/v1/projects/{projectId}/budget` | Administrator view/update for project credit limits. |
+| `GET` | `/api/v1/projects/{projectId}/tools/invocations` | Administrator evidence view for controlled tool decisions. |
+| `POST` | `/api/v1/projects/{projectId}/evidence/exports` | Create a bounded redacted R2 audit export. |
+| `GET` | `/api/v1/projects/{projectId}/evidence/exports/{exportId}` | Download a retained audit export. |
 
 The ingestion body follows the canonical event contract in
 [`../../docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md`](../../docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md).
@@ -196,6 +207,34 @@ python3 "$ADAPTER" --project autopilot --agent build-01 validate --lease lease_e
 Agents must stop when the validate command returns `3`. A `contained` receipt
 transitions the corresponding incident to `contained`; `rejected` and `failed`
 remain visible and blocking until a later containment acknowledgement or expiry.
+
+The adapter also has `gate` and `authorize` commands. Both exit `3` on a denied
+result, so a Loop Enforcer wrapper can make an actual stop decision before it
+runs its configured external tool. `authorize` accepts only an input digest;
+raw external-tool input is never sent to Watchtower merely for authorization.
+
+### Budget and session registry
+
+The project budget defaults to `$10.00` with an `$8.00` warning threshold until
+an administrator sets a different limit. A signed event may include a bounded
+numeric `metadata.creditCostUsd`; it is appended once to the project budget
+ledger, and policy evaluation observes the accumulated spend. The registry
+tracks one durable session per project/agent/run, updated from lease requests,
+run lifecycle events, validation gates, and heartbeats.
+
+### Local operator console
+
+`/operator.html` is a static, responsive operator page included in the Worker
+assets. It uses the same administrator API routes as automation, prompts for a
+token, and keeps that token only in page memory. For local use:
+
+```bash
+npx wrangler dev --local --port 8787
+# Open http://localhost:8787/operator.html?api=http://localhost:8787
+```
+
+It provides incident transitions, sessions, controlled-tool evidence, and
+budget configuration without introducing a second dashboard backend.
 
 ### Notification delivery
 
@@ -249,18 +288,32 @@ All project routes use `/api/projects/{projectId}/...`.
 | `GET` | `/api/federation/speech` | Read the global speech pool. |
 | `GET` | `/api/federation/speech/project/{projectId}` | Read project speech lines. |
 
-### MCP organization records
+### Remote MCP and organization principals
 
-These routes maintain the organization registry and audit records used by a future authenticated MCP gateway. They require the administrative bearer token:
+`POST /mcp` is a Streamable HTTP MCP endpoint backed by Cloudflare's Agents SDK
+and the Model Context Protocol SDK. It is not public: each request requires
+`Authorization: Bearer <orgId>.<organizationApiKey>`. The Worker stores only a
+Web Crypto SHA-256 verifier, enforces the organization's stored rate limit and
+IP allowlist, evaluates both global and `project:<id>:read|control` scopes, and
+writes a redacted row to `mcp_access_logs` for the transport request and each
+tool call.
+
+The administrator provisions an organization with a caller-supplied high
+entropy `apiKey`; Watchtower hashes it immediately and never returns it. The
+administrative routes are:
 
 - `POST /api/mcp/organizations`
 - `GET /api/mcp/organizations/{orgId}`
+- `POST /api/mcp/organizations/{orgId}/credentials` — rotate a caller-supplied key.
+- `POST /api/mcp/organizations/{orgId}/status` — activate, suspend, or revoke.
 - `GET /api/mcp/logs`
 
-All legacy mutation routes and private MCP/incident routes require
-`Authorization: Bearer <WATCHTOWER_ADMIN_TOKEN>` in production. CORS is not an
-authentication boundary; put the administrative and MCP hostname behind
-Cloudflare Access before sharing it outside the organization.
+The remote tools are deliberately narrow: status/project/incident/session/budget
+reads, bounded lease and gate operations, controlled-action authorization,
+containment acknowledgement, policy simulation, and retained evidence export.
+For a human-facing or third-party browser connection, put `/mcp` behind
+Cloudflare Access or an OAuth provider as well; the organization credential is
+the service-to-service principal used by this deployment.
 
 Workers observability is enabled with full head sampling. Emit structured JSON
 only; Watchtower records the small safe correlation fields in Worker logs and
@@ -300,11 +353,13 @@ federation-serverless/
     ├── agent-registry.ts           # Per-project Durable Object
     ├── agent-watchdog.ts            # Per-agent heartbeat deadline/alarm
     ├── federation-coordinator.ts   # Global Durable Object
+    ├── mcp.ts                      # Scoped Streamable-HTTP MCP tool surface
     ├── project-guardrail.ts        # Per-project event/policy/incident coordinator
     ├── watchtower.ts                # Event validation, HMAC, and runaway rules
     ├── watchtower.test.ts           # Standalone core-policy tests
     ├── migrations/0001_watchtower_enforcement.sql
     ├── migrations/0002_watchtower_control_loop.sql
+    ├── migrations/0003_watchtower_access_gateway.sql
     └── schema.sql                  # D1 schema
 ```
 
