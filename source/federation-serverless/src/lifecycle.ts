@@ -1,7 +1,8 @@
-import type { AgentRegistry, WatchtowerEnv } from "./agent-registry.ts";
+import type { Agent, AgentRegistry, WatchtowerEnv } from "./agent-registry.ts";
 import type { FederationCoordinator } from "./federation-coordinator.ts";
 import type { AgentWatchdog } from "./agent-watchdog.ts";
 import type { ProjectGuardrail } from "./project-guardrail.ts";
+import type { RoomScene } from "./room-scene.ts";
 import { sha256Hex, validateAgentId, validateOperationalEvent, validateProjectId } from "./watchtower.ts";
 
 type Json = (data: unknown, status?: number) => Response;
@@ -105,7 +106,9 @@ export async function handleLifecycleRequest(input: {
     const token = issue(AGENT_PREFIX);
     await env.DB.prepare("INSERT INTO federation_agent_credentials (id, agent_id, credential_hash, scopes, issued_at) VALUES (?, ?, ?, ?, ?)")
       .bind(`agentcred-${crypto.randomUUID()}`, canonicalId, await sha256Hex(token), JSON.stringify(["agent:connect", "agent:heartbeat", "agent:emit", "agent:disconnect"]), now).run();
-    await appendLifecycle(env, canonicalId, "agent.registered", `register-${crypto.randomUUID()}`, { publicProjection: manifest.publicProjection, roomId: legacy?.roomId }, now);
+    const registrationEventId = `register-${crypto.randomUUID()}`;
+    await appendLifecycle(env, canonicalId, "agent.registered", registrationEventId, { publicProjection: manifest.publicProjection, roomId: legacy?.roomId }, now);
+    if (legacy?.roomId) await projectPublicScene(env, legacy, "registered", "agent.registered", registrationEventId, now);
     return json({ agent: presentAgent({ id: canonicalId, project_id: manifest.projectId, agent_id: manifest.agentId, owner_id: owner.id, organization_id: manifest.organizationId || null, display_name: manifest.displayName, role: manifest.role, capabilities: JSON.stringify(manifest.capabilities), avatar_seed: manifest.identity.avatarSeed, palette_key: manifest.identity.paletteKey, character_type: manifest.identity.characterType, public_projection: manifest.publicProjection ? 1 : 0, heartbeat_seconds: manifest.heartbeatSeconds, lifecycle_state: "registered" }, legacy?.roomId), credential: { token, scopes: ["agent:connect", "agent:heartbeat", "agent:emit", "agent:disconnect"], issuedAt: now }, next: { connect: `/api/v1/agents/${encodeURIComponent(manifest.agentId)}/connect`, heartbeat: `/api/v1/agents/${encodeURIComponent(manifest.agentId)}/heartbeat`, event: `/api/v1/agents/${encodeURIComponent(manifest.agentId)}/events` }, requestId: crypto.randomUUID() }, 201);
   }
 
@@ -122,14 +125,16 @@ export async function handleLifecycleRequest(input: {
   const watchdog = env.AGENT_WATCHDOG.get(env.AGENT_WATCHDOG.idFromName(`${projectId}:${agentId}`)) as DurableObjectStub<AgentWatchdog>;
   const now = Date.now();
   if (action === "disconnect") {
-    await registry.setAgentStatus(agentId, "offline");
+    const publicAgent = await registry.setAgentStatus(agentId, "offline");
     await watchdog.disconnect({ projectId, agentId });
     await env.DB.prepare("UPDATE federation_agents SET lifecycle_state = 'offline', disconnected_at = ?, updated_at = ? WHERE id = ?").bind(now, now, agent.id).run();
-    await appendLifecycle(env, agent.id, "agent.disconnected", optionalId(body.idempotencyKey), {}, now);
+    const lifecycleEventId = optionalId(body.idempotencyKey) || `disconnect-${crypto.randomUUID()}`;
+    await appendLifecycle(env, agent.id, "agent.disconnected", lifecycleEventId, {}, now);
+    if (publicAgent) await projectPublicScene(env, publicAgent, "offline", "agent.disconnected", lifecycleEventId, now);
     return json({ agent: { ...presentAgent(agent), lifecycleState: "offline" }, requestId: crypto.randomUUID() });
   }
   const deadlineAt = now + agent.heartbeat_seconds * 1_000;
-  await registry.heartbeat(agentId);
+  const publicAgent = await registry.heartbeat(agentId);
   await watchdog.recordHeartbeat({ projectId, agentId, deadlineAt });
   await env.DB.prepare("UPDATE federation_agents SET lifecycle_state = 'connected', connected_at = COALESCE(connected_at, ?), last_heartbeat_at = ?, disconnected_at = NULL, updated_at = ? WHERE id = ?").bind(now, now, now, agent.id).run();
   if (action === "events") {
@@ -137,11 +142,17 @@ export async function handleLifecycleRequest(input: {
     const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
     const result = await guardrail.ingest({ event, producerId: `agent:${agent.id}`, payloadDigest: await sha256Hex(raw), receivedAt: now });
     if (result.alerts.length) await env.WATCHTOWER_ALERTS.sendBatch(result.alerts.map(alert => ({ body: alert })));
-    if (agent.public_projection) await registry.recordPublicEvent({ eventType: event.eventType, agentId, message: event.statement, priority: event.severity === "critical" ? "critical" : event.severity === "error" ? "high" : "normal", metadata: { lifecycle: "canonical", eventId: event.eventId } });
+    if (agent.public_projection && !result.duplicate) {
+      await registry.recordPublicEvent({ eventType: event.eventType, agentId, message: event.statement, priority: event.severity === "critical" ? "critical" : event.severity === "error" ? "high" : "normal", metadata: { lifecycle: "canonical", eventId: event.eventId } });
+      if (publicAgent) await projectPublicScene(env, publicAgent, "connected", event.eventType, event.eventId, now);
+    }
     await appendLifecycle(env, agent.id, event.eventType, event.idempotencyKey, { severity: event.severity }, now);
     return json({ accepted: true, eventId: event.eventId, watchdogDeadlineAt: deadlineAt, guardrail: result, requestId: crypto.randomUUID() }, result.duplicate ? 200 : 201);
   }
-  await appendLifecycle(env, agent.id, action === "connect" ? "agent.connected" : "agent.heartbeat", optionalId(body.idempotencyKey), { deadlineAt }, now);
+  const lifecycleEventId = optionalId(body.idempotencyKey) || `${action}-${crypto.randomUUID()}`;
+  const lifecycleEventType = action === "connect" ? "agent.connected" : "agent.heartbeat";
+  await appendLifecycle(env, agent.id, lifecycleEventType, lifecycleEventId, { deadlineAt }, now);
+  if (agent.public_projection && publicAgent) await projectPublicScene(env, publicAgent, "connected", lifecycleEventType, lifecycleEventId, now);
   return json({ agent: { ...presentAgent(agent), lifecycleState: "connected", lastHeartbeatAt: now }, watchdogDeadlineAt: deadlineAt, requestId: crypto.randomUUID() });
 }
 
@@ -170,6 +181,21 @@ export function validateLifecycleManifest(value: unknown): Manifest {
 
 async function appendLifecycle(env: WatchtowerEnv, agentId: string, eventType: string, idempotencyKey: string | undefined, detail: Record<string, unknown>, occurredAt: number): Promise<void> {
   await env.DB.prepare("INSERT OR IGNORE INTO federation_lifecycle_events (id, agent_id, event_type, idempotency_key, detail, occurred_at) VALUES (?, ?, ?, ?, ?, ?)").bind(`life-${crypto.randomUUID()}`, agentId, eventType, idempotencyKey || null, JSON.stringify(detail), occurredAt).run();
+}
+async function projectPublicScene(env: WatchtowerEnv, agent: Agent, lifecycleState: string, eventType: string, sourceEventId: string, occurredAt: number): Promise<void> {
+  if (!agent.roomId) return;
+  const scene = env.ROOM_SCENE.get(env.ROOM_SCENE.idFromName(agent.roomId)) as DurableObjectStub<RoomScene>;
+  await scene.project({
+    roomId: agent.roomId,
+    agentId: agent.agentId,
+    displayName: agent.name,
+    role: agent.role || undefined,
+    paletteKey: typeof agent.metadata.paletteKey === "string" ? agent.metadata.paletteKey : undefined,
+    lifecycleState,
+    eventType,
+    sourceEventId,
+    occurredAt,
+  });
 }
 function presentAgent(agent: CanonicalAgent, roomId?: string) { return { agentId: agent.agent_id, projectId: agent.project_id, ownerId: agent.owner_id, organizationId: agent.organization_id || undefined, displayName: agent.display_name, role: agent.role, capabilities: JSON.parse(agent.capabilities), identity: { avatarSeed: agent.avatar_seed, paletteKey: agent.palette_key, characterType: agent.character_type }, publicProjection: Boolean(agent.public_projection), heartbeat: { intervalSeconds: agent.heartbeat_seconds }, lifecycleState: agent.lifecycle_state, roomId }; }
 function bearer(request: Request, prefix: string): string | null { const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") || ""; return token.startsWith(prefix) ? token : null; }

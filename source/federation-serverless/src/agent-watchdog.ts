@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { WatchtowerEnv } from "./agent-registry";
 import type { AgentRegistry } from "./agent-registry";
 import type { ProjectGuardrail } from "./project-guardrail";
+import type { RoomScene } from "./room-scene";
 
 interface HeartbeatDeadline {
   projectId: string;
@@ -43,7 +44,11 @@ export class AgentWatchdog extends DurableObject<WatchtowerEnv> {
     const registry = this.env.AGENT_REGISTRY.get(
       this.env.AGENT_REGISTRY.idFromName(`${heartbeat.projectId}-registry`)
     ) as DurableObjectStub<AgentRegistry>;
-    await registry.setAgentStatus(heartbeat.agentId, "offline");
+    const agent = await registry.setAgentStatus(heartbeat.agentId, "offline");
+    if (agent?.roomId) {
+      const scene = this.env.ROOM_SCENE.get(this.env.ROOM_SCENE.idFromName(agent.roomId)) as DurableObjectStub<RoomScene>;
+      await scene.project({ roomId: agent.roomId, agentId: agent.agentId, displayName: agent.name, role: agent.role || undefined, paletteKey: typeof agent.metadata.paletteKey === "string" ? agent.metadata.paletteKey : undefined, lifecycleState: "offline", eventType: "heartbeat.missed", sourceEventId: `watchdog-${heartbeat.deadlineAt}`, occurredAt: Date.now() });
+    }
     const now = Date.now();
     await this.env.DB.prepare("UPDATE federation_agents SET lifecycle_state = 'offline', disconnected_at = ?, updated_at = ? WHERE id = ?")
       .bind(now, now, `${heartbeat.projectId}:${heartbeat.agentId}`).run();

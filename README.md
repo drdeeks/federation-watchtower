@@ -254,6 +254,8 @@ profiles are the remaining UX/management work.
   actions.
 - [Demo script](docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md) — a real,
   under-three-minute control-loop demonstration.
+- [Submission runbook](docs/review/SUBMISSION_RUNBOOK.md) — exact release,
+  demo, and Devpost handoff steps.
 
 ## Build Week submission checklist
 

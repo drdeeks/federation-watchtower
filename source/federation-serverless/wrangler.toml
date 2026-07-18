@@ -19,6 +19,10 @@ class_name = "ProjectGuardrail"
 name = "AGENT_WATCHDOG"
 class_name = "AgentWatchdog"
 
+[[durable_objects.bindings]]
+name = "ROOM_SCENE"
+class_name = "RoomScene"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "federation-db"
@@ -86,5 +90,9 @@ type = "durable-object"
 storage = "sqlite"
 
 [exports.AgentWatchdog]
+type = "durable-object"
+storage = "sqlite"
+
+[exports.RoomScene]
 type = "durable-object"
 storage = "sqlite"
