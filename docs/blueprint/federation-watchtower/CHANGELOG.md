@@ -128,3 +128,25 @@ Phase       : PHASE-1/PHASE-3 partial implementation; remote migration and
 Rollback Ref: do not apply 0004 migration; if already applied, revoke issued
               credentials and disable the new routes before a follow-up additive rollback
 ```
+
+## CL-0006 — Production Lifecycle Evidence
+
+```
+Date        : 2026-07-17
+Contributor : Codex
+Modules     : [MOD-002, MOD-003, MOD-005, MOD-006, MOD-007, MOD-011, MOD-015]
+Section Tags: [[IDENTITY-ACCESS-v1], [INGRESS-v1], [WATCHDOG-v1], [QUALITY-v1]]
+Files Changed: [PRODUCTION_LIFECYCLE_EVIDENCE.md, CHANGELOG.md]
+Description : Applied additive lifecycle migration 0004 and deployed Worker
+              version bb29a04c-3abf-476a-b637-2684ec2acc96. A disposable
+              production owner/agent completed registration, connect,
+              heartbeat, real event/public projection, persistence refresh, and
+              automatic watchdog expiry to offline. A separate owner-bound
+              organization application accepted exactly five technical answers
+              and two non-GitHub social proofs.
+Tests Passing: production lifecycle and organization application contracts PASS
+Phase       : PHASE-1/PHASE-3 partial evidence; reviewer roles, revocation UI,
+              room-family completion, and release checklist gates remain incomplete
+Rollback Ref: Worker rollback to prior version; migration is additive and must
+              be superseded by an additive disable/revocation migration if needed
+```
