@@ -328,6 +328,25 @@ Rollback Ref: remove the submission-readiness documentation and restore the
               previous Devpost project links/description if required
 ```
 
+## CL-0016 — Canonical Devpost Thumbnail Asset
+
+```
+Date        : 2026-07-18
+Contributor : Codex
+Modules     : [MOD-015]
+Section Tags: [[BRAND-v1], [SUBMISSION-v1]]
+Files Changed: [brand/federation-watchtower-thumbnail.jpg,
+                public/brand/federation-watchtower-thumbnail.jpg,
+                brand/README.md, public/brand/README.md]
+Description : Saved the supplied Federation mark as the canonical square
+              Devpost/project-listing thumbnail and mirrored it into the
+              deployed public brand bundle. The image is intentionally kept
+              separate from the unlicensed optional asset archives.
+Tests Passing: source/public thumbnail files match; JPEG metadata verified
+Phase       : PHASE-7 submission preparation
+Rollback Ref: remove the thumbnail copies and restore the prior brand index
+```
+
 ## CL-0013 — npm SDK Publication Handoff
 
 ```
