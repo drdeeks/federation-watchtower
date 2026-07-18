@@ -217,3 +217,28 @@ Phase       : PHASE-4 partial evidence; live newly-projected agent, sprite
 Rollback Ref: Worker rollback to preceding version; RoomScene data is isolated
               from operational D1 evidence and can be disabled by route/call-site rollback
 ```
+
+## CL-0010 — Navigation, Presentation Cadence, and Package Handoff
+
+```
+Date        : 2026-07-18
+Contributor : Codex
+Modules     : [MOD-008, MOD-009, MOD-015]
+Section Tags: [[CAMERA-PROJECTION-v1], [CHOREOGRAPHY-v1], [QUALITY-v1]]
+Files Changed: [tv-widget.js, index.html, join.html, integrate.html,
+                federation.html, operator.html, demo.html, tokens.css,
+                NEXT_DEVELOPMENT_TRACK.md, SUBMISSION_RUNBOOK.md]
+Description : Unified navigation across the public Watchtower, onboarding,
+              integration, Federation, operator, and demo surfaces. Added
+              compact responsive navigation sizing. Serialized bubbles and
+              suppressed initial-history replay so operational messages remain
+              readable. Replaced automatic random sitcom speech with a labelled
+              deterministic 15-minute/5-minute cadence through the first 41
+              blueprint statements. Added the owner/operator versus
+              agent/projector next-phase handoff and npm publication procedure.
+Tests Passing: pending static, SDK, and package inspection checks
+Phase       : PHASE-4 partial implementation; browser cadence acceptance and
+              owner/webhook/reviewer phases remain incomplete
+Rollback Ref: revert widget cadence/navigation and documentation changes;
+              backend evidence and RoomScene storage are unaffected
+```

@@ -34,6 +34,26 @@ has not been recorded. Commit the Worker, public widget, generated Worker types,
 room-scene contract, and submission documents. Push the branch that contains
 the deployed commit, then use that repository URL in Devpost.
 
+## 2a. Publish the first npm package
+
+The first package is the scoped server-side SDK at `@federation-watchtower/sdk`.
+Run this from the package directory after reviewing the committed diff:
+
+```bash
+cd packages/watchtower-sdk
+npm test
+npm run pack:check
+npm login
+npm publish --access public
+```
+
+The package has `prepublishOnly` checks and public scoped access configured. The
+publisher must be logged into the npm account that owns the
+`@federation-watchtower` organization, use npm 2FA if enabled, and verify the
+package contents from `npm pack --dry-run` before publishing. Do not publish
+from a machine containing `.dev.vars`, and never put a Worker secret or
+production credential in the package.
+
 ## 3. Record one real public demo — under three minutes
 
 Follow [the demo script](OPENAI_SUBMISSION_VIDEO_SCRIPT.md), updated with this
