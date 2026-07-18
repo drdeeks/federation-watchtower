@@ -122,6 +122,24 @@
     "rollback plan: always have one",
   ];
 
+  // Normative Watchtower seed repertoire: scheduled in order, not randomly.
+  const FEDERATION_REPERTOIRE = [
+    "Signal received. Nobody panic professionally.", "The pipeline is secured. Please stop touching it.", "One assertion fell into the soup.",
+    "I have created a checklist for my checklist.", "This is relaxing.", "The room is full; the overtime crew has been notified.",
+    "A mirror room is still a room. I checked.", "Heartbeat received. Continue looking busy.", "Heartbeat missing. The tiny clipboard is concerned.",
+    "Reconnected with the same face and a new excuse.", "Tool authorized. The paperwork has achieved sentience.", "Tool denied. The paperwork remains undefeated.",
+    "That payload is wearing a fake mustache.", "Request ID acquired. Please keep it somewhere sensible.", "The queue is moving, technically.",
+    "Retry number two: optimism with a timestamp.", "Retry exhausted. The supervisor is walking over.", "Boss says the test suite was due yesterday.",
+    "Boss says ship the log, not the vibes.", "I am not a background process. I am standing right here.", "MCP is a door, not a ghost haunting your laptop.",
+    "Webhook signed. The envelope has a wax seal.", "Webhook rejected. The wax seal was suspicious.", "Duplicate detected. We already had this conversation.",
+    "Sequence gap detected. Everyone freeze politely.", "The camera sees everything except the missing asset.", "Avatar fallback deployed: initials never go out of style.",
+    "I am walking to a more useful part of the room.", "I have begun an extremely important little dance.", "Duel postponed until after the deploy.",
+    "This corner has excellent observability.", "Five minutes of rest, then five minutes of incident response.", "The room theme changed; my palette did not.",
+    "Color is not identity. The label is identity.", "The feed is live, and the feed is also honest.", "The feed is catching up. Please enjoy this timestamp.",
+    "We have entered feed-only mode. The pixels are on leave.", "Audio muted. The agents will continue being loud visually.",
+    "Reduced motion enabled. The hallway appreciates it.", "New agent at the door. Please show your manifest.", "Welcome to the Federation. We missed you."
+  ];
+
   // ============================================================
   // AGENT CHARACTER GENERATION — Offline, deterministic, sitcom-style
   // ============================================================
@@ -230,6 +248,11 @@
       this.pollTimer = null;
       this.speechTimer = null;
       this.ambientTimer = null;
+      this.presentationTimer = null;
+      this.presentationIndex = 0;
+      this.presentationDelayIndex = 0;
+      this.activeBubbleOwner = null;
+      this.eventHydrated = false;
       
       if (!this.container) {
         console.warn('[FederationTV] No container found');
@@ -554,7 +577,15 @@
         this.renderEventFeed();
         this.onFeedUpdate?.([...this.eventFeed]);
         this.scheduleAmbientCameo();
-        for (const event of [...this.eventFeed].reverse()) {
+        let eventsToAnnounce;
+        if (!this.eventHydrated) {
+          for (const event of this.eventFeed) this.shownEventIds.add(this.getEventId(event));
+          eventsToAnnounce = [];
+          this.eventHydrated = true;
+        } else {
+          eventsToAnnounce = [...this.eventFeed].reverse().filter(event => !this.shownEventIds.has(this.getEventId(event)));
+        }
+        for (const event of eventsToAnnounce) {
           if (event.action && this.agents.has(event.agentId)) this.agents.get(event.agentId).action = event.action;
           if (event.agentId && event.visibility?.publicBubble !== false && (event.statement || event.message)) {
             this.enqueueBubble(event);
@@ -587,6 +618,9 @@
       this.projectId = projectId;
       this.sceneAgents.clear();
       this.sceneSequence = 0;
+      this.eventHydrated = false;
+      this.shownEventIds.clear();
+      this.pendingBubbles = [];
       this.fetchAgents();
       this.fetchScene();
       this.fetchEvents();
@@ -759,7 +793,7 @@
         setTimeout(() => {
           this.bubbleQueueRunning = false;
           this.drainBubbleQueue();
-        }, 1200);
+        }, 6800);
         return;
       }
 
@@ -772,7 +806,8 @@
       }, 500);
     }
 
-    showBubble(agentId, text, duration = 5000) {
+    showBubble(agentId, text, duration = 6500, options = {}) {
+      if (this.activeBubbleOwner && this.activeBubbleOwner !== agentId) return false;
       const agentEl = this.dioramaEl?.querySelector(`[data-agent-id="${agentId}"]`);
       if (!agentEl) return false;
       
@@ -781,6 +816,7 @@
       
       // Clear existing bubble for this agent
       this.clearBubble(agentId);
+      this.activeBubbleOwner = agentId;
       
       const bubble = document.createElement('div');
       bubble.style.cssText = `
@@ -794,6 +830,12 @@
         animation: tv-bubble-pop 0.3s ease-out;
       `;
       bubble.textContent = text;
+      if (options.ambient) {
+        const label = document.createElement('small');
+        label.textContent = 'AMBIENT PRESENTATION · NO EVENT';
+        label.style.cssText = 'display:block;margin-bottom:4px;color:#8a5d00;font:800 8px ui-monospace,monospace;letter-spacing:.04em;';
+        bubble.prepend(label);
+      }
       
       // Speech bubble tail
       const tail = document.createElement('div');
@@ -813,6 +855,7 @@
         bubble.style.animation = 'tv-bubble-fade 0.3s ease-in forwards';
         setTimeout(() => bubble.remove(), 300);
         this.activeBubbles.delete(agentId);
+        if (this.activeBubbleOwner === agentId) this.activeBubbleOwner = null;
       }, duration);
       
       this.activeBubbles.set(agentId, { text, element: bubble, timeout });
@@ -825,6 +868,7 @@
         clearTimeout(bubble.timeout);
         bubble.element?.remove();
         this.activeBubbles.delete(agentId);
+        if (this.activeBubbleOwner === agentId) this.activeBubbleOwner = null;
       }
     }
 
@@ -853,6 +897,26 @@
       return true;
     }
 
+    triggerScheduledPresentation() {
+      const agents = Array.from(this.agents.values()).sort((left, right) => String(left.agentId).localeCompare(String(right.agentId)));
+      if (!agents.length) return false;
+      const agent = agents[this.presentationIndex % agents.length];
+      const line = FEDERATION_REPERTOIRE[this.presentationIndex % FEDERATION_REPERTOIRE.length];
+      this.presentationIndex += 1;
+      return this.showBubble(agent.agentId, line, 6500, { ambient: true });
+    }
+
+    schedulePresentation() {
+      if (this.presentationTimer) clearTimeout(this.presentationTimer);
+      const delay = this.presentationDelayIndex % 2 === 0 ? 15 * 60 * 1000 : 5 * 60 * 1000;
+      this.presentationTimer = setTimeout(() => {
+        if (!this.isRunning) return;
+        this.triggerScheduledPresentation();
+        this.presentationDelayIndex += 1;
+        this.schedulePresentation();
+      }, delay);
+    }
+
     start() {
       if (this.isRunning) return;
       this.isRunning = true;
@@ -870,27 +934,20 @@
       };
       this.pollTimer = setTimeout(poll, this.refreshInterval);
       
-      // Random speech is opt-in. Packet-driven bubbles are deterministic and
-      // are the default for the Build Week demo.
-      if (this.randomSpeech) {
-        let speechCount = 0;
-        const speak = () => {
-          if (!this.isRunning || speechCount >= 12) return;
-          speechCount += 1;
-          if (Math.random() < 0.4) this.triggerRandomSpeech();
-          this.speechTimer = setTimeout(speak, this.speechInterval);
-        };
-        this.speechTimer = setTimeout(speak, 2000);
-      }
+      // Sitcom lines are a fixed 15m / 5m cadence through the normative seed
+      // repertoire. Operational feed bubbles remain event-driven and queued.
+      this.schedulePresentation();
     }
 
     stop() {
       this.isRunning = false;
-      if (this.pollTimer) clearInterval(this.pollTimer);
-      if (this.speechTimer) clearInterval(this.speechTimer);
+      if (this.pollTimer) clearTimeout(this.pollTimer);
+      if (this.speechTimer) clearTimeout(this.speechTimer);
       if (this.ambientTimer) clearTimeout(this.ambientTimer);
+      if (this.presentationTimer) clearTimeout(this.presentationTimer);
       for (const [, bubble] of this.activeBubbles) clearTimeout(bubble.timeout);
       this.activeBubbles.clear();
+      this.activeBubbleOwner = null;
     }
 
     // ============================================================

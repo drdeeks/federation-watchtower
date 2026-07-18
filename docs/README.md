@@ -16,6 +16,7 @@ Federation Watchtower documentation is grouped by purpose:
 - [`review/OPENAI_SUBMISSION_NOTES.md`](review/OPENAI_SUBMISSION_NOTES.md) — developer-tool positioning and demo narrative.
 - [`review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md`](review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md) — short demo script.
 - [`review/SUBMISSION_RUNBOOK.md`](review/SUBMISSION_RUNBOOK.md) — exact release, demo, and Devpost handoff steps.
+- [`review/NEXT_DEVELOPMENT_TRACK.md`](review/NEXT_DEVELOPMENT_TRACK.md) — the ordered owner/operator and agent/projector workstream after the current release.
 - [`review/ONCHAIN_IDENTITY_NOTES.md`](review/ONCHAIN_IDENTITY_NOTES.md) — identity and attribution notes.
 
 ## Integration references
