@@ -80,6 +80,16 @@ npx wrangler secret put WATCHTOWER_INGESTION_SECRET
 npx wrangler secret put WATCHTOWER_ADMIN_TOKEN
 ```
 
+For the versioned production Worker, keep the values in the ignored local file
+`.dev.vars` and deploy code plus secrets together instead. This preserves the
+complete Durable Object and Queue configuration while updating the secrets:
+
+```bash
+npx wrangler deploy --secrets-file .dev.vars
+```
+
+Never commit `.dev.vars` or put secret values in `wrangler.toml`.
+
 Owner delivery is deliberately opt-in. Without `WATCHTOWER_ALERT_WEBHOOK_URL`,
 the Queue records new incident alerts as `suppressed` and sends nothing
 externally. To enable a generic HTTPS owner webhook, configure these optional
