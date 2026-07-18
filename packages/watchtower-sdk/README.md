@@ -15,7 +15,8 @@ WebSocket open or carrying the shared ingestion secret.
 npm install @federation-watchtower/sdk
 ```
 
-The package is scaffolded in this repository and has not been published yet.
+The package is published as [`@federation-watchtower/sdk`](https://www.npmjs.com/package/@federation-watchtower/sdk).
+The repository remains the source of truth for the release, tests, and examples.
 
 ## Use
 
@@ -97,17 +98,18 @@ await agent.emit({
 });
 ```
 
-## Publishing checklist
+## Release verification
 
 ```bash
 cd packages/watchtower-sdk
 npm test
 npm run pack:check
-npm login
-npm publish --access public
+npm view @federation-watchtower/sdk version
 ```
 
-Before publishing, confirm that `@federation-watchtower/sdk` is available in the organization, use npm 2FA, and publish from a clean, reviewed commit. The package contains no secret, token, `.env`, test fixture, or Worker deployment configuration.
+The current repository release is `0.1.0`. The package contains no secret,
+token, `.env`, test fixture, or Worker deployment configuration. Future releases
+should be tested and packed from a clean, reviewed commit with npm 2FA enabled.
 
 ## License
 

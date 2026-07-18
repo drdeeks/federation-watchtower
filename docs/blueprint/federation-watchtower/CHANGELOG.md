@@ -279,3 +279,23 @@ Phase       : PHASE-4 partial implementation; host cache purge authority is
               external to the Worker deploy token
 Rollback Ref: restore the domain-root navigation targets
 ```
+
+## CL-0013 — npm SDK Publication Handoff
+
+```
+Date        : 2026-07-18
+Contributor : Codex
+Modules     : [MOD-015]
+Section Tags: [[INTEGRATION-v1], [QUALITY-v1]]
+Files Changed: [packages/watchtower-sdk/README.md, SUBMISSION_RUNBOOK.md,
+                NEXT_DEVELOPMENT_TRACK.md]
+Description : Updated repository documentation after publication of
+              @federation-watchtower/sdk@0.1.0. Replaced pre-publication
+              language with public verification commands and kept future
+              release guidance explicit about tests, package inspection, 2FA,
+              and secret exclusion.
+Tests Passing: SDK tests and npm pack dry-run previously PASS
+Phase       : PHASE-3 partial implementation; owner-scoped webhook and
+              organization integration controls remain incomplete
+Rollback Ref: restore pre-publication wording if the npm release is withdrawn
+```
