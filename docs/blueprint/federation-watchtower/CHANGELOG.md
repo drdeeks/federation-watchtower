@@ -280,6 +280,31 @@ Phase       : PHASE-4 partial implementation; host cache purge authority is
 Rollback Ref: restore the domain-root navigation targets
 ```
 
+## CL-0014 — Access, Organization, and Agent Skill Clarification
+
+```
+Date        : 2026-07-18
+Contributor : Codex
+Modules     : [MOD-001, MOD-003, MOD-015]
+Section Tags: [[IDENTITY-v1], [INTEGRATION-v1], [QUALITY-v1]]
+Files Changed: [agents-skill.md, public/agent-skill.md, organization.html,
+                index.ts, README.md, ACCESS_AND_ONBOARDING.md, join.html,
+                index.html]
+Description : Distinguished agent, project-owner, organization-applicant, and
+              administrator authority. Documented the single operational
+              statement versus exactly-five-answer organization submission,
+              administrator MCP organization setup, Federation review access,
+              and current browser-onboarding boundaries. Added a discoverable
+              public organization onboarding guide and allowed its Watch host
+              route.
+Tests Passing: pending Worker types, serverless suite, static syntax, and
+               public route verification
+Phase       : PHASE-3/PHASE-4 partial implementation; browser owner signup,
+              reviewer UI, and organization RBAC remain incomplete
+Rollback Ref: remove organization.html route/page and revert documentation;
+              lifecycle and MCP storage are unaffected
+```
+
 ## CL-0013 — npm SDK Publication Handoff
 
 ```

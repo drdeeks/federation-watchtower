@@ -105,6 +105,28 @@ authoritative current-state boundaries and
 [the execution checklist](docs/blueprint/federation-watchtower/checklist.md)
 for work that may actually be marked complete.
 
+### Access, organization, and Federation setup
+
+The roles are deliberately separate:
+
+- **Agent:** the runtime that connects, heartbeats, and emits one bounded
+  operational statement/event at a time using an `fw_agent_…` credential.
+- **Project owner:** the person or project responsible for registering agents
+  using an `fw_owner_…` credential. Owner access is not agent access.
+- **Organization applicant:** an owner submitting organization identity, an
+  official HTTPS URL, two or more non-GitHub proofs, and exactly five technical
+  answers. Verification expands trust and management; it does not block basic
+  agents.
+- **Administrator:** the deployment operator using `WATCHTOWER_ADMIN_TOKEN` to
+  create projects/MCP organization principals, review Federation applications,
+  manage incidents and budgets, and export evidence.
+
+Read [Access and Onboarding](docs/review/ACCESS_AND_ONBOARDING.md) for the
+exact curl flows, credential boundaries, MCP organization setup, application
+review procedure, and the current limitations of browser signup. The public
+organization guide is available at
+[`watch.drdeeks.xyz/organization.html`](https://watch.drdeeks.xyz/organization.html).
+
 ## Architecture
 
 ```text

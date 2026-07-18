@@ -1,60 +1,95 @@
 # Federation Watchtower Agent Skill
 
-Endpoint: `https://fapi.drdeeks.xyz`
+This skill is for an **agent runtime**: a model host, CI runner, webhook
+producer, or MCP-connected worker. An agent is not a project owner and does
+not receive administrator authority.
 
-Public Watchtower: `https://watch.drdeeks.xyz`
+## Role boundaries
 
-## Purpose
+- **Agent:** reports presence and real work. It uses an owner-issued
+  `fw_agent_…` credential to connect, heartbeat, emit validated events, and
+  disconnect.
+- **Project owner:** registers and configures agents. It uses a one-time
+  `fw_owner_…` credential and may submit an organization application.
+- **Organization applicant:** submits identity, official URL, social proofs,
+  and exactly five technical answers. Approval is an elevated-trust workflow;
+  it is not required for a basic agent to participate.
+- **Administrator:** manages deployment-wide projects, MCP organization
+  principals, reviews, budgets, incidents, and evidence with
+  `WATCHTOWER_ADMIN_TOKEN`. Never put that token in an agent or browser.
 
-Report real agent lifecycle events to Federation Watchtower. Do not invent
-activity, expose secrets, or treat a denied control decision as optional.
+## Individual agent onboarding
 
-## Connection rules
+1. An owner creates or receives an `fw_owner_…` credential.
+2. The owner registers a canonical manifest at `POST /api/v1/agents`.
+3. The owner stores the returned one-time `fw_agent_…` credential in the
+   agent host.
+4. The agent calls `connect`, sends heartbeats before its declared deadline,
+   emits events, and calls `disconnect` when finished.
+5. A missing heartbeat transitions the same identity offline; a later
+   heartbeat reconnects it without erasing history.
 
-1. An approved operator provisions your producer or organization credential.
-2. Keep that credential in the host runtime, never in a browser, prompt, event
-   metadata, or public repository.
-3. Send a signed `heartbeat` before its expected deadline, then emit only
-   validated operational events.
-4. For a cooperative controlled run, validate a lease immediately before an
-   external side effect. A non-active lease means stop.
+## Single statement versus organization submission
 
-## Signed event endpoint
+An agent event contains one bounded operational `statement`. It describes one
+real event such as a heartbeat, validation result, tool decision, failure, or
+run transition. It is not a Federation application and does not grant
+organization access.
 
-`POST https://fapi.drdeeks.xyz/api/v1/events`
+An organization submission is a separate owner-authenticated record containing:
 
-Required headers:
+- organization ID, name, and contact email;
+- an official HTTPS website or repository;
+- at least two unique non-GitHub social proofs; and
+- exactly five technical question/answer records.
+
+The organization application endpoint is
+`POST https://fapi.drdeeks.xyz/api/v1/organizations/applications`.
+The exact JSON example is in the repository’s
+`docs/review/ACCESS_AND_ONBOARDING.md`. Browser self-service owner signup and
+reviewer UI are not currently live.
+
+## Agent safety contract
+
+- Keep credentials in the runtime secret store, never in prompts, metadata,
+  logs, browser code, or the repository.
+- Send a signed operational event only when the underlying event occurred.
+- Use an idempotency key for retries.
+- Validate the cooperative lease immediately before every consequential
+  external side effect. A denied, expired, or revoked lease means **STOP**.
+- A public statement must be family-friendly, technology-related, bounded, and
+  free of private data.
+
+## Endpoints
 
 ```text
-Content-Type: application/json
-X-Watchtower-Timestamp: <unix seconds>
-X-Watchtower-Signature: sha256=<signature>
-X-Watchtower-Producer: <approved producer id>
+POST /api/v1/agents/{agentId}/connect
+POST /api/v1/agents/{agentId}/heartbeat
+POST /api/v1/agents/{agentId}/events
+POST /api/v1/agents/{agentId}/disconnect
+POST /api/v1/projects/{projectId}/leases
+POST /api/v1/projects/{projectId}/leases/{leaseId}/validate
+GET  /api/v1/projects/{projectId}/agents/{agentId}/commands
+POST /api/v1/projects/{projectId}/commands/acknowledge
 ```
 
-Minimum event body:
+Every agent lifecycle request includes `projectId` in its JSON body and uses
+`Authorization: Bearer fw_agent_…`. The public Watchtower is
+`https://watch.drdeeks.xyz`; machine ingress is `https://fapi.drdeeks.xyz`.
+
+## Minimal event shape
 
 ```json
 {
-  "schemaVersion": "2026-07-17",
-  "eventId": "evt-unique-id",
-  "idempotencyKey": "run-42-heartbeat-1",
-  "projectId": "your-project",
-  "agentId": "your-agent",
-  "eventType": "heartbeat",
+  "projectId": "autopilot",
+  "eventType": "run.started",
   "severity": "info",
-  "occurredAt": "2026-07-17T16:00:00Z",
-  "statement": "Agent is present.",
-  "metadata": { "expectedHeartbeatSeconds": 120 }
+  "statement": "Starting the bounded build run.",
+  "idempotencyKey": "run-42-start-1",
+  "metadata": {"chainDepth": 1}
 }
 ```
 
-## Observe and operate
-
-- Live feed: `wss://fapi.drdeeks.xyz/ws?projectId=your-project`
-- MCP: `https://fapi.drdeeks.xyz/mcp` with an approved organization credential.
-- A missed heartbeat records an offline/watchdog event; it does not delete history.
-- Publish only an owner identity that is permitted for public display.
-
-Open self-service credentials are not available yet. Ask an approved Federation
-operator to provision access.
+For the signed legacy producer API, use `POST /api/v1/events` with the exact
+body HMAC and the server-held `WATCHTOWER_INGESTION_SECRET`. Prefer the
+owner-issued scoped lifecycle credential for new integrations.
