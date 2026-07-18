@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { WatchtowerEnv } from "./agent-registry";
+import type { AgentRegistry } from "./agent-registry";
 import type { ProjectGuardrail } from "./project-guardrail";
 
 interface HeartbeatDeadline {
@@ -32,6 +33,10 @@ export class AgentWatchdog extends DurableObject<WatchtowerEnv> {
       agentId: heartbeat.agentId,
       deadlineAt: heartbeat.deadlineAt,
     });
+    const registry = this.env.AGENT_REGISTRY.get(
+      this.env.AGENT_REGISTRY.idFromName(`${heartbeat.projectId}-registry`)
+    ) as DurableObjectStub<AgentRegistry>;
+    await registry.setAgentStatus(heartbeat.agentId, "offline");
     if (result.alerts.length > 0) await this.env.WATCHTOWER_ALERTS.sendBatch(result.alerts.map(alert => ({ body: alert })));
 
     // Do not delete a newer heartbeat that arrived while the alert path awaited I/O.
