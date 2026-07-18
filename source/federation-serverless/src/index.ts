@@ -1,17 +1,23 @@
 import { AgentRegistry } from "./agent-registry";
 import { FederationCoordinator } from "./federation-coordinator";
 import type { WatchtowerEnv } from "./agent-registry";
-import { ProjectGuardrail } from "./project-guardrail";
-import { constantTimeEqual, hmacSha256Hex, sha256Hex, validateOperationalEvent } from "./watchtower";
+import { AgentWatchdog } from "./agent-watchdog";
+import { ProjectGuardrail, type AlertDispatch } from "./project-guardrail";
+import {
+  constantTimeEqual, hmacSha256Hex, sha256Hex, stableJson, validateAgentId,
+  validateCommandAcknowledgement, validateLeaseRequest, validateLeaseValidationRequest,
+  validateOperationalEvent, validateProjectId,
+} from "./watchtower";
 
 export { AgentRegistry } from "./agent-registry";
 export { FederationCoordinator } from "./federation-coordinator";
 export { ProjectGuardrail } from "./project-guardrail";
+export { AgentWatchdog } from "./agent-watchdog";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Watchtower-Producer, X-Watchtower-Signature, X-Watchtower-Timestamp",
 };
 
 function json(data: any, status = 200): Response {
@@ -79,6 +85,37 @@ function requireAdmin(request: Request, env: WatchtowerEnv): Response | null {
   return constantTimeEqual(token, supplied) ? null : error("administrative authorization is required", 401);
 }
 
+function validated<T>(operation: () => T): T {
+  try {
+    return operation();
+  } catch (cause) {
+    throw new HttpError(400, cause instanceof Error ? cause.message : "request is invalid");
+  }
+}
+
+function heartbeatDeadline(event: { metadata: Record<string, unknown> }): number {
+  const requested = event.metadata.expectedHeartbeatSeconds;
+  const seconds = typeof requested === "number" && Number.isInteger(requested) && requested >= 30 && requested <= 900
+    ? requested
+    : 120;
+  return Date.now() + seconds * 1_000;
+}
+
+async function enqueueAlerts(env: WatchtowerEnv, alerts: AlertDispatch[]): Promise<void> {
+  if (alerts.length > 0) await env.WATCHTOWER_ALERTS.sendBatch(alerts.map(alert => ({ body: alert })));
+}
+
+function alertWebhookUrl(value: string): string {
+  const url = new URL(value);
+  if (url.protocol !== "https:") throw new Error("WATCHTOWER_ALERT_WEBHOOK_URL must use HTTPS");
+  return url.toString();
+}
+
+function externalErrorDetail(cause: unknown): string {
+  const message = cause instanceof Error ? cause.message : "unknown delivery failure";
+  return message.replace(/[\r\n]/g, " ").slice(0, 240);
+}
+
 export default {
   async fetch(request: Request, env: WatchtowerEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -109,11 +146,18 @@ export default {
       if (path === "/api/v1/events" && method === "POST") {
         const { raw, value } = await readBoundedJson(request);
         const producerId = await authenticateProducer(request, raw, env);
-        const event = validateOperationalEvent(value);
+        const event = validated(() => validateOperationalEvent(value));
         if (!await coordinator.getProjectSummary(event.projectId)) return error("project not found", 404);
         const guardrailId = env.PROJECT_GUARDRAIL.idFromName(event.projectId);
         const guardrail = env.PROJECT_GUARDRAIL.get(guardrailId) as DurableObjectStub<ProjectGuardrail>;
         const result = await guardrail.ingest({ event, producerId, payloadDigest: await sha256Hex(raw), receivedAt: Date.now() });
+        if (event.eventType === "heartbeat") {
+          const watchdog = env.AGENT_WATCHDOG.get(env.AGENT_WATCHDOG.idFromName(`${event.projectId}:${event.agentId}`)) as DurableObjectStub<AgentWatchdog>;
+          await watchdog.recordHeartbeat({ projectId: event.projectId, agentId: event.agentId, deadlineAt: heartbeatDeadline(event) });
+        }
+        // Queue redelivery is intentionally idempotent by delivery ID. Re-queueing on an event retry closes
+        // the small failure window between the durable D1 decision and the durable Queue write.
+        await enqueueAlerts(env, result.alerts);
         console.log({ event: "watchtower.event.accepted", projectId: event.projectId, agentId: event.agentId, eventType: event.eventType, duplicate: result.duplicate, incidentCount: result.incidentIds.length });
         return json(result, result.duplicate ? 200 : 201);
       }
@@ -126,6 +170,55 @@ export default {
         const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
         const limit = parseInt(url.searchParams.get("limit") || "50");
         return json({ incidents: await guardrail.getIncidents(limit) });
+      }
+
+      // ==================== WATCHTOWER COOPERATIVE CONTROL LOOP ====================
+      const leaseRequestMatch = path.match(/^\/api\/v1\/projects\/([^/]+)\/leases$/);
+      if (leaseRequestMatch && method === "POST") {
+        const projectId = validated(() => validateProjectId(leaseRequestMatch[1]));
+        const { raw, value } = await readBoundedJson(request);
+        const producerId = await authenticateProducer(request, raw, env);
+        const leaseRequest = validated(() => validateLeaseRequest(value));
+        if (leaseRequest.projectId !== projectId) return error("projectId must match the request path", 400);
+        if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
+        const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
+        const result = await guardrail.requestLease(leaseRequest, producerId);
+        return json(result, result.status === "active" ? 201 : 409);
+      }
+
+      const leaseValidationMatch = path.match(/^\/api\/v1\/projects\/([^/]+)\/leases\/([^/]+)\/validate$/);
+      if (leaseValidationMatch && method === "POST") {
+        const projectId = validated(() => validateProjectId(leaseValidationMatch[1]));
+        const leaseId = validated(() => validateAgentId(leaseValidationMatch[2]));
+        const { raw, value } = await readBoundedJson(request);
+        await authenticateProducer(request, raw, env);
+        const { agentId } = validated(() => validateLeaseValidationRequest(value));
+        if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
+        const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
+        const result = await guardrail.validateLease(projectId, leaseId, agentId);
+        return json(result, result.status === "active" ? 200 : 409);
+      }
+
+      const commandListMatch = path.match(/^\/api\/v1\/projects\/([^/]+)\/agents\/([^/]+)\/commands$/);
+      if (commandListMatch && method === "GET") {
+        const projectId = validated(() => validateProjectId(commandListMatch[1]));
+        const agentId = validated(() => validateAgentId(commandListMatch[2]));
+        await authenticateProducer(request, "", env);
+        if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
+        const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
+        return json({ commands: await guardrail.getPendingCommands(projectId, agentId) });
+      }
+
+      const commandAcknowledgementMatch = path.match(/^\/api\/v1\/projects\/([^/]+)\/commands\/acknowledge$/);
+      if (commandAcknowledgementMatch && method === "POST") {
+        const projectId = validated(() => validateProjectId(commandAcknowledgementMatch[1]));
+        const { raw, value } = await readBoundedJson(request);
+        await authenticateProducer(request, raw, env);
+        const acknowledgement = validated(() => validateCommandAcknowledgement(value));
+        if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
+        const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
+        const result = await guardrail.acknowledgeCommand(projectId, acknowledgement);
+        return json(result, result.success ? 200 : 404);
       }
 
       // ==================== SYSTEM ROUTES (before project routes) ====================
@@ -240,7 +333,50 @@ export default {
       return json({ error: "internal server error" }, 500);
     }
   },
-} satisfies ExportedHandler<WatchtowerEnv>;
+
+  async queue(batch: MessageBatch<AlertDispatch>, env: WatchtowerEnv): Promise<void> {
+    for (const message of batch.messages) {
+      const alert = message.body;
+      const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(alert.projectId)) as DurableObjectStub<ProjectGuardrail>;
+
+      if (batch.queue === "watchtower-alerts-dlq") {
+        await guardrail.updateNotification(alert.deliveryId, "failed", "alert delivery exhausted its retry budget");
+        message.ack();
+        continue;
+      }
+
+      const configuredUrl = env.WATCHTOWER_ALERT_WEBHOOK_URL;
+      if (!configuredUrl) {
+        await guardrail.updateNotification(alert.deliveryId, "suppressed", "no alert webhook is configured");
+        message.ack();
+        continue;
+      }
+
+      try {
+        const webhookUrl = alertWebhookUrl(configuredUrl);
+        const body = stableJson(alert);
+        const timestamp = Math.floor(Date.now() / 1_000).toString();
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          "X-Watchtower-Delivery": alert.deliveryId,
+          "X-Watchtower-Timestamp": timestamp,
+        };
+        if (env.WATCHTOWER_ALERT_WEBHOOK_SECRET) {
+          headers["X-Watchtower-Signature"] = `sha256=${await hmacSha256Hex(env.WATCHTOWER_ALERT_WEBHOOK_SECRET, `${timestamp}.${body}`)}`;
+        }
+        const response = await fetch(webhookUrl, { method: "POST", headers, body });
+        if (!response.ok) throw new Error(`webhook returned HTTP ${response.status}`);
+        await guardrail.updateNotification(alert.deliveryId, "delivered");
+        message.ack();
+      } catch (cause) {
+        const detail = externalErrorDetail(cause);
+        console.error({ event: "watchtower.alert.delivery_retry", deliveryId: alert.deliveryId, detail });
+        await guardrail.updateNotification(alert.deliveryId, "retrying", detail);
+        message.retry({ delaySeconds: Math.min(60, 2 ** Math.min(message.attempts, 5)) });
+      }
+    }
+  },
+} satisfies ExportedHandler<WatchtowerEnv, AlertDispatch>;
 
 async function handleProjectRoutes(request: Request, env: WatchtowerEnv, projectId: string, restPath: string, corsHeaders: Record<string, string>): Promise<Response> {
   const registryId = env.AGENT_REGISTRY.idFromName(`${projectId}-registry`);

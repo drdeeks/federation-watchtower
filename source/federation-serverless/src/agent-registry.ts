@@ -1,8 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 
 export type WatchtowerEnv = Env & {
-  WATCHTOWER_INGESTION_SECRET?: string;
-  WATCHTOWER_ADMIN_TOKEN?: string;
+  WATCHTOWER_ALERT_WEBHOOK_URL?: string;
+  WATCHTOWER_ALERT_WEBHOOK_SECRET?: string;
 };
 
 export interface Agent {

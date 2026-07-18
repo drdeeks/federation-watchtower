@@ -62,10 +62,11 @@ These gaps are also visible in the current source:
   while `source/federation-tv-package/federation-core/demo-gateway.js` is the
 only implementation of it.
 
-### Release 1 implementation status — 2026-07-17
+### Release 1 implementation and production status — 2026-07-17
 
-The source now implements the first safe control-loop slice, pending the
-explicit production migration and secret configuration:
+The first safe control-loop slice is implemented and deployed. Production D1
+has the additive enforcement migration, and the Worker has the required
+ingestion and administrative secrets:
 
 - `POST /api/v1/events` accepts a bounded, HMAC-signed, replay-limited,
   idempotent operational event and redacts sensitive metadata before storage.
@@ -78,10 +79,9 @@ explicit production migration and secret configuration:
 - The additive D1 migration, generated Worker binding types, standalone policy
   tests, and deployment documentation are included.
 
-It is deliberately **not deployed yet**: production must first receive the D1
-migration and the two Worker secrets. Notifications, owner acknowledgement,
-watchdog alarms, cooperative leases, per-agent credentials, queues/DLQs, and
-actual tool-call denial remain Release 2/3 work.
+Notifications, owner acknowledgement, watchdog alarms, cooperative leases,
+per-agent credentials, queues/DLQs, and actual tool-call denial remained
+Release 2/3 work at that point.
 
 ## Product Capabilities to Build
 
@@ -299,10 +299,20 @@ same result on retry without duplicating the incident.
 ### Release 2 — close the cooperative loop
 
 1. Add leases, control commands, and an adapter for the Loop Enforcer/Gate.
-2. Add an agent watchdog alarm and scheduled reconciliation.
+   **Implemented in source:** the standard-library adapter acquires and checks
+   leases, polls commands, emits heartbeats, and writes containment receipts.
+2. Add an agent watchdog alarm and scheduled reconciliation. **Implemented in
+   source:** one Agent Watchdog Durable Object per agent reschedules its alarm
+   on a signed heartbeat and emits a deduplicated missed-heartbeat event.
+   Scheduled reconciliation remains future safety-net work.
 3. Add the notification Queue, DLQ, generic signed-webhook delivery, and
-   acknowledgement/escalation rules.
-4. Add owner and policy administration behind Access/admin scopes.
+   acknowledgement/escalation rules. **Implemented in source:** an incident
+   creates a durable notification record, Queue delivery retries via the DLQ,
+   and HTTPS webhook delivery is HMAC-signable. Outbound delivery is safely
+   suppressed until an owner configures `WATCHTOWER_ALERT_WEBHOOK_URL`.
+4. Add owner and policy administration behind Access/admin scopes. Existing
+   admin protection remains in place; owner/project policy administration is
+   deferred until principal and scope design in Release 3.
 
 Success criterion: a nested-chain event exceeding the policy receives a
 quarantine command; the adapter sees the revoked lease before the next step,

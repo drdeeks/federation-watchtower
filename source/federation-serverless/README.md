@@ -26,9 +26,11 @@ Browser / agent / MCP client
        ├── FederationCoordinator Durable Object (global state)
        ├── AgentRegistry Durable Object (per-project state)
        ├── ProjectGuardrail Durable Object (per-project policy decisions)
-        ├── D1: projects, agents, rooms, events, federation records
-        ├── R2: federation vault objects
-        └── Static assets → watch.drdeeks.xyz
+       ├── AgentWatchdog Durable Object (per-agent heartbeat deadline)
+       ├── D1: projects, agents, events, leases, incidents, audit records
+       ├── Queue + DLQ: durable owner-alert delivery
+       ├── R2: federation vault objects
+       └── Static assets → watch.drdeeks.xyz
 ```
 
 The static bundle is sourced from `../federation-tv-widget/public`, so the deployed Watchtower and the embeddable widget use the same files. The canonical brand source remains the repository-level `brand/` directory; its deployment copy is `../federation-tv-widget/public/brand/`.
@@ -62,10 +64,13 @@ Apply the schema to a remote database:
 ```bash
 npm run schema
 npm run migrate:watchtower
+npm run migrate:control-loop
 ```
 
 The Watchtower migration is additive and must be applied once to the existing
-production D1 database before `/api/v1/events` is enabled.
+production D1 database before `/api/v1/events` is enabled. The control-loop
+migration is also additive; apply it before deploying leases, watchdogs, or
+alert delivery.
 
 Configure production credentials as Worker secrets, never as `vars` in
 `wrangler.toml`:
@@ -73,6 +78,16 @@ Configure production credentials as Worker secrets, never as `vars` in
 ```bash
 npx wrangler secret put WATCHTOWER_INGESTION_SECRET
 npx wrangler secret put WATCHTOWER_ADMIN_TOKEN
+```
+
+Owner delivery is deliberately opt-in. Without `WATCHTOWER_ALERT_WEBHOOK_URL`,
+the Queue records new incident alerts as `suppressed` and sends nothing
+externally. To enable a generic HTTPS owner webhook, configure these optional
+Worker secrets:
+
+```bash
+npx wrangler secret put WATCHTOWER_ALERT_WEBHOOK_URL
+npx wrangler secret put WATCHTOWER_ALERT_WEBHOOK_SECRET # optional HMAC signer
 ```
 
 Useful checks:
@@ -92,6 +107,7 @@ curl https://watch.drdeeks.xyz/
 | `npm run deploy` | Upload Worker code, static assets, bindings, and custom domains. |
 | `npm run schema` | Execute `src/schema.sql` against remote D1. |
 | `npm run migrate:watchtower` | Apply the additive Watchtower event/incident migration to remote D1. |
+| `npm run migrate:control-loop` | Apply leases, command receipts, and notification-delivery tables to remote D1. |
 | `npm test` | Run event validation and runaway-policy tests. |
 | `npx wrangler dev --local` | Run the Worker locally with simulated bindings. |
 | `npx wrangler tail federation-gateway` | Follow production Worker logs. |
@@ -118,6 +134,10 @@ curl https://watch.drdeeks.xyz/
 | --- | --- | --- |
 | `POST` | `/api/v1/events` | Signed, idempotent operational event ingestion. |
 | `GET` | `/api/v1/projects/{projectId}/incidents` | Read incidents; administrator authorization required. |
+| `POST` | `/api/v1/projects/{projectId}/leases` | Acquire or renew a bounded cooperative work lease. |
+| `POST` | `/api/v1/projects/{projectId}/leases/{leaseId}/validate` | Check a lease immediately before the next side effect. |
+| `GET` | `/api/v1/projects/{projectId}/agents/{agentId}/commands` | Read still-blocking containment commands. |
+| `POST` | `/api/v1/projects/{projectId}/commands/acknowledge` | Record `contained`, `rejected`, or `failed` command outcome. |
 
 The ingestion body follows the canonical event contract in
 [`../../docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md`](../../docs/review/WATCHTOWER_ENFORCEMENT_IMPLEMENTATION_PLAN.md).
@@ -136,7 +156,46 @@ keys, oversized bodies, and metadata containing secret-shaped keys are rejected
 or safely redacted before persistence. Retrying a known idempotency key returns
 the original decision without another side effect. An accepted event is
 projected into the existing feed and can open an advisory incident/control
-command for a runaway-policy result.
+command for a runaway-policy result. A `heartbeat` event arms a per-agent
+Durable Object alarm; if no new signed heartbeat replaces it before the stated
+deadline, Watchtower emits a deduplicated `heartbeat.missed` event.
+
+### Cooperative containment
+
+All cooperative-control routes use the same producer signature. A `GET` signs
+the empty body, so its input is `<timestamp>.`. Lease TTLs are constrained to
+30–900 seconds. A request is denied when a still-active `pause`, `quarantine`,
+`require_approval`, or `deny` command applies to that agent. A previously
+issued active lease is revoked on its next validation if such a command opens.
+
+The adapter at
+[`../federation-tv-package/mcp-skill/federation-agent/watchtower_loop.py`](../federation-tv-package/mcp-skill/federation-agent/watchtower_loop.py)
+is standard-library-only and intentionally returns exit code `3` whenever a
+lease is not active. Wrap a consequential tool or Loop Enforcer step with it:
+
+```bash
+export WATCHTOWER_INGESTION_SECRET='set-outside-the-repository'
+ADAPTER=../federation-tv-package/mcp-skill/federation-agent/watchtower_loop.py
+
+python3 "$ADAPTER" --project autopilot --agent build-01 lease --run deploy-42 --scope deploy
+# Persist the returned leaseId, then immediately before an external side effect:
+python3 "$ADAPTER" --project autopilot --agent build-01 validate --lease lease_example
+```
+
+Agents must stop when the validate command returns `3`. A `contained` receipt
+transitions the corresponding incident to `contained`; `rejected` and `failed`
+remain visible and blocking until a later containment acknowledgement or expiry.
+
+### Notification delivery
+
+The Worker writes a notification-delivery record in the same policy decision
+that opens an incident, then enqueues a delivery by its immutable `deliveryId`.
+The Queue retries failed HTTPS webhook calls and moves exhausted messages to a
+DLQ, where their delivery record becomes `failed`. Each webhook receives a
+public-safe JSON alert plus `X-Watchtower-Delivery` and timestamp headers; if a
+webhook secret is configured it also receives a HMAC signature over
+`<timestamp>.<canonical JSON body>`. Destinations must deduplicate by delivery
+ID because retries are intentional.
 
 ### Project routes
 
@@ -228,11 +287,13 @@ federation-serverless/
 └── src/
     ├── index.ts                    # Worker entry and HTTP/WebSocket routing
     ├── agent-registry.ts           # Per-project Durable Object
+    ├── agent-watchdog.ts            # Per-agent heartbeat deadline/alarm
     ├── federation-coordinator.ts   # Global Durable Object
     ├── project-guardrail.ts        # Per-project event/policy/incident coordinator
     ├── watchtower.ts                # Event validation, HMAC, and runaway rules
     ├── watchtower.test.ts           # Standalone core-policy tests
     ├── migrations/0001_watchtower_enforcement.sql
+    ├── migrations/0002_watchtower_control_loop.sql
     └── schema.sql                  # D1 schema
 ```
 

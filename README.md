@@ -29,7 +29,7 @@ Watchtower is meant to incorporate the surrounding operational systems already r
 
 - **Federation registry** — organizations, projects, agents, rooms, identities, heartbeats, and live events.
 - **Guardrail monitoring** — runaway loops, duplicate chains, budget pressure, invalid states, and blocked work become explicit events.
-- **Validation and enforcement** — blueprint gates, policy checks, source verification, and structured review signals can report into the same feed.
+- **Validation and enforcement** — blueprint gates, policy checks, source verification, bounded work leases, watchdog heartbeats, and structured review signals can report into the same feed.
 - **MCP/API/widget access** — humans see the broadcast, agents use MCP or REST, and embedded widgets provide a lightweight status surface.
 - **Enterprise operations** — the referenced crew, self-healing, audit, memory, and integration systems provide the deeper control-plane patterns behind the visible Watchtower.
 
@@ -104,6 +104,7 @@ npm run check       # run Wrangler's installed validation command
 npm run deploy      # deploy Worker, assets, and custom domains
 npm run schema      # apply src/schema.sql to the remote D1 database
 npm run migrate:watchtower # apply the additive Watchtower enforcement tables
+npm run migrate:control-loop # apply cooperative leases, receipts, and alert delivery tables
 npm test             # validate the event contract and core runaway rules
 ```
 
@@ -189,6 +190,7 @@ The widget’s `public/brand/` directory is the deployment copy of those assets;
 - Keep generated dependencies, Wrangler state, logs, and release archives ignored.
 - Prefer the Cloudflare Worker path for production behavior; use the local adapter for fast demos and tests.
 - Production secrets must be set before deployment: `WATCHTOWER_INGESTION_SECRET` signs telemetry and `WATCHTOWER_ADMIN_TOKEN` protects administrative routes. Do not treat CORS as access control.
+- Incident webhooks are off until `WATCHTOWER_ALERT_WEBHOOK_URL` is configured. Until then, Watchtower records the alert as safely suppressed; it does not send to an unchosen destination.
 
 ## License
 
