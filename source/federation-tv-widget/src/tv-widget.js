@@ -289,7 +289,17 @@
             </div>
           </div>
 
-          <div id="tv-diorama" class="tv-scene"></div>
+          <div id="tv-diorama" class="tv-scene">
+            <div class="tv-office-set" aria-hidden="true">
+              <div class="tv-zone tv-zone--conference"><b>CONFERENCE</b><i></i><i></i><i></i></div>
+              <div class="tv-zone tv-zone--ops"><b>OPS DESKS</b><span class="tv-monitor"></span><span class="tv-monitor"></span><span class="tv-monitor"></span></div>
+              <div class="tv-zone tv-zone--console"><b>WATCH CONSOLE</b><span class="tv-console-light"></span></div>
+              <div class="tv-zone tv-zone--incident"><b>INCIDENT BAY</b><span class="tv-beacon"></span></div>
+              <div class="tv-zone tv-zone--lounge"><b>BREAK CORNER</b><span class="tv-sofa"></span><span class="tv-plant">✦</span></div>
+              <div class="tv-assembly"><span>⇢</span><span>⇢</span><span>⇢</span><b>BUILD LINE</b></div>
+              <div class="tv-door">⇥</div>
+            </div>
+          </div>
 
           <div class="tv-widget-feed" style="
             margin-top: 16px; padding-top: 12px;
@@ -354,7 +364,20 @@
               border: 1px solid rgba(148,163,184,.16);
               border-radius: 10px;
               opacity: .72;
+              z-index:1; pointer-events:none;
             }
+            .tv-office-set { position:absolute; inset:0; z-index:2; pointer-events:none; font-family:ui-monospace,monospace; image-rendering:pixelated; }
+            .tv-zone { position:absolute; border:2px solid rgba(222,238,229,.33); background:rgba(8,17,17,.22); box-shadow:inset 0 0 0 2px rgba(3,7,7,.25); color:#d8eee4; }
+            .tv-zone b { position:absolute; top:-13px; left:2px; color:#c6ded4; font-size:6px; letter-spacing:.08em; white-space:nowrap; }
+            .tv-zone--conference { left:17%; top:14%; width:27%; height:16%; border-radius:50%; background:radial-gradient(ellipse,#785c43 0 44%,transparent 46%); }
+            .tv-zone--conference i { position:absolute; width:8px; height:8px; border:2px solid #263e3a; background:#96b9a9; } .tv-zone--conference i:nth-of-type(1){left:10%;bottom:-5px}.tv-zone--conference i:nth-of-type(2){right:10%;bottom:-5px}.tv-zone--conference i:nth-of-type(3){left:46%;top:-5px}
+            .tv-zone--ops { left:18%; top:50%; width:39%; height:17%; border-color:rgba(239,199,102,.5); background:repeating-linear-gradient(90deg,rgba(54,70,63,.8) 0 17%,rgba(22,38,34,.8) 17% 20%); }
+            .tv-monitor { position:absolute; top:26%; width:13%; height:38%; background:#061211; border:2px solid #b8d8ce; box-shadow:0 0 0 2px #263f37, inset 0 0 0 2px #39d5b0; } .tv-monitor::after { content:""; position:absolute; left:36%; top:100%; width:26%; height:35%; background:#a8c8bb; } .tv-monitor:nth-of-type(1){left:9%}.tv-monitor:nth-of-type(2){left:43%}.tv-monitor:nth-of-type(3){left:76%}
+            .tv-zone--console { left:62%; top:31%; width:21%; height:14%; border-color:rgba(87,211,190,.55); background:linear-gradient(135deg,#1c3b3b,#102522); }.tv-console-light{position:absolute;right:10%;top:18%;width:11px;height:11px;background:#60f4ce;box-shadow:0 0 11px #60f4ce;animation:tv-console-blink 2s steps(2,end) infinite}
+            .tv-zone--incident { left:75%; top:63%; width:19%; height:16%; border-color:rgba(255,120,101,.7); background:repeating-linear-gradient(135deg,rgba(97,41,36,.8) 0 6px,rgba(44,25,23,.8) 6px 12px); }.tv-beacon{position:absolute;right:10%;top:13%;width:8px;height:8px;border-radius:50%;background:#ff806e;box-shadow:0 0 11px #ff806e;animation:tv-alert 1.1s infinite}
+            .tv-zone--lounge { left:19%; top:73%; width:26%; height:14%; border-color:rgba(176,137,210,.55); background:#392b42; }.tv-sofa{position:absolute;left:19%;bottom:17%;width:48%;height:32%;border:3px solid #dac7ee;border-bottom-width:7px;background:#754f93}.tv-plant{position:absolute;right:11%;bottom:17%;color:#8df1a9;font-size:20px;text-shadow:0 0 6px #44b76d}
+            .tv-assembly { position:absolute; left:47%; bottom:8%; width:27%; height:8%; display:flex; align-items:center; gap:7%; padding:0 7%; border-top:2px dashed rgba(241,205,93,.7); border-bottom:2px dashed rgba(241,205,93,.7); color:#f4cd5d; font-size:13px; }.tv-assembly b{position:absolute;right:2px;bottom:-11px;font-size:6px;letter-spacing:.08em}
+            .tv-door{position:absolute;left:3%;bottom:9%;width:7%;height:14%;display:grid;place-items:center;border:3px solid #b7d2c7;background:#1b2f2b;color:#f5d05d;font-size:20px}
             .tv-agent {
               position: relative;
               width: auto;
@@ -435,6 +458,7 @@
             @keyframes tv-pace { 0%,100% { transform: translateX(0); } 45% { transform: translateX(46px); } 55% { transform: translateX(46px); } }
             @keyframes tv-look { 0%,100% { transform: rotate(0deg); } 35% { transform: rotate(-4deg); } 70% { transform: rotate(4deg); } }
             @keyframes tv-alert { 0%,100% { opacity: .9; } 50% { opacity: .25; } }
+            @keyframes tv-console-blink { 0%,100% { opacity:1; } 50% { opacity:.25; } }
             @keyframes tv-ambient-visit { 0%,100% { opacity:0; transform:translateX(-50%) translateY(8px); } 16%,84% { opacity:1; transform:translateX(-50%) translateY(0); } }
             @media (prefers-reduced-motion: reduce) {
               * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
