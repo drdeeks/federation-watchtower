@@ -261,3 +261,21 @@ Phase       : PHASE-4 partial implementation; organization identity and role
 Rollback Ref: revert the host-specific redirect and restore the prior asset
               selection behavior
 ```
+
+## CL-0012 — Cache-Safe Federation Navigation
+
+```
+Date        : 2026-07-18
+Contributor : Codex
+Modules     : [MOD-015]
+Section Tags: [[HOST-SURFACE-v1], [QUALITY-v1]]
+Files Changed: [index.html, join.html, integrate.html, federation.html,
+                operator.html]
+Description : Updated every Federation navigation target to use the explicit
+              member page path, so cross-domain navigation remains correct even
+              while a cached root response is revalidating.
+Tests Passing: pending static and public asset verification
+Phase       : PHASE-4 partial implementation; host cache purge authority is
+              external to the Worker deploy token
+Rollback Ref: restore the domain-root navigation targets
+```
