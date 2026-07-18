@@ -218,6 +218,8 @@
       this.maxBubbles = options.maxBubbles || 4;
       
       this.agents = new Map();           // agentId -> agent data
+      this.sceneAgents = new Map();      // agentId -> authoritative room-scene projection
+      this.sceneSequence = 0;
       this.speechLines = [...DEFAULT_SPEECH_LINES];
       this.activeBubbles = new Map();    // agentId -> { text, element, timeout }
       this.eventFeed = [];
@@ -245,6 +247,7 @@
     async init() {
       this.renderShell();
       await this.fetchAgents();
+      await this.fetchScene();
       await this.fetchEvents();
       this.start();
     }
@@ -363,6 +366,16 @@
               gap: 1px;
               z-index: 3;
             }
+            .tv-scene--projected { display:block; padding:0; }
+            .tv-scene--projected .tv-agent {
+              position:absolute; left:var(--scene-x); top:var(--scene-y);
+              width:74px; min-height:72px; transform:translate(-50%,-50%);
+              transition:left 2.4s cubic-bezier(.22,.61,.36,1), top 2.4s cubic-bezier(.22,.61,.36,1);
+            }
+            .tv-scene--projected .tv-agent[data-scene-origin="ambient"]::after {
+              content:"AMBIENT"; position:absolute; top:-10px; right:-4px; padding:2px 3px;
+              color:#101a19; background:#f4c842; font:800 6px ui-monospace,monospace; letter-spacing:.04em;
+            }
             .tv-agent svg { width: clamp(38px, 5.1vw, 58px); height: auto; max-height: 62px; transform-origin: 50% 100%; }
             .tv-agent-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:750; font-size:9px; color:#f8fafc; text-align:center; }
             .tv-agent-role { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:7px; color:#e0c9a0; text-transform:uppercase; letter-spacing:.04em; }
@@ -371,6 +384,8 @@
             .tv-agent--pacing svg { animation: tv-walk 1.2s steps(2,end) infinite; }
             .tv-agent--watching svg { animation: tv-look 4.2s ease-in-out infinite; }
             .tv-agent--alerting .tv-agent-status { animation: tv-alert 1.1s ease-in-out infinite; }
+            .tv-scene--projected .tv-agent[data-scene-animation="walk"] svg { animation: tv-walk 1.05s steps(2,end) infinite; }
+            .tv-scene--projected .tv-agent[data-scene-animation="work"] svg { animation: tv-work 2.8s ease-in-out infinite; }
             .tv-agent-status {
               position: absolute;
               right: 12%;
@@ -479,6 +494,28 @@
       }
     }
 
+    async fetchScene() {
+      if (this.roomId === 'all') {
+        this.sceneAgents.clear();
+        this.sceneSequence = 0;
+        this.updateDiorama();
+        return;
+      }
+      try {
+        const res = await fetch(`${this.gatewayUrl}/api/v1/public/rooms/${encodeURIComponent(this.roomId)}/scene`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const scene = await res.json();
+        this.sceneSequence = Number(scene.sequence || 0);
+        this.sceneAgents = new Map((scene.agents || []).map(agent => [agent.agentId, agent]));
+        this.updateDiorama();
+      } catch (e) {
+        // Keep roster/feed observation available if a scene is temporarily recovering.
+        console.warn('[FederationTV] Failed to fetch authoritative room scene:', e);
+        this.sceneAgents.clear();
+        this.updateDiorama();
+      }
+    }
+
     async fetchEvents() {
       try {
         const url = this.projectId === 'all'
@@ -524,7 +561,10 @@
     setRoom(roomId = 'all', projectId = 'all') {
       this.roomId = roomId;
       this.projectId = projectId;
+      this.sceneAgents.clear();
+      this.sceneSequence = 0;
       this.fetchAgents();
+      this.fetchScene();
       this.fetchEvents();
     }
 
@@ -568,6 +608,7 @@
     // ============================================================
     updateDiorama() {
       if (!this.dioramaEl) return;
+      this.dioramaEl.classList.toggle('tv-scene--projected', this.sceneAgents.size > 0);
       
       const agentArray = Array.from(this.agents.values());
       
@@ -588,17 +629,17 @@
       for (const agent of agentArray) {
         let el = this.dioramaEl.querySelector(`[data-agent-id="${agent.agentId}"]`);
         if (!el) {
-          el = this.createAgentElement(agent);
+          el = this.createAgentElement(agent, this.sceneAgents.get(agent.agentId));
           this.dioramaEl.appendChild(el);
         } else {
-          this.updateAgentElement(el, agent);
+          this.updateAgentElement(el, agent, this.sceneAgents.get(agent.agentId));
         }
       }
 
       this.drainBubbleQueue();
     }
 
-    createAgentElement(agent) {
+    createAgentElement(agent, sceneAgent) {
       const avatar = generateAvatarSVG(agent.agentId, agent.name, agent.role);
       const statusColor = agent.status === 'active' ? '#22c55e' : 
                           agent.status === 'busy' ? '#f59e0b' : '#64748b';
@@ -606,11 +647,12 @@
       const div = document.createElement('div');
       div.dataset.agentId = agent.agentId;
       div._federationAgent = agent;
-      div.className = `tv-agent tv-agent--${this.agentAction(agent)}`;
+      div.className = `tv-agent tv-agent--${this.agentAction(sceneAgent || agent)}`;
       div.tabIndex = 0;
       div.setAttribute('role', 'button');
       div.setAttribute('aria-label', `Inspect ${agent.name}`);
       div.title = `Inspect ${agent.name}`;
+      this.applyScenePosition(div, sceneAgent);
       
       div.innerHTML = `
         <div style="position: relative;">${avatar}<div class="tv-agent-status" style="background: ${statusColor};"></div></div>
@@ -627,9 +669,10 @@
       return div;
     }
 
-    updateAgentElement(el, agent) {
-      el.className = `tv-agent tv-agent--${this.agentAction(agent)}`;
+    updateAgentElement(el, agent, sceneAgent) {
+      el.className = `tv-agent tv-agent--${this.agentAction(sceneAgent || agent)}`;
       el._federationAgent = agent;
+      this.applyScenePosition(el, sceneAgent);
       const nameEl = el.querySelector('.tv-agent-name');
       const roleEl = el.querySelector('.tv-agent-role');
       const statusDot = el.querySelector('.tv-agent-status');
@@ -644,7 +687,26 @@
     }
 
     agentAction(agent) {
-      return ['working', 'pacing', 'watching', 'alerting'].includes(agent.action) ? agent.action : 'working';
+      const action = agent.operationalAction || agent.action;
+      return ['working', 'pacing', 'watching', 'alerting'].includes(action) ? action : 'watching';
+    }
+
+    applyScenePosition(el, sceneAgent) {
+      if (!sceneAgent) {
+        el.removeAttribute('data-scene-origin');
+        el.removeAttribute('data-scene-animation');
+        el.removeAttribute('data-scene-label');
+        el.style.removeProperty('--scene-x');
+        el.style.removeProperty('--scene-y');
+        return;
+      }
+      const destination = sceneAgent.destination || sceneAgent.position;
+      el.style.setProperty('--scene-x', `${destination.x}%`);
+      el.style.setProperty('--scene-y', `${destination.y}%`);
+      el.dataset.sceneOrigin = sceneAgent.presentation?.origin || 'lifecycle';
+      el.dataset.sceneAnimation = sceneAgent.animation || 'idle';
+      el.dataset.sceneLabel = sceneAgent.presentation?.label || 'scene projection';
+      el.title = `${el._federationAgent?.name || sceneAgent.displayName} · ${el.dataset.sceneLabel}`;
     }
 
     getEventId(event) {
@@ -778,6 +840,7 @@
         if (!this.isRunning || polls >= this.maxPolls) return;
         polls += 1;
         this.fetchAgents();
+        this.fetchScene();
         this.fetchEvents();
         this.pollTimer = setTimeout(poll, this.refreshInterval);
       };

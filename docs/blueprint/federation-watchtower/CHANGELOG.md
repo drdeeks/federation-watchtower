@@ -150,3 +150,70 @@ Phase       : PHASE-1/PHASE-3 partial evidence; reviewer roles, revocation UI,
 Rollback Ref: Worker rollback to prior version; migration is additive and must
               be superseded by an additive disable/revocation migration if needed
 ```
+
+## CL-0007 — Authoritative Room Scene Projection Slice
+
+```
+Date        : 2026-07-18
+Contributor : Codex
+Modules     : [MOD-003, MOD-006, MOD-007, MOD-008, MOD-009]
+Section Tags: [[CAMERA-PROJECTION-v1], [CHOREOGRAPHY-v1], [WATCHDOG-v1]]
+Files Changed: [room-scene.ts, lifecycle.ts, agent-watchdog.ts, index.ts,
+                wrangler.toml, ROOM_SCENE_CONTRACT.md, room-scene.test.ts]
+Description : Added one SQLite-backed Durable Object coordination atom per
+              public room. It persists bounded agent placement, destination,
+              action, presentation provenance, sequence, and recent scene
+              events. Real lifecycle and operational inputs project into the
+              scene; a scheduled ambient beat may move an active agent but is
+              explicitly labelled as presentation with no operational event.
+              The public read-only scene snapshot is exposed on fapi. Browser
+              coordinate/sprite rendering is intentionally not claimed here.
+Tests Passing: Worker type generation; serverless 18/18; git diff --check
+Phase       : PHASE-4 partial implementation; no checklist item marked pending
+              endpoint, browser, and production acceptance evidence
+Rollback Ref: remove ROOM_SCENE binding/routes and revert scene invocation;
+              RoomScene storage is isolated from operational D1 evidence
+```
+
+## CL-0008 — Public Room Scene Consumption and Submission Handoff
+
+```
+Date        : 2026-07-18
+Contributor : Codex
+Modules     : [MOD-008, MOD-009, MOD-015]
+Section Tags: [[CAMERA-PROJECTION-v1], [CHOREOGRAPHY-v1], [QUALITY-v1]]
+Files Changed: [tv-widget.js, index.html, SUBMISSION_RUNBOOK.md, README.md]
+Description : Wired the public widget to the read-only authoritative room-scene
+              endpoint. A selected camera room now uses server-issued positions,
+              destination, animation, and provenance; ambient movement carries
+              a visible label. The public home selects the first real room when
+              available instead of presenting an all-room static grid. Added a
+              concise release and Devpost handoff runbook.
+Tests Passing: pending browser syntax, Worker suite, and deployment verification
+Phase       : PHASE-4 partial implementation; sprite rendering, stream cursors,
+              production scene evidence, and checklist gate remain incomplete
+Rollback Ref: revert widget scene fetch/placement and retain the roster/feed
+              fallback; the RoomScene backend remains independently reversible
+```
+
+## CL-0009 — Room Scene Production Release Evidence
+
+```
+Date        : 2026-07-18
+Contributor : Codex
+Modules     : [MOD-008, MOD-009, MOD-015]
+Section Tags: [[CAMERA-PROJECTION-v1], [CHOREOGRAPHY-v1], [QUALITY-v1]]
+Files Changed: [CHANGELOG.md, ROOM_SCENE_CONTRACT.md]
+Description : Deployed RoomScene binding, lifecycle projection, public snapshot
+              route, and Watchtower scene consumer as Worker version
+              524b7f37-f53f-4e87-9b6a-b91834a2a7be. Public health returned 200;
+              the selected existing room returned an empty but valid scene
+              snapshot, and the deployed widget contained the scene endpoint
+              and projected-camera code. No fake scene data was seeded.
+Tests Passing: Worker types; serverless 18/18; browser syntax; public health,
+              scene snapshot, and deployed widget inspection PASS
+Phase       : PHASE-4 partial evidence; live newly-projected agent, sprite
+              renderer, stream cursors, and full checklist gate remain pending
+Rollback Ref: Worker rollback to preceding version; RoomScene data is isolated
+              from operational D1 evidence and can be disabled by route/call-site rollback
+```

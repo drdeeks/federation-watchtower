@@ -2,6 +2,7 @@ import { AgentRegistry } from "./agent-registry";
 import { FederationCoordinator } from "./federation-coordinator";
 import type { WatchtowerEnv } from "./agent-registry";
 import { AgentWatchdog } from "./agent-watchdog";
+import { RoomScene } from "./room-scene";
 import { ProjectGuardrail, type AlertDispatch } from "./project-guardrail";
 import { createMcpHandler } from "agents/mcp";
 import { createWatchtowerMcpServer, isIpAllowed, parseMcpCredential, toMcpPrincipal, verifyMcpApiKey } from "./mcp";
@@ -16,6 +17,7 @@ export { AgentRegistry } from "./agent-registry";
 export { FederationCoordinator } from "./federation-coordinator";
 export { ProjectGuardrail } from "./project-guardrail";
 export { AgentWatchdog } from "./agent-watchdog";
+export { RoomScene } from "./room-scene";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -205,6 +207,7 @@ export default {
           eventIngestion: "/api/v1/events",
           mcp: "/mcp",
           websocket: "/ws?projectId={projectId}",
+          publicRoomScene: "/api/v1/public/rooms/{roomId}/scene",
           universalAccess: "https://watch.drdeeks.xyz/",
           integrationGuide: "https://watch.drdeeks.xyz/integrate.html",
         });
@@ -212,6 +215,17 @@ export default {
 
       const lifecycleResponse = await handleLifecycleRequest({ request, path, method, env, coordinator, json, readBoundedJson });
       if (lifecycleResponse) return lifecycleResponse;
+
+      // A public scene is a read-only projection. It contains location and
+      // presentation provenance, never a credential or mutation capability.
+      const sceneMatch = path.match(/^\/api\/v1\/public\/rooms\/([^/]+)\/scene$/);
+      if (sceneMatch && method === "GET") {
+        const roomId = decodeURIComponent(sceneMatch[1]);
+        const room = await env.DB.prepare("SELECT id FROM rooms WHERE id = ?").bind(roomId).first<{ id: string }>();
+        if (!room) return error("room not found", 404);
+        const scene = env.ROOM_SCENE.get(env.ROOM_SCENE.idFromName(roomId)) as DurableObjectStub<RoomScene>;
+        return json(await scene.snapshot());
+      }
 
       // ==================== REMOTE MCP GATEWAY ====================
       if (path === "/mcp") {
@@ -245,6 +259,13 @@ export default {
         // Queue redelivery is intentionally idempotent by delivery ID. Re-queueing on an event retry closes
         // the small failure window between the durable D1 decision and the durable Queue write.
         await enqueueAlerts(env, result.alerts);
+        const registry = env.AGENT_REGISTRY.get(env.AGENT_REGISTRY.idFromName(`${event.projectId}-registry`)) as DurableObjectStub<AgentRegistry>;
+        const publicAgent = await registry.getAgent(event.agentId);
+        if (publicAgent?.roomId && !result.duplicate) {
+          await registry.recordPublicEvent({ eventType: event.eventType, agentId: event.agentId, message: event.statement, priority: event.severity === "critical" ? "critical" : event.severity === "error" ? "high" : "normal", metadata: { source: "signed-ingestion", eventId: event.eventId } });
+          const scene = env.ROOM_SCENE.get(env.ROOM_SCENE.idFromName(publicAgent.roomId)) as DurableObjectStub<RoomScene>;
+          await scene.project({ roomId: publicAgent.roomId, agentId: publicAgent.agentId, displayName: publicAgent.name, role: publicAgent.role || undefined, paletteKey: typeof publicAgent.metadata.paletteKey === "string" ? publicAgent.metadata.paletteKey : undefined, lifecycleState: publicAgent.status, eventType: event.eventType, sourceEventId: event.eventId, occurredAt: Date.now() });
+        }
         console.log({ event: "watchtower.event.accepted", projectId: event.projectId, agentId: event.agentId, eventType: event.eventType, duplicate: result.duplicate, incidentCount: result.incidentIds.length });
         return json(result, result.duplicate ? 200 : 201);
       }

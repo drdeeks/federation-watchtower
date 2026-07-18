@@ -15,6 +15,7 @@ Federation Watchtower documentation is grouped by purpose:
 - [`review/SUPER_STATEMENT_PACKET_SPEC.md`](review/SUPER_STATEMENT_PACKET_SPEC.md) — event and speech packet shape.
 - [`review/OPENAI_SUBMISSION_NOTES.md`](review/OPENAI_SUBMISSION_NOTES.md) — developer-tool positioning and demo narrative.
 - [`review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md`](review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md) — short demo script.
+- [`review/SUBMISSION_RUNBOOK.md`](review/SUBMISSION_RUNBOOK.md) — exact release, demo, and Devpost handoff steps.
 - [`review/ONCHAIN_IDENTITY_NOTES.md`](review/ONCHAIN_IDENTITY_NOTES.md) — identity and attribution notes.
 
 ## Integration references
