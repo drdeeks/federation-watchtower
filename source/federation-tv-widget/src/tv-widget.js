@@ -141,77 +141,209 @@
   ];
 
   // ============================================================
-  // AGENT CHARACTER GENERATION — Offline, deterministic, sitcom-style
+  // OFFICE FLOOR — agents are drawn by the procedural sprite generator
+  // above (a deterministic per-agent pixel character), rendered on a real
+  // pixel-art office floor and walked between a fixed set of waypoints.
   // ============================================================
-  function generateAvatarSVG(agentId, name, role) {
-    // Deterministic hash from agentId
+  const OFFICE_WAYPOINTS = [
+    { x: 13, y: 54 }, // cubicle 1 (front row)
+    { x: 35, y: 54 }, // cubicle 2 (front row)
+    { x: 57, y: 54 }, // cubicle 3 (front row)
+    { x: 13, y: 84 }, // cubicle 4 (back row)
+    { x: 35, y: 84 }, // cubicle 5 (back row)
+    { x: 57, y: 84 }, // cubicle 6 (back row)
+    { x: 79, y: 52 }, // by the water cooler (casual meetup)
+    { x: 82, y: 82 }, // by the plant
+  ];
+
+  function hashId(id) {
     let hash = 0;
-    for (let i = 0; i < agentId.length; i++) {
-      hash = ((hash << 5) - hash) + agentId.charCodeAt(i);
-      hash |= 0;
+    for (let i = 0; i < id.length; i++) { hash = ((hash << 5) - hash) + id.charCodeAt(i); hash |= 0; }
+    return Math.abs(hash);
+  }
+
+  // ============================================================
+  // PROCEDURAL SPRITE GENERATOR — draws a deterministic pixel-art
+  // character sheet per agent onto an offscreen <canvas> and hands back
+  // a data-URL, so the diorama needs no static PNG/GIF sprite assets.
+  // Every roll is a pure function of the agent's stable identity
+  // (agentId + avatarSeed + paletteKey + characterType), so the same
+  // agent always renders the same face — the presentation layer never
+  // fabricates identity, it only visualises what the record already says.
+  // ============================================================
+  const SPRITE_PAL = {
+    paper: "#efe6d0", ink: "#1a1a22", brick: "#9c4a3c",
+    yellow: "#f2c14e", teal: "#2fb6a8", coral: "#e5654f"
+  };
+  const SPRITE_SKINS = ["#e8b98f", "#c98a5e", "#f0cba0", "#a9744f", "#d9a06b"];
+  // Real palette keys (build, operator, …) map to a stable body colour;
+  // anything unmapped falls back to a hashed pick so it's still distinct.
+  const SPRITE_BODY_BY_KEY = {
+    build: SPRITE_PAL.yellow, operator: SPRITE_PAL.teal, runner: SPRITE_PAL.teal,
+    guardian: SPRITE_PAL.brick, monitor: SPRITE_PAL.teal, signal: SPRITE_PAL.yellow
+  };
+  const SPRITE_BODY_CYCLE = [SPRITE_PAL.yellow, SPRITE_PAL.teal, SPRITE_PAL.brick, SPRITE_PAL.coral, SPRITE_PAL.paper];
+
+  // deterministic RNG (mulberry32 over an FNV-1a string hash)
+  function fnv1a(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+  // Build a stable seed string from whatever identity fields an agent
+  // carries. Public roster agents expose metadata.paletteKey; scene
+  // projections expose paletteKey directly; canonical agents expose an
+  // identity block. All are optional — agentId alone is enough.
+  function spriteSeed(a) {
+    if (!a) return "?";
+    const id = a.identity || {};
+    const meta = a.metadata || {};
+    const parts = [
+      a.agentId || a.agent_id || "?",
+      a.avatarSeed || id.avatarSeed || meta.avatarSeed || a.avatar_seed || "",
+      a.paletteKey || id.paletteKey || meta.paletteKey || a.palette_key || "",
+      a.characterType || id.characterType || meta.characterType || a.character_type || "",
+      "v" + (a.variant != null ? a.variant : 0)
+    ];
+    return parts.join("|");
+  }
+  function spriteBodyColor(a, seed) {
+    const key = (a && (a.paletteKey || (a.identity && a.identity.paletteKey) || (a.metadata && a.metadata.paletteKey) || a.palette_key)) || "";
+    return SPRITE_BODY_BY_KEY[String(key).toLowerCase()] || SPRITE_BODY_CYCLE[fnv1a(seed) % SPRITE_BODY_CYCLE.length];
+  }
+
+  // 8-frame sheet: idle x2, walk x4, react x2. Drawn with smooth vector
+  // shapes at 2x internal resolution (not pixel blocks), so the characters
+  // read as polished flat-design workers. Each frame is SPR_FW x SPR_FH
+  // internally and shown at half that size.
+  const SPR_NFRAMES = 8;
+  const SPR_FW_DISP = 60, SPR_FH_DISP = 78;              // displayed size per frame
+  const SPR_FW = SPR_FW_DISP * 2, SPR_FH = SPR_FH_DISP * 2; // 120 x 156 internal
+  const SPR_FRAMES = [
+    { pose: "idle", bob: 0 }, { pose: "idle", bob: 1 },
+    { pose: "walk", leg: 0 }, { pose: "walk", leg: 1 }, { pose: "walk", leg: 2 }, { pose: "walk", leg: 3 },
+    { pose: "react", hop: 0 }, { pose: "react", hop: 1 }
+  ];
+
+  // shift a #rrggbb colour lighter (+) or darker (-)
+  function shade(hex, amt) {
+    const n = parseInt(String(hex).slice(1), 16);
+    const c = v => Math.max(0, Math.min(255, v + amt));
+    return "#" + ((1 << 24) + (c(n >> 16) << 16) + (c((n >> 8) & 255) << 8) + c(n & 255)).toString(16).slice(1);
+  }
+  function roundRect(ctx, x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+  const OUTLINE = "rgba(20,16,30,0.5)";
+  function paint(ctx, fill, stroke, lw) { if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw || 3; ctx.strokeStyle = stroke; ctx.stroke(); } }
+  function limb(ctx, x, y, w, h, r, fill, stroke) { roundRect(ctx, x, y, w, h, r); paint(ctx, fill, stroke, 3); }
+
+  function sprAccessory(ctx, cx, hy, hr, S) {
+    const c = S.accent, ink = SPRITE_PAL.ink;
+    ctx.lineJoin = "round";
+    if (S.acc === 0) {                 // hard hat
+      ctx.beginPath(); ctx.arc(cx, hy - 3, hr + 1, Math.PI, 0); ctx.closePath(); paint(ctx, c, OUTLINE, 3);
+      roundRect(ctx, cx - hr - 6, hy - 6, 2 * hr + 12, 7, 3); paint(ctx, c, OUTLINE, 3);
+      roundRect(ctx, cx - 3, hy - hr - 7, 6, 7, 2); paint(ctx, shade(c, 24), null);
+    } else if (S.acc === 1) {          // goggles
+      roundRect(ctx, cx - hr + 1, hy - 5, 2 * hr - 2, 13, 6); paint(ctx, ink, null);
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx - 8, hy + 1, 4, 0, 7); ctx.arc(cx + 8, hy + 1, 4, 0, 7); ctx.fill();
+    } else if (S.acc === 2) {          // antenna
+      ctx.strokeStyle = ink; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx, hy - hr); ctx.lineTo(cx, hy - hr - 13); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, hy - hr - 15, 4.5, 0, 7); paint(ctx, SPRITE_PAL.coral, null);
+    } else if (S.acc === 3) {          // headset
+      ctx.strokeStyle = ink; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(cx, hy, hr + 4, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+      roundRect(ctx, cx - hr - 8, hy - 3, 9, 13, 3); paint(ctx, c, OUTLINE, 2);
+      ctx.strokeStyle = ink; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx - hr - 3, hy + 9); ctx.quadraticCurveTo(cx - 7, hy + 18, cx + 2, hy + 13); ctx.stroke();
+    } else {                           // cap
+      ctx.beginPath(); ctx.arc(cx, hy - 1, hr + 1, Math.PI * 1.03, Math.PI * 1.97); ctx.closePath(); paint(ctx, c, OUTLINE, 3);
+      roundRect(ctx, cx - hr + 3, hy - hr + 2, hr, 6, 3); paint(ctx, shade(c, -18), null);
     }
-    hash = Math.abs(hash);
+  }
 
-    const hue = hash % 360;
-    const hue2 = (hue + 155) % 360;
-    const skinHue = 24 + (hash % 18);
-    const hairHue = (hash * 31) % 360;
-    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-    const roleShort = (role || 'agent').slice(0, 10);
-    const accessory = hash % 3 === 0
-      ? '<path d="M39 31 h50 l-7 11 H46z" fill="#334155"/><path d="M49 31 l6 -10 h18 l6 10" fill="#64748b"/>'
-      : hash % 3 === 1
-        ? '<path d="M38 42 h52" stroke="#38bdf8" stroke-width="5" stroke-linecap="round"/><circle cx="50" cy="42" r="7" fill="#0f172a" stroke="#67e8f9" stroke-width="3"/><circle cx="78" cy="42" r="7" fill="#0f172a" stroke="#67e8f9" stroke-width="3"/>'
-        : '<rect x="42" y="26" width="44" height="13" rx="6" fill="#0f172a"/><rect x="48" y="23" width="32" height="9" rx="4" fill="#334155"/>';
+  // Draw one flat-design worker into frame slot at origin ox (internal px).
+  function sprDrawFrame(ctx, ox, S, f) {
+    const cx = ox + SPR_FW / 2;
+    const ink = SPRITE_PAL.ink;
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    const bob = f.pose === "idle" ? (f.bob ? -5 : 0)
+      : f.pose === "walk" ? [0, -4, 0, -4][f.leg]
+        : (f.hop ? -12 : 0);
+    const legBob = f.pose === "react" ? bob : 0;
 
-    // Deterministic pattern
-    const rand = (n) => (hash = (hash * 1664525 + 1013904223) % 4294967296, (hash / 4294967296) * n);
-    const shapes = [];
-    for (let i = 0; i < 6; i++) {
-      const x = (rand(16) + 2).toFixed(1);
-      const y = (rand(16) + 2).toFixed(1);
-      const size = (rand(4) + 1.5).toFixed(1);
-      const opacity = (0.08 + rand(0.15)).toFixed(2);
-      const shapeType = Math.floor(rand(3));
-      const color = `hsl(${hue}, 70%, 60%)`;
-      if (shapeType === 0) {
-        shapes.push(`<circle cx="${x}" cy="${y}" r="${size}" fill="${color}" opacity="${opacity}"/>`);
-      } else if (shapeType === 1) {
-        shapes.push(`<rect x="${x}" y="${y}" width="${size}" height="${size}" fill="${color}" opacity="${opacity}" rx="0.5"/>`);
-      } else {
-        const x2 = (parseFloat(x) + parseFloat(size)).toFixed(1);
-        const y2 = (parseFloat(y) + parseFloat(size)).toFixed(1);
-        shapes.push(`<polygon points="${x},${y} ${x2},${y} ${x},${y2}" fill="${color}" opacity="${opacity}"/>`);
+    // grounded contact shadow (does not bob)
+    ctx.beginPath(); ctx.ellipse(cx, 149, 30, 7, 0, 0, Math.PI * 2); ctx.fillStyle = "rgba(0,0,0,0.24)"; ctx.fill();
+
+    // legs + shoes
+    const legTop = 100 + legBob;
+    let liftL = 0, liftR = 0, sway = 0;
+    if (f.pose === "walk") { liftL = [0, -7, -11, -7][f.leg]; liftR = [-11, -7, 0, -7][f.leg]; sway = [-3, 0, 3, 0][f.leg]; }
+    const trouser = shade(S.body, -46);
+    limb(ctx, cx - 17 + sway, legTop + liftL, 15, 46, 7, trouser);
+    limb(ctx, cx + 2 + sway, legTop + liftR, 15, 46, 7, trouser);
+    limb(ctx, cx - 20 + sway, legTop + liftL + 40, 20, 12, 6, ink);
+    limb(ctx, cx + 1 + sway, legTop + liftR + 40, 20, 12, 6, ink);
+
+    // torso with a subtle vertical gradient + hi-vis vest
+    const bodyW = 50, bodyH = 54, bodyX = cx - bodyW / 2, bodyTop = 54 + bob;
+    const g = ctx.createLinearGradient(0, bodyTop, 0, bodyTop + bodyH);
+    g.addColorStop(0, shade(S.body, 26)); g.addColorStop(1, shade(S.body, -16));
+    roundRect(ctx, bodyX, bodyTop, bodyW, bodyH, 17); paint(ctx, g, OUTLINE, 3);
+    ctx.save(); roundRect(ctx, bodyX, bodyTop, bodyW, bodyH, 17); ctx.clip();
+    ctx.fillStyle = S.accent; ctx.fillRect(cx - 16, bodyTop, 6, bodyH); ctx.fillRect(cx + 10, bodyTop, 6, bodyH);
+    ctx.fillStyle = S.detail; ctx.fillRect(bodyX, bodyTop + bodyH - 13, bodyW, 5);
+    ctx.restore();
+
+    // arms
+    if (f.pose === "react") {
+      limb(ctx, bodyX - 8, bodyTop - 20, 13, 30, 6, S.skin, OUTLINE);
+      limb(ctx, bodyX + bodyW - 5, bodyTop - 20, 13, 30, 6, S.skin, OUTLINE);
+    } else {
+      limb(ctx, bodyX - 8, bodyTop + 8, 13, 34, 6, S.skin, OUTLINE);
+      limb(ctx, bodyX + bodyW - 5, bodyTop + 8, 13, 34, 6, S.skin, OUTLINE);
+    }
+
+    // head
+    const hy = 38 + bob, hr = 20;
+    ctx.beginPath(); ctx.arc(cx, hy, hr, 0, Math.PI * 2); paint(ctx, S.skin, OUTLINE, 3);
+    ctx.save(); ctx.globalAlpha = 0.45; ctx.beginPath(); ctx.arc(cx - 6, hy - 6, hr * 0.55, 0, Math.PI * 2); ctx.fillStyle = shade(S.skin, 30); ctx.fill(); ctx.restore();
+    ctx.fillStyle = ink; ctx.beginPath(); ctx.arc(cx - 7, hy + 1, 2.6, 0, 7); ctx.arc(cx + 7, hy + 1, 2.6, 0, 7); ctx.fill();
+    if (S.mouth) { ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, hy + 5, 5, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
+
+    sprAccessory(ctx, cx, hy, hr, S);
+  }
+
+  const spriteSheetCache = new Map(); // seed -> data URL (or null when unsupported)
+  function buildSpriteSheet(agent) {
+    const seed = spriteSeed(agent);
+    if (spriteSheetCache.has(seed)) return spriteSheetCache.get(seed);
+    let url = null;
+    try {
+      const rng = mulberry32(fnv1a(seed));
+      const parts = {
+        body: spriteBodyColor(agent, seed),
+        skin: SPRITE_SKINS[(rng() * SPRITE_SKINS.length) | 0],
+        detail: rng() > 0.5 ? SPRITE_PAL.ink : SPRITE_PAL.paper,
+        accent: rng() > 0.5 ? SPRITE_PAL.yellow : SPRITE_PAL.coral,
+        acc: (rng() * 5) | 0,
+        mouth: rng() > 0.4
+      };
+      const cv = document.createElement("canvas");
+      cv.width = SPR_FW * SPR_NFRAMES; cv.height = SPR_FH;
+      const ctx = cv.getContext("2d");
+      if (ctx) {
+        ctx.lineJoin = "round"; ctx.lineCap = "round";
+        for (let i = 0; i < SPR_NFRAMES; i++) sprDrawFrame(ctx, i * SPR_FW, parts, SPR_FRAMES[i]);
+        url = cv.toDataURL();
       }
-    }
-    const pattern = shapes.join('');
-
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="154" viewBox="0 0 128 154" shape-rendering="geometricPrecision" role="img" aria-label="${name}">
-  <defs>
-    <linearGradient id="coat-${agentId}" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="hsl(${hue}, 72%, 54%)"/>
-      <stop offset="100%" stop-color="hsl(${hue2}, 74%, 42%)"/>
-    </linearGradient>
-    <filter id="soft-${agentId}"><feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#020617" flood-opacity=".38"/></filter>
-  </defs>
-  <ellipse cx="64" cy="145" rx="38" ry="7" fill="#020617" opacity=".28"/>
-  <g filter="url(#soft-${agentId})">
-    <path d="M34 117 C38 86 49 74 64 74 C79 74 91 86 95 117 L88 141 H40z" fill="url(#coat-${agentId})"/>
-    <path d="M44 102 L24 119" stroke="hsl(${hue}, 72%, 62%)" stroke-width="12" stroke-linecap="round"/>
-    <path d="M84 102 L104 119" stroke="hsl(${hue2}, 72%, 58%)" stroke-width="12" stroke-linecap="round"/>
-    <path d="M51 139 l-8 12" stroke="#1e293b" stroke-width="10" stroke-linecap="round"/>
-    <path d="M77 139 l8 12" stroke="#1e293b" stroke-width="10" stroke-linecap="round"/>
-    <circle cx="64" cy="54" r="34" fill="hsl(${skinHue}, 74%, 72%)"/>
-    <path d="M34 52 C38 18 89 12 96 49 C84 31 48 31 34 52z" fill="hsl(${hairHue}, 43%, 24%)"/>
-    ${accessory}
-    <circle cx="52" cy="57" r="4" fill="#0f172a"/>
-    <circle cx="76" cy="57" r="4" fill="#0f172a"/>
-    <path d="M53 72 C59 78 69 78 76 72" stroke="#0f172a" stroke-width="4" stroke-linecap="round" fill="none"/>
-    <rect x="43" y="88" width="42" height="16" rx="8" fill="#0f172a" opacity=".24"/>
-    <text x="64" y="100" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="800" fill="white" text-anchor="middle">${initials}</text>
-  </g>
-  <text x="64" y="152" font-family="system-ui, -apple-system, sans-serif" font-size="8" fill="#cbd5e1" text-anchor="middle" opacity=".82">${roleShort}</text>
-</svg>`;
+    } catch (e) { url = null; }
+    spriteSheetCache.set(seed, url);
+    return url;
   }
 
   // ============================================================
@@ -237,6 +369,7 @@
       
       this.agents = new Map();           // agentId -> agent data
       this.sceneAgents = new Map();      // agentId -> authoritative room-scene projection
+      this.waypointAssignments = new Map(); // agentId -> office waypoint index (sticky, collision-checked)
       this.sceneSequence = 0;
       this.speechLines = [...DEFAULT_SPEECH_LINES];
       this.activeBubbles = new Map();    // agentId -> { text, element, timeout }
@@ -279,63 +412,66 @@
       this.container.innerHTML = `
         <div class="federation-tv ${this.presentationMode === 'camera' ? 'federation-tv--camera' : ''}" style="
           font-family: system-ui, -apple-system, sans-serif;
-          background: #111827;
-          border-radius: 14px;
+          background: #1c1d1e;
+          border-radius: 4px;
           padding: 14px;
-          color: #e2e8f0;
+          color: #f5e6bd;
           max-width: 760px;
           margin: 0 auto;
-          border: 1px solid rgba(148,163,184,0.18);
+          border: 2px solid #171718;
           position: relative;
           overflow: hidden;
         ">
           <div class="tv-widget-header" style="
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 12px; padding-bottom: 8px;
-            border-bottom: 1px solid rgba(148,163,184,0.15);
+            border-bottom: 2px solid #171718;
             position: relative; z-index: 1;
           ">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 20px;">📺</span>
               <strong style="font-size: 16px; letter-spacing: 0.5px;">FEDERATION TV</strong>
               <span style="
-                font-size: 10px; padding: 2px 6px; background: rgba(34,197,94,0.2);
-                color: #22c55e; border-radius: 4px; font-weight: 600;
+                font-size: 10px; padding: 2px 6px; background: rgba(103,201,141,0.22);
+                color: #67c98d; border-radius: 2px; font-weight: 600;
               ">LIVE</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #94a3b8;">
+            <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #c8b992;">
               <span id="tv-agent-count">0 agents</span>
               <span id="tv-project-badge" style="
-                padding: 2px 8px; background: rgba(59,130,246,0.2);
-                color: #60a5fa; border-radius: 4px; text-transform: uppercase;
+                padding: 2px 8px; background: rgba(94,197,194,0.2);
+                color: #5ec5c2; border-radius: 2px; text-transform: uppercase;
               ">${this.projectId.toUpperCase()}</span>
             </div>
           </div>
 
           <div id="tv-diorama" class="tv-scene">
-            <div class="tv-office-set" aria-hidden="true">
-              <div class="tv-zone tv-zone--conference"><b>CONFERENCE</b><i></i><i></i><i></i></div>
-              <div class="tv-zone tv-zone--ops"><b>OPS DESKS</b><span class="tv-monitor"></span><span class="tv-monitor"></span><span class="tv-monitor"></span></div>
-              <div class="tv-zone tv-zone--console"><b>WATCH CONSOLE</b><span class="tv-console-light"></span></div>
-              <div class="tv-zone tv-zone--incident"><b>INCIDENT BAY</b><span class="tv-beacon"></span></div>
-              <div class="tv-zone tv-zone--lounge"><b>BREAK CORNER</b><span class="tv-sofa"></span><span class="tv-plant">✦</span></div>
-              <div class="tv-assembly"><span>⇢</span><span>⇢</span><span>⇢</span><b>BUILD LINE</b></div>
-              <div class="tv-door">⇥</div>
+            <div class="office" aria-hidden="true">
+              <div class="office-back"></div>
+              <div class="office-floor"></div>
+              <div class="desk" style="left:15%; top:50%;"></div>
+              <div class="desk" style="left:38%; top:50%;"></div>
+              <div class="desk" style="left:61%; top:50%;"></div>
+              <div class="desk" style="left:15%; top:82%;"></div>
+              <div class="desk" style="left:38%; top:82%;"></div>
+              <div class="desk" style="left:61%; top:82%;"></div>
+              <div class="cooler" style="left:90%; top:44%;"></div>
+              <div class="plant" style="left:93%; top:84%;"></div>
             </div>
           </div>
 
           <div class="tv-widget-feed" style="
             margin-top: 16px; padding-top: 12px;
-            border-top: 1px solid rgba(148,163,184,0.1);
+            border-top: 2px solid #171718;
             position: relative; z-index: 1;
           ">
             <div style="
               display: flex; align-items: center; gap: 6px;
-              font-size: 11px; color: #64748b; margin-bottom: 8px;
+              font-size: 11px; color: #c8b992; margin-bottom: 8px;
               text-transform: uppercase; letter-spacing: 0.5px;
             ">
               <span style="
-                width: 6px; height: 6px; background: #22c55e; border-radius: 50%;
+                width: 6px; height: 6px; background: #67c98d; border-radius: 50%;
                 animation: tv-pulse 1.5s infinite;
               "></span>
               <span>LIVE FEED</span>
@@ -343,8 +479,8 @@
             <div id="tv-event-feed" style="
               max-height: 120px; overflow-y: auto;
               font-size: 11px; line-height: 1.6;
-              font-family: 'SF Mono', 'Fira Code', monospace;
-              color: #94a3b8;
+              font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+              color: #c8b992;
             "></div>
           </div>
 
@@ -355,91 +491,129 @@
               position: relative;
               z-index: 1;
               overflow: hidden;
-              border: 1px solid rgba(148,163,184,.16);
-              border-radius: 14px;
-              background:
-                radial-gradient(circle at 18% 18%, rgba(125,211,252,.20), transparent 28%),
-                linear-gradient(180deg, #254351 0%, #31535c 52%, #765443 53%, #241d1c 100%);
-              box-shadow: inset 0 0 0 18px rgba(8,12,14,.18), inset 0 0 70px rgba(0,0,0,.3);
-              display: grid;
-              grid-template-columns: repeat(7, minmax(0, 1fr));
-              grid-auto-rows: minmax(72px, 1fr);
-              align-content: end;
-              gap: 4px;
-              padding: 42px 14px 16px;
+              border: 1px solid #171718;
+              border-radius: 6px;
+              background: #171718;
+              box-shadow: inset 0 0 0 18px rgba(8,12,14,.2), inset 0 0 70px rgba(0,0,0,.32);
             }
             .tv-scene::before {
               content: "FEDERATION FLOOR · WATCHTOWER OFFICE";
               position: absolute;
               left: 14px;
               top: 12px;
-              color: rgba(226,232,240,.68);
+              z-index: 4;
+              padding: 2px 6px;
+              color: #f5e6bd;
+              background: rgba(23,24,24,.55);
               font: 700 10px ui-monospace, monospace;
               letter-spacing: .08em;
+            }
+            /* One cohesive, dependency-free CSS office: a back wall with a
+               window, a floor with subtle receding grid + depth, CSS desk
+               pods with glowing monitors, a water cooler and a plant. No
+               clipped sprite sheet. Agents (z-index 3) work among the desks. */
+            .office { position:absolute; inset:0; z-index:1; overflow:hidden; }
+            .office-back {
+              position:absolute; inset:0 0 74% 0;
+              background:linear-gradient(180deg,#24313b 0%,#1c2830 72%,#16202a 100%);
+              border-bottom:2px solid rgba(0,0,0,.45);
+            }
+            .office-back::before {
+              content:""; position:absolute; left:7%; right:27%; top:24%; height:44%;
+              background:linear-gradient(180deg,#31505b,#233942);
+              border:2px solid #101820; border-radius:3px;
+              background-image:
+                linear-gradient(90deg,transparent 48.5%, rgba(10,15,18,.65) 48.5% 51.5%, transparent 51.5%),
+                linear-gradient(0deg,transparent 48.5%, rgba(10,15,18,.5) 48.5% 51.5%, transparent 51.5%);
+              box-shadow:inset 0 0 18px rgba(120,190,200,.16);
+            }
+            .office-floor {
+              position:absolute; inset:26% 0 0 0;
+              background:
+                linear-gradient(180deg, rgba(0,0,0,.32), rgba(0,0,0,0) 34%),
+                repeating-linear-gradient(180deg, rgba(255,255,255,.045) 0 1px, transparent 1px 28px),
+                repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 1px, transparent 1px 48px),
+                linear-gradient(180deg,#3c4852,#2c363e 58%,#232c33);
+            }
+            .office-floor::after {
+              content:""; position:absolute; inset:0;
+              background:radial-gradient(120% 78% at 50% 6%, rgba(110,175,185,.10), transparent 62%);
+            }
+            .desk { position:absolute; width:66px; height:36px; transform:translate(-50%,-50%); z-index:2; }
+            .desk::before {
+              content:""; position:absolute; left:0; right:0; bottom:0; height:16px;
+              background:linear-gradient(180deg,#6d5a45,#4d4032); border:2px solid #17110c; border-radius:5px;
+              box-shadow:0 4px 0 rgba(0,0,0,.28);
+            }
+            .desk::after {
+              content:""; position:absolute; left:50%; bottom:11px; transform:translateX(-50%);
+              width:28px; height:20px; background:#0d1415; border:2px solid #101a1c; border-radius:3px;
+              box-shadow:0 0 10px rgba(47,182,168,.45), inset 0 0 0 2px rgba(47,182,168,.32);
+            }
+            .cooler { position:absolute; width:24px; height:46px; transform:translate(-50%,-50%); z-index:2; }
+            .cooler::before {
+              content:""; position:absolute; top:0; left:50%; transform:translateX(-50%);
+              width:18px; height:20px; background:linear-gradient(180deg, rgba(96,196,205,.9), rgba(58,150,165,.9));
+              border:2px solid #101820; border-radius:7px 7px 3px 3px;
+            }
+            .cooler::after {
+              content:""; position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+              width:16px; height:26px; background:linear-gradient(180deg,#e2efe9,#b6ccc6); border:2px solid #101820; border-radius:3px;
+            }
+            .plant { position:absolute; width:28px; height:36px; transform:translate(-50%,-50%); z-index:2; }
+            .plant::before {
+              content:""; position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+              width:18px; height:15px; background:linear-gradient(180deg,#b5643f,#8a482d); border:2px solid #17110c; border-radius:0 0 4px 4px;
+            }
+            .plant::after {
+              content:""; position:absolute; top:0; left:50%; transform:translateX(-50%);
+              width:26px; height:26px; background:radial-gradient(circle at 50% 62%, #40915b, #2b6a41); border-radius:52% 52% 44% 44%;
+              box-shadow:0 0 0 2px rgba(18,24,20,.4);
             }
             .tv-scene::after {
               content: "";
               position: absolute;
-              inset: 54px 22px 98px;
-              background:
-                linear-gradient(90deg, rgba(215,170,83,.26), rgba(215,170,83,.03) 28%, transparent 29% 38%, rgba(94,197,194,.18) 39% 58%, transparent 59%),
-                linear-gradient(#a66b43 0 0) 0 100% / 100% 4px no-repeat;
-              border: 1px solid rgba(148,163,184,.16);
-              border-radius: 10px;
-              opacity: .72;
-              z-index:1; pointer-events:none;
-            }
-            .tv-office-set { position:absolute; inset:0; z-index:2; pointer-events:none; font-family:ui-monospace,monospace; image-rendering:pixelated; }
-            .tv-zone { position:absolute; border:2px solid rgba(222,238,229,.33); background:rgba(8,17,17,.22); box-shadow:inset 0 0 0 2px rgba(3,7,7,.25); color:#d8eee4; }
-            .tv-zone b { position:absolute; top:-13px; left:2px; color:#c6ded4; font-size:6px; letter-spacing:.08em; white-space:nowrap; }
-            .tv-zone--conference { left:17%; top:14%; width:27%; height:16%; border-radius:50%; background:radial-gradient(ellipse,#785c43 0 44%,transparent 46%); }
-            .tv-zone--conference i { position:absolute; width:8px; height:8px; border:2px solid #263e3a; background:#96b9a9; } .tv-zone--conference i:nth-of-type(1){left:10%;bottom:-5px}.tv-zone--conference i:nth-of-type(2){right:10%;bottom:-5px}.tv-zone--conference i:nth-of-type(3){left:46%;top:-5px}
-            .tv-zone--ops { left:18%; top:50%; width:39%; height:17%; border-color:rgba(239,199,102,.5); background:repeating-linear-gradient(90deg,rgba(54,70,63,.8) 0 17%,rgba(22,38,34,.8) 17% 20%); }
-            .tv-monitor { position:absolute; top:26%; width:13%; height:38%; background:#061211; border:2px solid #b8d8ce; box-shadow:0 0 0 2px #263f37, inset 0 0 0 2px #39d5b0; } .tv-monitor::after { content:""; position:absolute; left:36%; top:100%; width:26%; height:35%; background:#a8c8bb; } .tv-monitor:nth-of-type(1){left:9%}.tv-monitor:nth-of-type(2){left:43%}.tv-monitor:nth-of-type(3){left:76%}
-            .tv-zone--console { left:62%; top:31%; width:21%; height:14%; border-color:rgba(87,211,190,.55); background:linear-gradient(135deg,#1c3b3b,#102522); }.tv-console-light{position:absolute;right:10%;top:18%;width:11px;height:11px;background:#60f4ce;box-shadow:0 0 11px #60f4ce;animation:tv-console-blink 2s steps(2,end) infinite}
-            .tv-zone--incident { left:75%; top:63%; width:19%; height:16%; border-color:rgba(255,120,101,.7); background:repeating-linear-gradient(135deg,rgba(97,41,36,.8) 0 6px,rgba(44,25,23,.8) 6px 12px); }.tv-beacon{position:absolute;right:10%;top:13%;width:8px;height:8px;border-radius:50%;background:#ff806e;box-shadow:0 0 11px #ff806e;animation:tv-alert 1.1s infinite}
-            .tv-zone--lounge { left:19%; top:73%; width:26%; height:14%; border-color:rgba(176,137,210,.55); background:#392b42; }.tv-sofa{position:absolute;left:19%;bottom:17%;width:48%;height:32%;border:3px solid #dac7ee;border-bottom-width:7px;background:#754f93}.tv-plant{position:absolute;right:11%;bottom:17%;color:#8df1a9;font-size:20px;text-shadow:0 0 6px #44b76d}
-            .tv-assembly { position:absolute; left:47%; bottom:8%; width:27%; height:8%; display:flex; align-items:center; gap:7%; padding:0 7%; border-top:2px dashed rgba(241,205,93,.7); border-bottom:2px dashed rgba(241,205,93,.7); color:#f4cd5d; font-size:13px; }.tv-assembly b{position:absolute;right:2px;bottom:-11px;font-size:6px;letter-spacing:.08em}
-            .tv-door{position:absolute;left:3%;bottom:9%;width:7%;height:14%;display:grid;place-items:center;border:3px solid #b7d2c7;background:#1b2f2b;color:#f5d05d;font-size:20px}
-            .tv-agent {
-              position: relative;
-              width: auto;
-              min-height: 72px;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: end;
-              gap: 1px;
+              inset: 0;
               z-index: 3;
+              pointer-events: none;
+              background-image: radial-gradient(rgba(245,230,189,.6) 1px, transparent 1.4px);
+              background-size: 6px 6px;
+              opacity: .05;
+              mix-blend-mode: overlay;
             }
-            .tv-scene--projected { display:block; padding:0; }
-            .tv-scene--projected .tv-agent {
-              position:absolute; left:var(--scene-x); top:var(--scene-y);
-              width:74px; min-height:72px; transform:translate(-50%,-50%);
-              transition:left 2.4s cubic-bezier(.22,.61,.36,1), top 2.4s cubic-bezier(.22,.61,.36,1);
+            .tv-agent {
+              position: absolute; left: var(--scene-x, 50%); top: var(--scene-y, 50%);
+              width: 72px; transform: translate(-50%, -50%);
+              transition: left 2.45s cubic-bezier(.22,.61,.36,1), top 2.45s cubic-bezier(.22,.61,.36,1);
+              display: flex; flex-direction: column; align-items: center; justify-content: end;
+              gap: 1px; z-index: 3;
             }
-            .tv-scene--projected .tv-agent[data-scene-origin="ambient"]::after {
+            .tv-agent[data-scene-origin="ambient"]::after {
               content:"AMBIENT"; position:absolute; top:-10px; right:-4px; padding:2px 3px;
-              color:#101a19; background:#f4c842; font:800 6px ui-monospace,monospace; letter-spacing:.04em;
+              color:#171718; background:#f4c842; font:800 6px ui-monospace,monospace; letter-spacing:.04em;
             }
-            .tv-agent svg { width: clamp(38px, 5.1vw, 58px); height: auto; max-height: 62px; transform-origin: 50% 100%; }
-            .tv-agent-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:750; font-size:9px; color:#f8fafc; text-align:center; }
-            .tv-agent-role { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:7px; color:#e0c9a0; text-transform:uppercase; letter-spacing:.04em; }
-            .tv-agent--working svg { animation: tv-work 2.8s ease-in-out infinite; }
-            .tv-agent--pacing { animation: tv-pace 8s ease-in-out infinite; }
-            .tv-agent--pacing svg { animation: tv-walk 1.2s steps(2,end) infinite; }
-            .tv-agent--watching svg { animation: tv-look 4.2s ease-in-out infinite; }
+            /* Procedurally-generated sprite sheet: 8 frames laid out
+               horizontally (idle x2, walk x4, react x2). Pose is played by
+               stepping background-position-x, so no PNG/GIF assets load. */
+            .tv-agent-sprite { width: 60px; height: 78px; transform-origin: 50% 92%; display:block; background-repeat:no-repeat; background-size:480px 78px; background-position-x:0; filter:drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
+            .tv-agent-sprite.flip { transform: scaleX(-1); }
+            .tv-agent-sprite.pose-idle { animation: tv-frame-idle .9s steps(2) infinite; }
+            .tv-agent-sprite.pose-walk { animation: tv-frame-walk .6s steps(4) infinite; }
+            .tv-agent-sprite.pose-react { animation: tv-frame-react .35s steps(2) infinite; }
+            .tv-agent-sprite--fallback { display:flex; align-items:center; justify-content:center; font:800 20px ui-monospace,monospace; color:#171718; border-radius:8px; }
+            .tv-agent-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:750; font-size:9px; color:#f5e6bd; text-align:center; text-shadow:0 1px 2px #000; }
+            .tv-agent-role { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:7px; color:#e0c9a0; text-transform:uppercase; letter-spacing:.04em; text-shadow:0 1px 2px #000; }
             .tv-agent--alerting .tv-agent-status { animation: tv-alert 1.1s ease-in-out infinite; }
-            .tv-scene--projected .tv-agent[data-scene-animation="walk"] svg { animation: tv-walk 1.05s steps(2,end) infinite; }
-            .tv-scene--projected .tv-agent[data-scene-animation="work"] svg { animation: tv-work 2.8s ease-in-out infinite; }
+            .tv-agent--pulse { animation: tv-agent-flash .85s ease-out; }
             .tv-agent-status {
               position: absolute;
-              right: 12%;
-              top: 12px;
+              right: 2px;
+              top: 4px;
               width: 10px;
               height: 10px;
               border-radius: 999px;
-              border: 2px solid #111827;
+              border: 2px solid #171718;
+              z-index: 1;
             }
             .ambient-cameo {
               position:absolute;
@@ -450,14 +624,14 @@
               display:grid;
               justify-items:center;
               gap:3px;
-              color:#f4e7b5;
+              color:#f5e6bd;
               text-align:center;
               text-shadow:0 2px 8px #000;
               pointer-events:none;
               animation:tv-ambient-visit 4.5s ease-in-out both;
             }
             .ambient-cameo b { font:800 10px ui-monospace,monospace; letter-spacing:.08em; }
-            .ambient-cameo span { font:700 8px ui-monospace,monospace; color:#b6d4ca; letter-spacing:.06em; text-transform:uppercase; }
+            .ambient-cameo span { font:700 8px ui-monospace,monospace; color:#c8b992; letter-spacing:.06em; text-transform:uppercase; }
             .ambient-cameo i { font-size:34px; font-style:normal; filter:drop-shadow(0 0 8px rgba(244,200,66,.55)); }
             .federation-tv--camera { max-width:none !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:transparent !important; }
             .federation-tv--camera .tv-widget-header, .federation-tv--camera .tv-widget-feed { display:none !important; }
@@ -476,12 +650,11 @@
               80% { opacity: 1; }
               100% { opacity: 0; transform: scale(0.95) translateY(-5px); }
             }
-            @keyframes tv-work { 0%,100% { transform: rotate(-1deg) translateY(0); } 50% { transform: rotate(1deg) translateY(-3px); } }
-            @keyframes tv-walk { 0%,100% { transform: rotate(-2deg) translateX(-2px); } 50% { transform: rotate(2deg) translateX(2px); } }
-            @keyframes tv-pace { 0%,100% { transform: translateX(0); } 45% { transform: translateX(46px); } 55% { transform: translateX(46px); } }
-            @keyframes tv-look { 0%,100% { transform: rotate(0deg); } 35% { transform: rotate(-4deg); } 70% { transform: rotate(4deg); } }
+            @keyframes tv-frame-idle { from { background-position-x: 0; } to { background-position-x: -120px; } }
+            @keyframes tv-frame-walk { from { background-position-x: -120px; } to { background-position-x: -360px; } }
+            @keyframes tv-frame-react { from { background-position-x: -360px; } to { background-position-x: -480px; } }
             @keyframes tv-alert { 0%,100% { opacity: .9; } 50% { opacity: .25; } }
-            @keyframes tv-console-blink { 0%,100% { opacity:1; } 50% { opacity:.25; } }
+            @keyframes tv-agent-flash { 0% { filter:drop-shadow(0 0 0 rgba(244,200,66,0)); } 35% { filter:drop-shadow(0 0 9px rgba(244,200,66,.95)); } 100% { filter:drop-shadow(0 0 0 rgba(244,200,66,0)); } }
             @keyframes tv-ambient-visit { 0%,100% { opacity:0; transform:translateX(-50%) translateY(8px); } 16%,84% { opacity:1; transform:translateX(-50%) translateY(0); } }
             @media (prefers-reduced-motion: reduce) {
               * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -587,6 +760,7 @@
         }
         for (const event of eventsToAnnounce) {
           if (event.action && this.agents.has(event.agentId)) this.agents.get(event.agentId).action = event.action;
+          if (event.agentId && this.agents.has(event.agentId)) this.pulseAgent(event.agentId);
           if (event.agentId && event.visibility?.publicBubble !== false && (event.statement || event.message)) {
             this.enqueueBubble(event);
           }
@@ -666,42 +840,47 @@
     // ============================================================
     updateDiorama() {
       if (!this.dioramaEl) return;
-      this.dioramaEl.classList.toggle('tv-scene--projected', this.sceneAgents.size > 0);
-      
+
       const agentArray = Array.from(this.agents.values());
-      
+
       // Keep existing agents, update or add new ones
       const existingIds = new Set(Array.from(this.dioramaEl.querySelectorAll('[data-agent-id]')).map(el => el.dataset.agentId));
       const currentIds = new Set(agentArray.map(a => a.agentId));
-      
+
       // Remove agents that no longer exist
       for (const id of existingIds) {
         if (!currentIds.has(id)) {
           const el = this.dioramaEl.querySelector(`[data-agent-id="${id}"]`);
-          if (el) el.remove();
+          if (el) {
+            clearTimeout(el._wanderTimer);
+            clearTimeout(el._walkArriveTimer);
+            el.remove();
+          }
           this.clearBubble(id);
+          this.waypointAssignments.delete(id);
         }
       }
-      
+
       // Add/update agents
       for (const agent of agentArray) {
+        const waypointIdx = this.assignWaypoint(agent.agentId);
         let el = this.dioramaEl.querySelector(`[data-agent-id="${agent.agentId}"]`);
         if (!el) {
-          el = this.createAgentElement(agent, this.sceneAgents.get(agent.agentId));
+          el = this.createAgentElement(agent, this.sceneAgents.get(agent.agentId), waypointIdx);
           this.dioramaEl.appendChild(el);
         } else {
-          this.updateAgentElement(el, agent, this.sceneAgents.get(agent.agentId));
+          this.updateAgentElement(el, agent, this.sceneAgents.get(agent.agentId), waypointIdx);
         }
       }
 
       this.drainBubbleQueue();
     }
 
-    createAgentElement(agent, sceneAgent) {
-      const avatar = generateAvatarSVG(agent.agentId, agent.name, agent.role);
-      const statusColor = agent.status === 'active' ? '#22c55e' : 
-                          agent.status === 'busy' ? '#f59e0b' : '#64748b';
-      
+    createAgentElement(agent, sceneAgent, waypointIdx) {
+      const hash = hashId(agent.agentId);
+      const statusColor = agent.status === 'active' ? '#67c98d' :
+                          agent.status === 'busy' ? '#f4c842' : '#8c8370';
+
       const div = document.createElement('div');
       div.dataset.agentId = agent.agentId;
       div._federationAgent = agent;
@@ -710,36 +889,38 @@
       div.setAttribute('role', 'button');
       div.setAttribute('aria-label', `Inspect ${agent.name}`);
       div.title = `Inspect ${agent.name}`;
-      this.applyScenePosition(div, sceneAgent);
-      
+
       div.innerHTML = `
-        <div style="position: relative;">${avatar}<div class="tv-agent-status" style="background: ${statusColor};"></div></div>
+        <div style="position: relative;"><div class="tv-agent-sprite" role="img"></div><div class="tv-agent-status" style="background: ${statusColor};"></div></div>
         <div class="tv-agent-name">${this.escapeHtml(agent.name)}</div>
         <div class="tv-agent-role">${this.escapeHtml(agent.role || 'agent')}</div>
         <div class="bubble-container" style="position: relative; min-height: 0;"></div>
       `;
+      this.renderSprite(div, sceneAgent || agent);
+      this.applyScenePosition(div, sceneAgent, hash, waypointIdx);
       const inspect = () => this.onAgentSelect?.(div._federationAgent);
       div.addEventListener('click', inspect);
       div.addEventListener('keydown', event => {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); inspect(); }
       });
-      
+
       return div;
     }
 
-    updateAgentElement(el, agent, sceneAgent) {
+    updateAgentElement(el, agent, sceneAgent, waypointIdx) {
       el.className = `tv-agent tv-agent--${this.agentAction(sceneAgent || agent)}`;
       el._federationAgent = agent;
-      this.applyScenePosition(el, sceneAgent);
+      this.renderSprite(el, sceneAgent || agent);
+      this.applyScenePosition(el, sceneAgent, hashId(agent.agentId), waypointIdx);
       const nameEl = el.querySelector('.tv-agent-name');
       const roleEl = el.querySelector('.tv-agent-role');
       const statusDot = el.querySelector('.tv-agent-status');
-      
+
       if (nameEl) nameEl.textContent = agent.name;
       if (roleEl) roleEl.textContent = agent.role || 'agent';
       if (statusDot) {
-        const color = agent.status === 'active' ? '#22c55e' : 
-                      agent.status === 'busy' ? '#f59e0b' : '#64748b';
+        const color = agent.status === 'active' ? '#67c98d' :
+                      agent.status === 'busy' ? '#f4c842' : '#8c8370';
         statusDot.style.background = color;
       }
     }
@@ -749,22 +930,149 @@
       return ['working', 'pacing', 'watching', 'alerting'].includes(action) ? action : 'watching';
     }
 
-    applyScenePosition(el, sceneAgent) {
-      if (!sceneAgent) {
-        el.removeAttribute('data-scene-origin');
-        el.removeAttribute('data-scene-animation');
-        el.removeAttribute('data-scene-label');
-        el.style.removeProperty('--scene-x');
-        el.style.removeProperty('--scene-y');
+    // Draw (once, then cache) the procedurally-generated sprite sheet for
+    // this agent's stable identity, and set its resting pose. Seed is always
+    // taken from the canonical roster entry so the face never shifts when a
+    // scene projection appears or disappears. Falls back to coloured initials
+    // if <canvas> is unavailable.
+    renderSprite(el, poseSource) {
+      const sprite = el.querySelector('.tv-agent-sprite');
+      if (!sprite) return;
+      const agent = el._federationAgent || poseSource || {};
+      const seed = spriteSeed(agent);
+      if (sprite.dataset.seed !== seed) {
+        sprite.dataset.seed = seed;
+        const url = buildSpriteSheet(agent);
+        if (url) {
+          sprite.classList.remove('tv-agent-sprite--fallback');
+          sprite.style.background = '';
+          sprite.textContent = '';
+          sprite.style.backgroundImage = `url(${url})`;
+        } else {
+          sprite.classList.add('tv-agent-sprite--fallback');
+          sprite.style.background = spriteBodyColor(agent, seed);
+          sprite.textContent = this.spriteInitials(agent);
+        }
+        sprite.setAttribute('aria-label', `${agent.name || agent.displayName || 'agent'} avatar`);
+      }
+      const pose = this.basePose(poseSource || agent);
+      el.dataset.pose = pose;
+      if (!el.classList.contains('tv-agent--walking')) this.setPose(sprite, pose);
+    }
+
+    setPose(sprite, pose) {
+      if (!sprite) return;
+      sprite.classList.remove('pose-idle', 'pose-walk', 'pose-react');
+      sprite.classList.add(`pose-${pose}`);
+    }
+
+    // Resting sprite pose derived only from the agent's real operational
+    // action / scene animation — never a fabricated state.
+    basePose(a) {
+      if (!a) return 'idle';
+      const action = a.operationalAction || a.action;
+      if (action === 'alerting') return 'react';
+      if (action === 'pacing' || a.animation === 'walk') return 'walk';
+      return 'idle';
+    }
+
+    spriteInitials(a) {
+      const name = (a && (a.name || a.displayName)) || '';
+      return name.replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+    }
+
+    // Persistent, collision-checked office-waypoint assignment. This must be
+    // a stateful registry rather than a value recomputed from the current
+    // agent set: fetchAgents/fetchScene/fetchEvents can run concurrently
+    // (see setRoom()), so multiple updateDiorama() passes can interleave
+    // with different agent-set snapshots — a call-time-relative index would
+    // let two agents race onto the same desk. This is append-only and
+    // sticky per agentId, so it can't drift once assigned.
+    assignWaypoint(agentId) {
+      if (this.waypointAssignments.has(agentId)) return this.waypointAssignments.get(agentId);
+      const taken = new Set(this.waypointAssignments.values());
+      const start = hashId(agentId) % OFFICE_WAYPOINTS.length;
+      let idx = start;
+      for (let i = 0; i < OFFICE_WAYPOINTS.length; i++) {
+        const candidate = (start + i) % OFFICE_WAYPOINTS.length;
+        if (!taken.has(candidate)) { idx = candidate; break; }
+      }
+      this.waypointAssignments.set(agentId, idx);
+      return idx;
+    }
+
+    // Brief, purely decorative reaction (no position/state change) so the
+    // diorama visibly responds the moment a real event lands for an agent.
+    pulseAgent(agentId) {
+      const el = this.dioramaEl?.querySelector(`[data-agent-id="${agentId}"]`);
+      if (!el) return;
+      el.classList.remove('tv-agent--pulse');
+      // eslint-disable-next-line no-unused-expressions
+      el.offsetWidth; // restart the animation if it's already mid-pulse
+      el.classList.add('tv-agent--pulse');
+      setTimeout(() => el.classList.remove('tv-agent--pulse'), 900);
+    }
+
+    // Real authoritative backend position wins when it exists (truthful,
+    // never overridden). Otherwise the agent walks a small, fixed loop of
+    // office waypoints — bounded, predetermined stops, picked pseudo-randomly
+    // per agent from a stable hash — so the floor reads as staffed without
+    // fabricating a location for a real agent.
+    applyScenePosition(el, sceneAgent, hash, waypointIdx) {
+      if (sceneAgent) {
+        if (el._wanderTimer) { clearTimeout(el._wanderTimer); el._wanderTimer = null; }
+        const destination = sceneAgent.destination || sceneAgent.position;
+        this.placeAgent(el, destination.x, destination.y);
+        el.dataset.sceneOrigin = sceneAgent.presentation?.origin || 'lifecycle';
+        el.dataset.sceneAnimation = sceneAgent.animation || 'idle';
+        el.dataset.sceneLabel = sceneAgent.presentation?.label || 'scene projection';
+        el.title = `${el._federationAgent?.name || sceneAgent.displayName} · ${el.dataset.sceneLabel}`;
         return;
       }
-      const destination = sceneAgent.destination || sceneAgent.position;
-      el.style.setProperty('--scene-x', `${destination.x}%`);
-      el.style.setProperty('--scene-y', `${destination.y}%`);
-      el.dataset.sceneOrigin = sceneAgent.presentation?.origin || 'lifecycle';
-      el.dataset.sceneAnimation = sceneAgent.animation || 'idle';
-      el.dataset.sceneLabel = sceneAgent.presentation?.label || 'scene projection';
-      el.title = `${el._federationAgent?.name || sceneAgent.displayName} · ${el.dataset.sceneLabel}`;
+      el.removeAttribute('data-scene-origin');
+      el.removeAttribute('data-scene-animation');
+      el.removeAttribute('data-scene-label');
+      if (!el._wanderTimer) this.scheduleWalk(el, hash, waypointIdx);
+    }
+
+    placeAgent(el, x, y, { animate = true } = {}) {
+      const prevX = parseFloat(el.style.getPropertyValue('--scene-x'));
+      el.style.setProperty('--scene-x', `${x}%`);
+      el.style.setProperty('--scene-y', `${y}%`);
+      const sprite = el.querySelector('.tv-agent-sprite');
+      if (!animate || !Number.isFinite(prevX)) {
+        el.dataset.facing = 'right';
+        if (sprite) { sprite.classList.remove('flip'); this.setPose(sprite, el.dataset.pose || 'idle'); }
+        return;
+      }
+      const facing = x < prevX ? 'left' : 'right';
+      el.dataset.facing = facing;
+      if (!sprite) return;
+      el.classList.add('tv-agent--walking');
+      sprite.classList.toggle('flip', facing === 'left');
+      this.setPose(sprite, 'walk');
+      clearTimeout(el._walkArriveTimer);
+      el._walkArriveTimer = setTimeout(() => {
+        el.classList.remove('tv-agent--walking');
+        this.setPose(sprite, el.dataset.pose || 'idle');
+      }, 2450);
+    }
+
+    // Predetermined stop-to-stop loop. The home slot is a stable round-robin
+    // assignment (spreads a small live roster across distinct desks); hash
+    // only jitters timing so agents don't all move in lockstep.
+    scheduleWalk(el, hash, waypointIdx) {
+      const homeIdx = Number.isInteger(waypointIdx) ? waypointIdx : hash % OFFICE_WAYPOINTS.length;
+      const home = OFFICE_WAYPOINTS[homeIdx];
+      this.placeAgent(el, home.x, home.y, { animate: false });
+      let idx = homeIdx;
+      const tick = () => {
+        idx = Math.random() < 0.4 ? homeIdx : (idx + 1) % OFFICE_WAYPOINTS.length;
+        const point = OFFICE_WAYPOINTS[idx];
+        this.placeAgent(el, point.x, point.y);
+        el._wanderTimer = setTimeout(tick, 6500 + (hash % 4500) + Math.random() * 3000);
+      };
+      el._wanderTimer = setTimeout(tick, 3500 + (hash % 5000));
     }
 
     getEventId(event) {
@@ -821,11 +1129,11 @@
       const bubble = document.createElement('div');
       bubble.style.cssText = `
         position: absolute; bottom: 142px; left: 50%; transform: translateX(-50%);
-        background: #f8fafc; color: #0f172a;
-        padding: 8px 12px; border-radius: 12px;
+        background: #f5e6bd; color: #171718;
+        padding: 8px 12px; border-radius: 2px;
         font-size: 12px; line-height: 1.35; white-space: normal;
-        width: max-content; max-width: 220px; box-shadow: 0 8px 18px rgba(0,0,0,0.26);
-        border: 1px solid rgba(15,23,42,.16);
+        width: max-content; max-width: 220px; box-shadow: 0 8px 18px rgba(0,0,0,0.32);
+        border: 2px solid #171718;
         z-index: 10; pointer-events: none;
         animation: tv-bubble-pop 0.3s ease-out;
       `;
@@ -833,10 +1141,10 @@
       if (options.ambient) {
         const label = document.createElement('small');
         label.textContent = 'AMBIENT PRESENTATION · NO EVENT';
-        label.style.cssText = 'display:block;margin-bottom:4px;color:#8a5d00;font:800 8px ui-monospace,monospace;letter-spacing:.04em;';
+        label.style.cssText = 'display:block;margin-bottom:4px;color:#5a2b24;font:800 8px ui-monospace,monospace;letter-spacing:.04em;';
         bubble.prepend(label);
       }
-      
+
       // Speech bubble tail
       const tail = document.createElement('div');
       tail.style.cssText = `
@@ -844,7 +1152,7 @@
         width: 0; height: 0;
         border-left: 8px solid transparent;
         border-right: 8px solid transparent;
-        border-top: 8px solid #f8fafc;
+        border-top: 8px solid #f5e6bd;
       `;
       bubble.appendChild(tail);
       
@@ -948,6 +1256,10 @@
       for (const [, bubble] of this.activeBubbles) clearTimeout(bubble.timeout);
       this.activeBubbles.clear();
       this.activeBubbleOwner = null;
+      for (const el of this.dioramaEl?.querySelectorAll('[data-agent-id]') ?? []) {
+        clearTimeout(el._wanderTimer);
+        clearTimeout(el._walkArriveTimer);
+      }
     }
 
     // ============================================================
@@ -963,10 +1275,10 @@
         const agent = e.agentId ? `${e.agentId} ` : '';
         const type = e.eventType || e.event_type || 'event';
         const msg = e.message || JSON.stringify(e.metadata || {});
-        return `<div style="margin: 4px 0; opacity: 0.8;"><span style="color:#475569;">${time}</span> <span style="color:#60a5fa;">${project}</span><span style="color:#a78bfa;">${agent}</span><span style="color:#fbbf24;">[${this.escapeHtml(type)}]</span> ${this.escapeHtml(msg)}</div>`;
+        return `<div style="margin: 4px 0; opacity: 0.8;"><span style="color:#8c8370;">${time}</span> <span style="color:#5ec5c2;">${project}</span><span style="color:#d96738;">${agent}</span><span style="color:#f4c842;">[${this.escapeHtml(type)}]</span> ${this.escapeHtml(msg)}</div>`;
       });
-      
-      this.feedEl.innerHTML = items.join('') || '<div style="color:#475569;">No events yet...</div>';
+
+      this.feedEl.innerHTML = items.join('') || '<div style="color:#8c8370;">No events yet...</div>';
     }
 
     updateCount() {
