@@ -83,6 +83,11 @@ export interface ValidationGateRequest {
   metadata: Record<string, unknown>;
 }
 
+// Thrown by every input validator below. Callers (and the Worker's top-level
+// error handler) treat it as a 400 client error, distinct from an unexpected
+// 500. Extending Error keeps existing `assert.throws(…, /message/)` tests valid.
+export class ValidationError extends Error {}
+
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const PROJECT_IDENTIFIER = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const SEVERITIES = new Set<EventSeverity>(["info", "success", "warning", "error", "critical"]);
@@ -92,7 +97,7 @@ const MAX_EVENT_AGE_MS = 90 * 24 * 60 * 60 * 1_000;
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 
 export function validateOperationalEvent(value: unknown, now = Date.now()): OperationalEvent {
-  if (!isRecord(value)) throw new Error("event body must be a JSON object");
+  if (!isRecord(value)) throw new ValidationError("event body must be a JSON object");
   const event: OperationalEvent = {
     schemaVersion: requiredString(value.schemaVersion, "schemaVersion", 32),
     eventId: requiredIdentifier(value.eventId, "eventId"),
@@ -109,15 +114,15 @@ export function validateOperationalEvent(value: unknown, now = Date.now()): Oper
     metadata: redactMetadata(value.metadata),
   };
 
-  if (!EVENT_TYPES.has(event.eventType)) throw new Error("eventType is not approved");
-  if (event.parentRunId && !event.runId) throw new Error("parentRunId requires runId");
+  if (!EVENT_TYPES.has(event.eventType)) throw new ValidationError("eventType is not approved");
+  if (event.parentRunId && !event.runId) throw new ValidationError("parentRunId requires runId");
   return event;
 }
 
 export function validateLeaseRequest(value: unknown): LeaseRequest {
-  if (!isRecord(value)) throw new Error("lease body must be a JSON object");
+  if (!isRecord(value)) throw new ValidationError("lease body must be a JSON object");
   const rawScopes = value.scopes === undefined ? [] : value.scopes;
-  if (!Array.isArray(rawScopes) || rawScopes.length > 16) throw new Error("scopes must contain at most 16 entries");
+  if (!Array.isArray(rawScopes) || rawScopes.length > 16) throw new ValidationError("scopes must contain at most 16 entries");
   return {
     projectId: requiredProjectId(value.projectId),
     agentId: requiredIdentifier(value.agentId, "agentId"),
@@ -128,22 +133,22 @@ export function validateLeaseRequest(value: unknown): LeaseRequest {
 }
 
 export function validateCommandAcknowledgement(value: unknown): CommandAcknowledgement {
-  if (!isRecord(value)) throw new Error("command acknowledgement must be a JSON object");
+  if (!isRecord(value)) throw new ValidationError("command acknowledgement must be a JSON object");
   const outcome = value.outcome;
-  if (outcome !== "contained" && outcome !== "rejected" && outcome !== "failed") throw new Error("command outcome is invalid");
+  if (outcome !== "contained" && outcome !== "rejected" && outcome !== "failed") throw new ValidationError("command outcome is invalid");
   const note = value.note === undefined ? undefined : requiredString(value.note, "note", 240);
   return { commandId: requiredIdentifier(value.commandId, "commandId"), agentId: requiredIdentifier(value.agentId, "agentId"), outcome, note };
 }
 
 export function validateLeaseValidationRequest(value: unknown): LeaseValidationRequest {
-  if (!isRecord(value)) throw new Error("lease validation body must be a JSON object");
+  if (!isRecord(value)) throw new ValidationError("lease validation body must be a JSON object");
   return { agentId: requiredIdentifier(value.agentId, "agentId") };
 }
 
 export function validateControlledToolAuthorizationRequest(value: unknown): ControlledToolAuthorizationRequest {
-  if (!isRecord(value)) throw new Error("controlled tool authorization body must be a JSON object");
+  if (!isRecord(value)) throw new ValidationError("controlled tool authorization body must be a JSON object");
   const inputDigest = requiredString(value.inputDigest, "inputDigest", 64).toLowerCase();
-  if (!/^[a-f0-9]{64}$/.test(inputDigest)) throw new Error("inputDigest must be a SHA-256 hexadecimal digest");
+  if (!/^[a-f0-9]{64}$/.test(inputDigest)) throw new ValidationError("inputDigest must be a SHA-256 hexadecimal digest");
   return {
     projectId: requiredProjectId(value.projectId),
     agentId: requiredIdentifier(value.agentId, "agentId"),
@@ -156,8 +161,8 @@ export function validateControlledToolAuthorizationRequest(value: unknown): Cont
 }
 
 export function validateValidationGateRequest(value: unknown): ValidationGateRequest {
-  if (!isRecord(value)) throw new Error("validation gate body must be a JSON object");
-  if (typeof value.passed !== "boolean") throw new Error("passed must be a boolean");
+  if (!isRecord(value)) throw new ValidationError("validation gate body must be a JSON object");
+  if (typeof value.passed !== "boolean") throw new ValidationError("passed must be a boolean");
   return {
     projectId: requiredProjectId(value.projectId),
     agentId: requiredIdentifier(value.agentId, "agentId"),
@@ -243,13 +248,13 @@ export function constantTimeEqual(left: string, right: string): boolean {
 }
 
 function requiredString(value: unknown, field: string, maxLength: number): string {
-  if (typeof value !== "string" || !value.trim() || value.length > maxLength) throw new Error(`${field} must be a non-empty string up to ${maxLength} characters`);
+  if (typeof value !== "string" || !value.trim() || value.length > maxLength) throw new ValidationError(`${field} must be a non-empty string up to ${maxLength} characters`);
   return value.trim();
 }
 
 function requiredIdentifier(value: unknown, field: string): string {
   const identifier = requiredString(value, field, 128);
-  if (!IDENTIFIER.test(identifier)) throw new Error(`${field} contains unsupported characters`);
+  if (!IDENTIFIER.test(identifier)) throw new ValidationError(`${field} contains unsupported characters`);
   return identifier;
 }
 
@@ -260,40 +265,40 @@ function optionalIdentifier(value: unknown, field: string): string | undefined {
 
 function requiredProjectId(value: unknown): string {
   const projectId = requiredString(value, "projectId", 64);
-  if (!PROJECT_IDENTIFIER.test(projectId)) throw new Error("projectId must be lowercase letters, digits, or hyphens");
+  if (!PROJECT_IDENTIFIER.test(projectId)) throw new ValidationError("projectId must be lowercase letters, digits, or hyphens");
   return projectId;
 }
 
 function requiredSeverity(value: unknown): EventSeverity {
-  if (typeof value !== "string" || !SEVERITIES.has(value as EventSeverity)) throw new Error("severity is invalid");
+  if (typeof value !== "string" || !SEVERITIES.has(value as EventSeverity)) throw new ValidationError("severity is invalid");
   return value as EventSeverity;
 }
 
 function requiredBoundedInteger(value: unknown, field: string, min: number, max: number): number {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) throw new Error(`${field} must be an integer between ${min} and ${max}`);
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) throw new ValidationError(`${field} must be an integer between ${min} and ${max}`);
   return value;
 }
 
 function requiredDate(value: unknown, now: number): string {
-  if (typeof value !== "string") throw new Error("occurredAt must be an ISO-8601 timestamp");
+  if (typeof value !== "string") throw new ValidationError("occurredAt must be an ISO-8601 timestamp");
   const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed) || parsed < now - MAX_EVENT_AGE_MS || parsed > now + MAX_FUTURE_SKEW_MS) throw new Error("occurredAt is outside the accepted window");
+  if (!Number.isFinite(parsed) || parsed < now - MAX_EVENT_AGE_MS || parsed > now + MAX_FUTURE_SKEW_MS) throw new ValidationError("occurredAt is outside the accepted window");
   return new Date(parsed).toISOString();
 }
 
 function redactMetadata(value: unknown): Record<string, unknown> {
   if (value === undefined) return {};
-  if (!isRecord(value)) throw new Error("metadata must be a JSON object");
+  if (!isRecord(value)) throw new ValidationError("metadata must be a JSON object");
   const redacted = redactValue(value, 0) as Record<string, unknown>;
-  if (new TextEncoder().encode(JSON.stringify(redacted)).byteLength > MAX_METADATA_BYTES) throw new Error("metadata exceeds 8 KiB after redaction");
+  if (new TextEncoder().encode(JSON.stringify(redacted)).byteLength > MAX_METADATA_BYTES) throw new ValidationError("metadata exceeds 8 KiB after redaction");
   return redacted;
 }
 
 function redactValue(value: unknown, depth: number): unknown {
-  if (depth > 4) throw new Error("metadata may not be nested more than four levels");
+  if (depth > 4) throw new ValidationError("metadata may not be nested more than four levels");
   if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
   if (Array.isArray(value)) return value.map(item => redactValue(item, depth + 1));
-  if (!isRecord(value)) throw new Error("metadata contains a non-JSON value");
+  if (!isRecord(value)) throw new ValidationError("metadata contains a non-JSON value");
   return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, SENSITIVE_KEY.test(key) ? "[REDACTED]" : redactValue(nested, depth + 1)]));
 }
 
