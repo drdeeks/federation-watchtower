@@ -10,7 +10,7 @@ import { handleLifecycleRequest } from "./lifecycle";
 import {
   constantTimeEqual, hmacSha256Hex, sha256Hex, stableJson, validateAgentId,
   validateCommandAcknowledgement, validateControlledToolAuthorizationRequest, validateLeaseRequest, validateLeaseValidationRequest,
-  validateOperationalEvent, validateProjectId, validateValidationGateRequest,
+  validateOperationalEvent, validateProjectId, validateValidationGateRequest, ValidationError,
 } from "./watchtower";
 
 export { AgentRegistry } from "./agent-registry";
@@ -181,7 +181,7 @@ export default {
     // privileged surface is the token-protected operator console.
     if (isFederationHost) {
       if (path === "/") return Response.redirect(new URL("/federation.html", request.url), 302);
-      const allowed = path === "/" || path === "/federation.html" || path === "/operator.html" || path.startsWith("/brand/");
+      const allowed = path === "/" || path === "/federation.html" || path === "/operator.html" || path === "/onboarding.html" || path.startsWith("/brand/");
       if ((method !== "GET" && method !== "HEAD") || !allowed) return error("not found", 404);
       return env.ASSETS.fetch(new Request(new URL(path, request.url), request));
     }
@@ -552,8 +552,9 @@ export default {
 
       return error("Not found", 404);
     } catch (e) {
-      console.error("Worker error:", e);
       if (e instanceof HttpError) return error(e.message, e.status);
+      if (e instanceof ValidationError) return error(e.message, 400);
+      console.error("Worker error:", e);
       return json({ error: "internal server error" }, 500);
     }
   },

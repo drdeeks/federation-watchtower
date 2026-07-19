@@ -3,7 +3,7 @@ import type { FederationCoordinator } from "./federation-coordinator.ts";
 import type { AgentWatchdog } from "./agent-watchdog.ts";
 import type { ProjectGuardrail } from "./project-guardrail.ts";
 import type { RoomScene } from "./room-scene.ts";
-import { sha256Hex, validateAgentId, validateOperationalEvent, validateProjectId } from "./watchtower.ts";
+import { sha256Hex, validateAgentId, validateOperationalEvent, validateProjectId, ValidationError } from "./watchtower.ts";
 
 type Json = (data: unknown, status?: number) => Response;
 type BoundedJson = (request: Request) => Promise<{ raw: string; value: unknown }>;
@@ -208,4 +208,4 @@ function optionalId(value: unknown): string | undefined { return value === undef
 function email(value: unknown): string { const result = text(value, "contactEmail", 254); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result)) fail("contactEmail must be valid"); return result; }
 function httpsUrl(value: unknown, label: string): string { try { const url = new URL(text(value, label, 500)); if (url.protocol !== "https:") fail(`${label} must use HTTPS`); return url.toString(); } catch { fail(`${label} must be a valid HTTPS URL`); } }
 function rejectSensitive(value: unknown): void { if (value === undefined) return; const body = record(value, "metadata"); for (const key of Object.keys(body)) if (SENSITIVE_KEY.test(key)) fail("metadata must not contain secret-shaped keys"); }
-function fail(message: string): never { throw new Error(message); }
+function fail(message: string): never { throw new ValidationError(message); }
