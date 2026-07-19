@@ -449,14 +449,22 @@
             <div class="office" aria-hidden="true">
               <div class="office-back"></div>
               <div class="office-floor"></div>
+              <div class="wall-board" style="left:63%; top:11%;"></div>
+              <div class="wall-clock" style="left:90%; top:8%;"></div>
+              <div class="cooler" style="left:72%; top:20%;"></div>
               <div class="desk" style="left:15%; top:50%;"></div>
               <div class="desk" style="left:38%; top:50%;"></div>
               <div class="desk" style="left:61%; top:50%;"></div>
               <div class="desk" style="left:15%; top:82%;"></div>
               <div class="desk" style="left:38%; top:82%;"></div>
               <div class="desk" style="left:61%; top:82%;"></div>
-              <div class="cooler" style="left:90%; top:44%;"></div>
-              <div class="plant" style="left:93%; top:84%;"></div>
+              <div class="cabinet" style="left:5%; top:37%;"></div>
+              <div class="rug" style="left:83%; top:70%;"></div>
+              <div class="couch" style="left:83%; top:60%;"></div>
+              <div class="lowtable" style="left:83%; top:75%;"></div>
+              <div class="plant" style="left:96%; top:43%;"></div>
+              <div class="plant" style="left:96%; top:91%;"></div>
+              <div class="plant" style="left:5%; top:92%;"></div>
             </div>
           </div>
 
@@ -570,6 +578,31 @@
               width:26px; height:26px; background:radial-gradient(circle at 50% 62%, #40915b, #2b6a41); border-radius:52% 52% 44% 44%;
               box-shadow:0 0 0 2px rgba(18,24,20,.4);
             }
+            /* back-wall decor + a lounge / casual-meetup zone to fill the room */
+            .wall-board { position:absolute; width:118px; height:54px; transform:translate(-50%,-50%); z-index:2;
+              background:linear-gradient(180deg,#eaf0e9,#ccd7cf); border:3px solid #101820; border-radius:3px; box-shadow:0 3px 0 rgba(0,0,0,.3); }
+            .wall-board::before { content:""; position:absolute; left:11%; top:26%; width:44%; height:3px; background:#2fb6a8; border-radius:2px;
+              box-shadow:0 11px 0 #e5654f, 0 22px 0 #f2c14e; }
+            .wall-board::after { content:""; position:absolute; right:13%; top:30%; width:22px; height:22px; border:3px solid #9c4a3c; border-radius:50%; }
+            .wall-clock { position:absolute; width:26px; height:26px; transform:translate(-50%,-50%); z-index:2; border-radius:50%;
+              background:#eef3ee; border:3px solid #101820; box-shadow:0 2px 0 rgba(0,0,0,.3); }
+            .wall-clock::before { content:""; position:absolute; left:50%; top:50%; width:2px; height:8px; background:#101820; border-radius:1px; transform-origin:bottom center; transform:translate(-50%,-100%) rotate(38deg); }
+            .wall-clock::after { content:""; position:absolute; left:50%; top:50%; width:2px; height:6px; background:#101820; border-radius:1px; transform-origin:bottom center; transform:translate(-50%,-100%) rotate(-72deg); }
+            .cabinet { position:absolute; width:30px; height:44px; transform:translate(-50%,-50%); z-index:2;
+              background:linear-gradient(180deg,#5a6b74,#3f4d55); border:2px solid #101820; border-radius:3px; box-shadow:0 4px 0 rgba(0,0,0,.28); }
+            .cabinet::before { content:""; position:absolute; left:5px; right:5px; top:6px; height:11px; background:rgba(255,255,255,.07);
+              border:1px solid rgba(0,0,0,.4); border-radius:2px; box-shadow:0 15px 0 rgba(255,255,255,.07), 0 15px 0 1px rgba(0,0,0,.4); }
+            .cabinet::after { content:""; position:absolute; left:50%; top:10px; width:8px; height:2px; background:#cdd8d0; transform:translateX(-50%); box-shadow:0 15px 0 #cdd8d0; }
+            .rug { position:absolute; width:150px; height:64px; transform:translate(-50%,-50%); z-index:1; border-radius:16px;
+              background:rgba(60,80,88,.5); box-shadow:inset 0 0 0 3px rgba(242,193,78,.22), inset 0 0 0 9px rgba(47,182,168,.12); }
+            .couch { position:absolute; width:70px; height:26px; transform:translate(-50%,-50%); z-index:2; }
+            .couch::before { content:""; position:absolute; inset:0; background:linear-gradient(180deg,#3a5a63,#2b444b);
+              border:2px solid #101820; border-radius:9px 9px 5px 5px; box-shadow:0 3px 0 rgba(0,0,0,.28); }
+            .couch::after { content:""; position:absolute; left:7px; right:7px; top:6px; height:9px; background:rgba(255,255,255,.08); border-radius:5px; }
+            .lowtable { position:absolute; width:34px; height:16px; transform:translate(-50%,-50%); z-index:2;
+              background:linear-gradient(180deg,#6d5a45,#4d4032); border:2px solid #17110c; border-radius:5px; box-shadow:0 3px 0 rgba(0,0,0,.28); }
+            .lowtable::after { content:""; position:absolute; left:50%; top:-6px; width:8px; height:8px; background:rgba(96,196,205,.85);
+              border:2px solid #101820; border-radius:2px; transform:translateX(-50%); }
             .tv-scene::after {
               content: "";
               position: absolute;
