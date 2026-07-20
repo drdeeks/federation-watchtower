@@ -57,8 +57,8 @@ log_success "Owner created successfully"
 echo "Owner credential: ${OWNER_TOKEN:0:40}..."
 echo ""
 
-# Step 2: Register Agent
-log_info "Step 2: Registering agent..."
+# Step 2: Register Agent (with auto-lease)
+log_info "Step 2: Registering agent (with auto-lease)..."
 AGENT_RESPONSE=$(curl -s -X POST "$API_BASE/api/v1/agents" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $OWNER_TOKEN" \
@@ -71,16 +71,20 @@ AGENT_RESPONSE=$(curl -s -X POST "$API_BASE/api/v1/agents" \
     \"capabilities\":[\"testing\",\"reporting\"],
     \"identity\":{\"avatarSeed\":\"$AGENT_ID\",\"paletteKey\":\"testing\",\"characterType\":\"runner\"},
     \"publicProjection\":true,
-    \"heartbeat\":{\"intervalSeconds\":60}
+    \"heartbeat\":{\"intervalSeconds\":60},
+    \"lease\":{\"ttlSeconds\":300,\"scopes\":[\"testing\",\"reporting\"]}
   }")
 
 AGENT_TOKEN=$(echo "$AGENT_RESPONSE" | jq -r '.credential.token // empty')
 AGENT_LIFECYCLE=$(echo "$AGENT_RESPONSE" | jq -r '.agent.lifecycleState // empty')
+LEASE_ID=$(echo "$AGENT_RESPONSE" | jq -r '.lease.leaseId // empty')
+LEASE_STATUS=$(echo "$AGENT_RESPONSE" | jq -r '.lease.status // empty')
 if [[ -z "$AGENT_TOKEN" ]]; then
   log_error "Failed to register agent: $AGENT_RESPONSE"
   exit 1
 fi
 log_success "Agent registered successfully (lifecycle: $AGENT_LIFECYCLE)"
+log_success "Auto-lease created: $LEASE_ID (status: $LEASE_STATUS)"
 echo "Agent credential: ${AGENT_TOKEN:0:40}..."
 echo ""
 
@@ -112,6 +116,21 @@ if [[ -z "$WATCHDOG_DEADLINE" ]]; then
   exit 1
 fi
 log_success "Heartbeat sent (watchdog deadline: $(date -d "@$((WATCHDOG_DEADLINE/1000))" 2>/dev/null || echo "$WATCHDOG_DEADLINE"))"
+echo ""
+
+# Step 4b: Validate Lease (before work)
+log_info "Step 4b: Validating lease (required before each action)..."
+LEASE_VALIDATE_RESPONSE=$(curl -s -X POST "$API_BASE/api/v1/projects/$PROJECT_ID/leases/$LEASE_ID/validate" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $AGENT_TOKEN" \
+  -d "{\"agentId\":\"$AGENT_ID\"}")
+
+VALIDATE_STATUS=$(echo "$LEASE_VALIDATE_RESPONSE" | jq -r '.status // empty')
+if [[ "$VALIDATE_STATUS" != "active" ]]; then
+  log_error "Lease validation failed: $LEASE_VALIDATE_RESPONSE"
+  exit 1
+fi
+log_success "Lease validated (status: $VALIDATE_STATUS)"
 echo ""
 
 # Step 5: Emit Events (Success or Failure path)

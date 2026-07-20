@@ -44,7 +44,11 @@
     </section>
     <section class="toolbar">
       <label>Project <select id="project" disabled><option>Connect first</option></select></label>
-      <button id="refresh" class="secondary" disabled>Refresh</button>
+      <button id="refresh" class="secondary" disabled>⟳ Refresh</button>
+      <label style="flex-direction:row;display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;color:#b8d8d4;">
+        <input id="autoRefresh" type="checkbox" style="width:auto;min-height:auto;"> Auto-refresh 30s
+      </label>
+      <button id="copyAgents" class="secondary" disabled>📋 Copy agent list</button>
       <button id="export" class="secondary" disabled>Export evidence</button>
       <span id="status" role="status">Disconnected</span>
     </section>
@@ -112,7 +116,29 @@
         renderBudget(budget.budget); renderSessions(sessions.sessions); renderIncidents(incidents.incidents); renderTools(tools.invocations); setStatus(`Live · refreshed ${new Date().toLocaleTimeString()}`);
       } catch (error) { setStatus(error.message, true); }
     }
-    $('connect').addEventListener('click', connect); $('refresh').addEventListener('click', refresh); project.addEventListener('change', refresh);
+    let autoRefreshInterval = null;
+    $('connect').addEventListener('click', connect);
+    $('refresh').addEventListener('click', refresh);
+    project.addEventListener('change', refresh);
+    $('autoRefresh').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        autoRefreshInterval = setInterval(refresh, 30000);
+        setStatus('Auto-refresh enabled (30s)');
+      } else {
+        if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+        setStatus('Auto-refresh disabled');
+      }
+    });
+    $('copyAgents').addEventListener('click', async () => {
+      try {
+        requireConnection();
+        const data = await request('/api/v1/admin/agents?projectId=' + encodeURIComponent(state.current));
+        const text = data.agents.map(a => `${a.agentId} · ${a.displayName} · ${a.lifecycleState} · lease: ${a.roomId || 'none'}`).join('\n');
+        await navigator.clipboard.writeText(text);
+        setStatus(`Copied ${data.agents.length} agents to clipboard`);
+      } catch (error) { setStatus(error.message, true); }
+    });
     $('budgetForm').addEventListener('submit', async event => { event.preventDefault(); try { requireConnection(); const base = `/api/v1/projects/${encodeURIComponent(state.current)}`; await request(`${base}/budget`, { method:'PUT', body: JSON.stringify({ limitUsd:Number($('limit').value), warningUsd:Number($('warning').value) }) }); await refresh(); } catch (error) { setStatus(error.message, true); } });
     $('export').addEventListener('click', async () => { try { requireConnection(); const base = `/api/v1/projects/${encodeURIComponent(state.current)}`; const result = await request(`${base}/evidence/exports`, { method:'POST', body: JSON.stringify({ retentionDays:30 }) }); setStatus(`Evidence export ${result.exportId} retained through ${date(result.expiresAt)}.`); } catch (error) { setStatus(error.message, true); } });
     $('incidentList').addEventListener('click', event => { const button = event.target.closest('button[data-action]'); if (!button) return; state.action = { action: button.dataset.action, id: button.dataset.id }; $('dialogTitle').textContent = `${state.action.action} ${state.action.id}`; $('reason').value=''; $('reasonDialog').showModal(); });
