@@ -27,7 +27,7 @@ The comedy is the hook. But the purpose is to **monitor what's actually happenin
 
 ### The personal context
 
-I operate on a 2013 Toshiba with 1.87 GHz, 2 cores, 4GB RAM that can barely open a browser. Being a single father with struggles from a mistake I made over 10 years ago, constantly being shown the door in job opportunities has been very difficult. I've always been a creative person who enjoys taking things most people throw away and transforming them into something completely different — 1/1 items. I figure things out, think mechanically, and try everything I can to get myself and my daughter in a better position.
+I operate on a 2013 ThinkPad with 1.87 GHz, 2 cores, 4GB RAM that can barely open a browser. Being a single father with struggles from a mistake I made over 10 years ago, constantly being shown the door in job opportunities has been very difficult. I've always been a creative person who enjoys taking things most people throw away and transforming them into something completely different — 1/1 items. I figure things out, think mechanically, and try everything I can to get myself and my daughter in a better position.
 
 When I started using Codex, I had five project demos that weren't quite functional. About 700 credits later, I realized the app I wanted to make wasn't going to cut it. I mentioned the Federation idea — originally a comical afterthought, a quirky agent monitoring layer for any project that wanted to join via MCP. Codex refined my concept into something possible and robust, then helped consolidate my refund into something functional and manageable.
 
