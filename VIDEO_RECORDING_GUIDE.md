@@ -88,7 +88,7 @@
 ---
 
 #### 4. Live Demo - Run Loop (60 seconds)
-**Stay on:** Onboarding page (Tab 2)
+**Stay on:** Onboarding (Tab 2)
 
 **Say:** *"Now I run the live loop - connect, heartbeat, emit events, disconnect..."*
 
@@ -100,6 +100,13 @@
 3. Pick event type: `run.started`
 4. Click **"Emit action now"**
    - Say: *"This emits a real operational event"*
+5. **Show watchdog expiry** (optional but recommended):
+   - Stop auto-heartbeat, wait 35+ seconds
+   - Say: *"After 30 seconds without heartbeat, watchdog marks agent offline"*
+   - Show the offline status in the log
+6. **Show guardrail failure** (optional):
+   - Try to emit an invalid event (wrong schema)
+   - Say: *"Validation failures are logged as incidents"*
 5. Click **"Start auto loop"**
    - Say: *"Auto loop heartbeats and emits every 30 seconds"*
    - Wait 10 seconds watching the log

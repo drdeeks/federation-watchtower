@@ -79,17 +79,27 @@ credential in the package.
 
 ## 3. Record one real public demo — under three minutes
 
-Follow [the demo script](VIDEO_RECORDING_GUIDE.md), updated with this order of proof:
+**Required elements per OpenAI Build Week:**
+- ✅ Watchtower camera view
+- ✅ Agent registration flow
+- ✅ Event feed showing real events
+- ✅ Guardrail/watchdog signals (validation failure or offline transition)
+- ✅ Codex/GPT-5.6 build workflow explanation
+
+Follow [the demo script](VIDEO_RECORDING_GUIDE.md), with this order:
 
 1. **Intro (15s):** Open `watch.drdeeks.xyz`, state what Federation Watchtower is
 2. **Problem (15s):** Explain the 25,000 credits invisibility problem
-3. **Live demo (60s):** Register owner → register agent with lease → connect → heartbeat → emit `run.started` → disconnect
-4. **Watchtower (20s):** Show agent live on public camera view, event feed
+3. **Live demo (60s):** Register owner → register agent with lease → connect → heartbeat → emit `run.started` → **show watchdog expiry or validation failure** → disconnect
+4. **Watchtower (20s):** Show agent live on public camera view, event feed with real events
 5. **Admin console (45s):** Open `manage.html`, show agent management, room create/delete, org review/approve
-6. **Codex usage (25s):** Show README, explain how Codex accelerated the work
+6. **Codex usage (25s):** Show README, explain how Codex + GPT-5.6 accelerated the work
 7. **Wrap up (10s):** Call to action
 
 Upload the recording publicly to YouTube (unlisted is OK for hackathon submission).
+
+**Title:** `Federation Watchtower - OpenAI Build Week Demo`  
+**Description:** Mention Codex session ID `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
 
 ## 4. Complete the Devpost form manually
 
