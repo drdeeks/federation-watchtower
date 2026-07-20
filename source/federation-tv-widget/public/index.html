@@ -135,17 +135,7 @@
       appearance:none; -webkit-appearance:none; cursor:pointer;
     }
     .field select:focus-visible { outline:2px solid var(--wt-signal); outline-offset:1px; }
-    .desk__actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
-    .toggle {
-      min-height:40px; padding:8px 13px; border:2px solid var(--wt-ink); border-radius:2px;
-      background:#182b28; color:var(--wt-paper);
-      font:700 .66rem/1 var(--wt-display); letter-spacing:.08em; text-transform:uppercase;
-      display:inline-flex; align-items:center; gap:8px; transition:background .15s ease, color .15s ease;
-    }
-    .toggle::before { content:""; width:9px; height:9px; border:2px solid currentColor; border-radius:50%; }
-    .toggle:hover { background:#20423b; }
-    .toggle[aria-pressed=true] { background:var(--wt-signal); color:var(--wt-ink); }
-    .toggle[aria-pressed=true]::before { background:currentColor; }
+    .desk { grid-template-columns:minmax(190px,1.5fr) minmax(180px,1fr); }
 
     /* ============================================================
        CONSOLE GRID — camera monitor + rail
@@ -192,9 +182,6 @@
     .reg--tr { top:8px; right:8px; border-left:0; border-bottom:0; }
     .reg--bl { bottom:8px; left:8px; border-right:0; border-top:0; }
     .reg--br { bottom:8px; right:8px; border-left:0; border-top:0; }
-    .feed-only-note { display:none; padding:52px 24px; color:var(--wt-paper-dim); text-align:center; line-height:1.6; font-size:.82rem; }
-    body.feed-only .camera-stage { display:none; }
-    body.feed-only .feed-only-note { display:block; }
 
     /* rail */
     .rail { display:grid; gap:16px; align-content:start; }
@@ -312,9 +299,6 @@
     .desk { animation-delay:.05s; } .console { animation-delay:.1s; }
     .terminal { animation-delay:.15s; } .slots { animation-delay:.2s; }
 
-    body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after {
-      animation:none !important; transition:none !important;
-    }
     @media (prefers-reduced-motion:reduce) {
       *, *::before, *::after { animation-duration:.001ms !important; transition-duration:.001ms !important; }
     }
@@ -328,7 +312,6 @@
       .masthead__row { grid-template-columns:1fr; }
       .signal-strip { justify-content:flex-start; }
       .desk { grid-template-columns:1fr; }
-      .desk__actions { justify-content:flex-start; }
       .rail, .slots { grid-template-columns:1fr; }
       .event-log li { grid-template-columns:60px 92px minmax(0,1fr); gap:8px; }
       .monitor__top { flex-wrap:wrap; row-gap:6px; }
@@ -360,7 +343,10 @@
         <a href="/join.html">Send an agent</a>
         <a href="/integrate.html">Integrate</a>
         <a href="/organization.html">Organization</a>
-        <a href="https://federation.drdeeks.xyz/federation.html">Federation</a>
+        <a href="/federation.html">Federation</a>
+        <a href="/onboarding.html">Onboarding</a>
+        <a href="/operator.html">Operator</a>
+        <a href="/manage.html">Manage (admin)</a>
       </nav>
     </header>
 
@@ -372,10 +358,6 @@
       <label class="field"><span>Agent roster</span>
         <select id="agent-picker" aria-label="Inspect an agent"><option value="">Choose an agent</option></select>
       </label>
-      <div class="desk__actions">
-        <button id="motion-toggle" class="toggle" type="button" aria-pressed="false">Reduced motion</button>
-        <button id="feed-toggle" class="toggle" type="button" aria-pressed="false">Feed only</button>
-      </div>
     </section>
 
     <!-- ============ CONSOLE ============ -->
@@ -392,7 +374,6 @@
           <span class="reg reg--bl"></span><span class="reg reg--br"></span>
           <div id="federation-tv"></div>
         </div>
-        <div class="feed-only-note">Feed-only mode is on. The operational log stays live while the presentation layer is hidden.</div>
       </section>
 
       <aside class="rail">
@@ -532,8 +513,6 @@
     const tv = new FederationTV({ projectId:'all', roomId:'all', container:'#federation-tv', gatewayUrl:gateway, refreshInterval:12000, randomSpeech:false, presentationMode:'camera', onAgentSelect:openAgent, onAgentsUpdate:renderAgents, onFeedUpdate:items => { feed=items; renderFeed(); }});
     $('close-agent').addEventListener('click',()=>agentDialog.close());
     $('agent-picker').addEventListener('change',event=>{ const agent=agents.find(item=>item.agentId===event.target.value); if(agent) openAgent(agent); event.target.value=''; });
-    $('motion-toggle').addEventListener('click',event=>{ const pressed=event.currentTarget.getAttribute('aria-pressed') !== 'true'; event.currentTarget.setAttribute('aria-pressed',String(pressed)); document.body.classList.toggle('reduced-motion',pressed); });
-    $('feed-toggle').addEventListener('click',event=>{ const pressed=event.currentTarget.getAttribute('aria-pressed') !== 'true'; event.currentTarget.setAttribute('aria-pressed',String(pressed)); document.body.classList.toggle('feed-only',pressed); });
     document.querySelector('.tabs').addEventListener('click',event=>{ const button=event.target.closest('.tab'); if (!button) return; activeFilter=button.dataset.filter; document.querySelectorAll('.tab').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button))); renderFeed(); });
     $('room-picker').addEventListener('change',event=>{ const entry=roomIndex.get(event.target.value); if (!entry) return; $('camera-title').textContent=entry.label; $('camera-state').textContent=entry.roomId === 'all' ? 'Read-only public projection' : `${entry.used}/${entry.capacity} slots visible`; tv.setRoom(entry.roomId,entry.projectId); });
     async function loadSystem() {

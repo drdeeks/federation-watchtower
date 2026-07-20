@@ -74,10 +74,13 @@ export class FederationCoordinator extends DurableObject<WatchtowerEnv> {
     const projects = await this.db.prepare(`SELECT * FROM projects ORDER BY id`).all<any>();
     const summaries: ProjectSummary[] = [];
     for (const p of projects.results) {
+      // Counts come from the canonical registry (federation_agents); the legacy
+      // `agents` table is only the public-floor projection.
+      // legacy: SELECT COUNT(*) FROM agents WHERE project_id = ? / AND status = 'active'
       const [agentCount, roomCount, activeCount, lastEvent] = await Promise.all([
-        this.db.prepare(`SELECT COUNT(*) as cnt FROM agents WHERE project_id = ?`).bind(p.id).first<{ cnt: number }>(),
+        this.db.prepare(`SELECT COUNT(*) as cnt FROM federation_agents WHERE project_id = ? AND lifecycle_state != 'revoked'`).bind(p.id).first<{ cnt: number }>(),
         this.db.prepare(`SELECT COUNT(*) as cnt FROM rooms WHERE project_id = ?`).bind(p.id).first<{ cnt: number }>(),
-        this.db.prepare(`SELECT COUNT(*) as cnt FROM agents WHERE project_id = ? AND status = 'active'`).bind(p.id).first<{ cnt: number }>(),
+        this.db.prepare(`SELECT COUNT(*) as cnt FROM federation_agents WHERE project_id = ? AND lifecycle_state = 'connected' AND paused_at IS NULL`).bind(p.id).first<{ cnt: number }>(),
         this.db.prepare(`SELECT timestamp FROM feed_events WHERE project_id = ? ORDER BY timestamp DESC LIMIT 1`).bind(p.id).first<{ timestamp: number }>(),
       ]);
       summaries.push({
@@ -92,10 +95,11 @@ export class FederationCoordinator extends DurableObject<WatchtowerEnv> {
   async getProjectSummary(projectId: string): Promise<ProjectSummary | null> {
     const p = await this.db.prepare(`SELECT * FROM projects WHERE id = ?`).bind(projectId).first<any>();
     if (!p) return null;
+    // legacy: SELECT COUNT(*) FROM agents WHERE project_id = ? / AND status = 'active'
     const [agentCount, roomCount, activeCount, lastEvent] = await Promise.all([
-      this.db.prepare(`SELECT COUNT(*) as cnt FROM agents WHERE project_id = ?`).bind(projectId).first<{ cnt: number }>(),
+      this.db.prepare(`SELECT COUNT(*) as cnt FROM federation_agents WHERE project_id = ? AND lifecycle_state != 'revoked'`).bind(projectId).first<{ cnt: number }>(),
       this.db.prepare(`SELECT COUNT(*) as cnt FROM rooms WHERE project_id = ?`).bind(projectId).first<{ cnt: number }>(),
-      this.db.prepare(`SELECT COUNT(*) as cnt FROM agents WHERE project_id = ? AND status = 'active'`).bind(projectId).first<{ cnt: number }>(),
+      this.db.prepare(`SELECT COUNT(*) as cnt FROM federation_agents WHERE project_id = ? AND lifecycle_state = 'connected' AND paused_at IS NULL`).bind(projectId).first<{ cnt: number }>(),
       this.db.prepare(`SELECT timestamp FROM feed_events WHERE project_id = ? ORDER BY timestamp DESC LIMIT 1`).bind(projectId).first<{ timestamp: number }>(),
     ]);
     return { projectId: p.id, name: p.name, track: p.track, color: p.color, emoji: p.emoji, prefix: p.prefix,
@@ -104,9 +108,10 @@ export class FederationCoordinator extends DurableObject<WatchtowerEnv> {
   }
 
   async getSystemStatus(): Promise<SystemStatus> {
+    // legacy: SELECT COUNT(*) FROM agents
     const [projects, totalAgents, totalRooms] = await Promise.all([
       this.db.prepare(`SELECT COUNT(*) as cnt FROM projects`).first<{ cnt: number }>(),
-      this.db.prepare(`SELECT COUNT(*) as cnt FROM agents`).first<{ cnt: number }>(),
+      this.db.prepare(`SELECT COUNT(*) as cnt FROM federation_agents WHERE lifecycle_state != 'revoked'`).first<{ cnt: number }>(),
       this.db.prepare(`SELECT COUNT(*) as cnt FROM rooms`).first<{ cnt: number }>(),
     ]);
     let healthyProjects = 0;
@@ -124,13 +129,17 @@ export class FederationCoordinator extends DurableObject<WatchtowerEnv> {
 
   async searchAgents(query: string, limit = 20): Promise<SearchResult> {
     const lowerQuery = query.toLowerCase();
+    // Public search reads the canonical registry, restricted to agents that
+    // opted into public projection — private canonical agents never appear.
+    // legacy: SELECT project_id, agent_id, name, role FROM agents WHERE ...
     const agentRows = await this.db.prepare(`
-      SELECT project_id, agent_id, name, role FROM agents
-      WHERE LOWER(name) LIKE ? OR LOWER(agent_id) LIKE ? OR LOWER(role) LIKE ?
+      SELECT project_id, agent_id, display_name AS name, role FROM federation_agents
+      WHERE public_projection = 1 AND lifecycle_state != 'revoked'
+        AND (LOWER(display_name) LIKE ? OR LOWER(agent_id) LIKE ? OR LOWER(role) LIKE ?)
       LIMIT ?`).bind(`%${lowerQuery}%`, `%${lowerQuery}%`, `%${lowerQuery}%`, limit).all<{ project_id: string; agent_id: string; name: string; role: string | null }>();
     const roomRows = await this.db.prepare(`
       SELECT r.project_id, r.id, r.capacity, (SELECT COUNT(*) FROM agents WHERE room_id = r.id) as used
-      FROM rooms r WHERE r.project_id IN (SELECT DISTINCT project_id FROM agents WHERE LOWER(name) LIKE ? OR LOWER(agent_id) LIKE ?) LIMIT ?`).bind(`%${lowerQuery}%`, `%${lowerQuery}%`, limit).all<{ project_id: string; id: string; capacity: number; used: number }>();
+      FROM rooms r WHERE r.project_id IN (SELECT DISTINCT project_id FROM federation_agents WHERE public_projection = 1 AND lifecycle_state != 'revoked' AND (LOWER(display_name) LIKE ? OR LOWER(agent_id) LIKE ?)) LIMIT ?`).bind(`%${lowerQuery}%`, `%${lowerQuery}%`, limit).all<{ project_id: string; id: string; capacity: number; used: number }>();
     return { agents: agentRows.results.map(r => ({ projectId: r.project_id, agentId: r.agent_id, name: r.name, role: r.role || undefined })), rooms: roomRows.results.map(r => ({ projectId: r.project_id, roomId: r.id, capacity: r.capacity, used: r.used })) };
   }
 

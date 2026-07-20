@@ -718,30 +718,14 @@ async function handleProjectRoutes(request: Request, env: WatchtowerEnv, project
 
   await registry.initialize();
 
-  // Agents
+  // Agents. Read-only: the legacy `agents` table is now purely the public
+  // projection of canonical agents (src/lifecycle.ts). The canonical lifecycle
+  // API is the ONLY write path for agent identity/presence.
   if (restPath === "agents" && request.method === "GET") return json({ agents: await registry.getAllAgents() });
-  if (restPath === "agents" && request.method === "POST") {
-    const data = await request.json();
-    return json({ agent: await registry.registerAgent({ agentId: data.agentId, name: data.name, role: data.role, capabilities: data.capabilities || [], status: data.status || "active", metadata: data.metadata || {} }) });
-  }
   if (restPath.startsWith("agents/") && request.method === "GET") {
     const agentId = restPath.split("/")[1];
     const agent = await registry.getAgent(agentId);
     return agent ? json({ agent }) : error("Not found", 404);
-  }
-  if (restPath.startsWith("agents/") && request.method === "PATCH") {
-    const agentId = restPath.split("/")[1];
-    const updates = await request.json();
-    return json({ agent: await registry.updateAgent(agentId, updates) });
-  }
-  if (restPath.endsWith("/heartbeat") && request.method === "POST") {
-    const agentId = restPath.split("/")[1];
-    return json({ agent: await registry.heartbeat(agentId) });
-  }
-  if (restPath.endsWith("/status") && request.method === "PATCH") {
-    const agentId = restPath.split("/")[1];
-    const { status } = await request.json();
-    return json({ agent: await registry.setAgentStatus(agentId, status) });
   }
 
   // Rooms

@@ -804,21 +804,24 @@
       }
     }
 
-    async registerAgent(agentData) {
-      try {
-        const res = await fetch(`${this.gatewayUrl}/api/projects/${this.projectId}/agents`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(agentData)
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        await this.fetchAgents();
-        return true;
-      } catch (e) {
-        console.error('[FederationTV] Failed to register agent:', e);
-        return false;
-      }
-    }
+    // Retired 2026-07-20 (registry unification): agents join only through the
+    // canonical lifecycle (federation.drdeeks.xyz/onboarding.html); the legacy
+    // direct-registration route no longer accepts writes.
+    // async registerAgent(agentData) {
+    //   try {
+    //     const res = await fetch(`${this.gatewayUrl}/api/projects/${this.projectId}/agents`, {
+    //       method: 'POST',
+    //       headers: { 'Content-Type': 'application/json' },
+    //       body: JSON.stringify(agentData)
+    //     });
+    //     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    //     await this.fetchAgents();
+    //     return true;
+    //   } catch (e) {
+    //     console.error('[FederationTV] Failed to register agent:', e);
+    //     return false;
+    //   }
+    // }
 
     setRoom(roomId = 'all', projectId = 'all') {
       this.roomId = roomId;
