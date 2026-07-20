@@ -12,7 +12,7 @@ test("accepts a bounded owner-bound canonical lifecycle manifest", () => {
   assert.deepEqual(validateLifecycleManifest(manifest()), {
     agentId: "build-01", displayName: "Build Runner", ownerId: "owner-01", projectId: "autopilot", role: "build",
     capabilities: ["build", "test"], identity: { avatarSeed: "build-01", paletteKey: "build", characterType: "runner" },
-    publicProjection: true, heartbeatSeconds: 1800, organizationId: undefined,
+    publicProjection: true, heartbeatSeconds: 1800, organizationId: undefined, lease: undefined,
   });
 });
 

@@ -6,7 +6,7 @@ import { RoomScene } from "./room-scene";
 import { ProjectGuardrail, type AlertDispatch } from "./project-guardrail";
 import { createMcpHandler } from "agents/mcp";
 import { createWatchtowerMcpServer, isIpAllowed, parseMcpCredential, toMcpPrincipal, verifyMcpApiKey } from "./mcp";
-import { handleLifecycleRequest } from "./lifecycle";
+import { handleLifecycleRequest, authenticateAgent } from "./lifecycle";
 import { handleManagementRequest } from "./management";
 import { alertWebhookFormat, buildAlertDelivery } from "./alert-webhook";
 import {
@@ -332,12 +332,16 @@ export default {
       if (leaseRequestMatch && method === "POST") {
         const projectId = validated(() => validateProjectId(leaseRequestMatch[1]));
         const { raw, value } = await readBoundedJson(request);
-        const producerId = await authenticateProducer(request, raw, env);
         const leaseRequest = validated(() => validateLeaseRequest(value));
         if (leaseRequest.projectId !== projectId) return error("projectId must match the request path", 400);
+        
+        // Authenticate the agent making the request (not just HMAC producer)
+        const agent = await authenticateAgent(request, env, projectId, leaseRequest.agentId);
+        if (!agent) return error("an active credential for this agent is required", 401);
+        
         if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
         const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
-        const result = await guardrail.requestLease(leaseRequest, producerId);
+        const result = await guardrail.requestLease(leaseRequest, `agent:${agent.id}`);
         return json(result, result.status === "active" ? 201 : 409);
       }
 
