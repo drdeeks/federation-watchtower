@@ -35,9 +35,20 @@ temp/
 Thumbs.db
 .idea/
 .vscode/
+.claude/
+CLAUDE.md
 *.swp
 *.swo
 
 # Generated release bundles; keep intentional releases in a release store.
 federation-*.tar.gz
 packages/*/*.tgz
+
+# Local reference material and large source-asset archives (not part of the deploy)
+skills-reference/
+brand/assets/
+# Legacy raster sprite sheets — the widget now draws agents/floor procedurally
+source/federation-tv-widget/public/sprites/
+
+# Local one-off debug/verification scripts (hardcoded dev ports/paths/tokens)
+/manage-drive.mjs

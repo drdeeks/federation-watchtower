@@ -7,10 +7,12 @@ import { ProjectGuardrail, type AlertDispatch } from "./project-guardrail";
 import { createMcpHandler } from "agents/mcp";
 import { createWatchtowerMcpServer, isIpAllowed, parseMcpCredential, toMcpPrincipal, verifyMcpApiKey } from "./mcp";
 import { handleLifecycleRequest } from "./lifecycle";
+import { handleManagementRequest } from "./management";
+import { alertWebhookFormat, buildAlertDelivery } from "./alert-webhook";
 import {
-  constantTimeEqual, hmacSha256Hex, sha256Hex, stableJson, validateAgentId,
+  constantTimeEqual, hmacSha256Hex, sha256Hex, validateAgentId,
   validateCommandAcknowledgement, validateControlledToolAuthorizationRequest, validateLeaseRequest, validateLeaseValidationRequest,
-  validateOperationalEvent, validateProjectId, validateValidationGateRequest,
+  validateOperationalEvent, validateProjectId, validateValidationGateRequest, ValidationError,
 } from "./watchtower";
 
 export { AgentRegistry } from "./agent-registry";
@@ -181,7 +183,7 @@ export default {
     // privileged surface is the token-protected operator console.
     if (isFederationHost) {
       if (path === "/") return Response.redirect(new URL("/federation.html", request.url), 302);
-      const allowed = path === "/" || path === "/federation.html" || path === "/operator.html" || path.startsWith("/brand/");
+      const allowed = path === "/" || path === "/federation.html" || path === "/operator.html" || path === "/onboarding.html" || path === "/manage.html" || path === "/tv-widget.js" || path.startsWith("/brand/");
       if ((method !== "GET" && method !== "HEAD") || !allowed) return error("not found", 404);
       return env.ASSETS.fetch(new Request(new URL(path, request.url), request));
     }
@@ -216,6 +218,14 @@ export default {
       const lifecycleResponse = await handleLifecycleRequest({ request, path, method, env, coordinator, json, readBoundedJson });
       if (lifecycleResponse) return lifecycleResponse;
 
+      // Operator god-view management (agents/rooms). Admin-token only.
+      if (path.startsWith("/api/v1/admin/")) {
+        const denied = requireAdmin(request, env);
+        if (denied) return denied;
+        const managementResponse = await handleManagementRequest({ request, path, method, env, json });
+        if (managementResponse) return managementResponse;
+      }
+
       // A public scene is a read-only projection. It contains location and
       // presentation provenance, never a credential or mutation capability.
       const sceneMatch = path.match(/^\/api\/v1\/public\/rooms\/([^/]+)\/scene$/);
@@ -225,6 +235,30 @@ export default {
         if (!room) return error("room not found", 404);
         const scene = env.ROOM_SCENE.get(env.ROOM_SCENE.idFromName(roomId)) as DurableObjectStub<RoomScene>;
         return json(await scene.snapshot());
+      }
+
+      // The outbound alert webhook is provable end-to-end: the queue consumer
+      // signs and POSTs each guardrail alert to WATCHTOWER_ALERT_WEBHOOK_URL.
+      // Pointing that URL at this self-hosted sink verifies the HMAC signature
+      // and appends an immutable receipt, so operators can see alerts actually
+      // arriving instead of trusting that the plumbing exists. Authentication is
+      // the shared alert-webhook secret, exactly as an external receiver would do.
+      if (path === "/api/v1/alert-sink" && method === "POST") {
+        const secret = env.WATCHTOWER_ALERT_WEBHOOK_SECRET;
+        if (!secret) return error("alert sink requires WATCHTOWER_ALERT_WEBHOOK_SECRET", 503);
+        const { raw, value } = await readBoundedJson(request);
+        const timestamp = request.headers.get("X-Watchtower-Timestamp") || "";
+        const provided = request.headers.get("X-Watchtower-Signature") || "";
+        const expected = `sha256=${await hmacSha256Hex(secret, `${timestamp}.${raw}`)}`;
+        if (!constantTimeEqual(provided, expected)) return error("invalid alert signature", 401);
+        const alert = value as AlertDispatch;
+        if (!alert || typeof alert.deliveryId !== "string" || typeof alert.projectId !== "string") return error("malformed alert payload", 400);
+        const deliveryId = request.headers.get("X-Watchtower-Delivery") || alert.deliveryId;
+        await env.DB.prepare(
+          "INSERT OR IGNORE INTO alert_webhook_receipts (delivery_id, project_id, incident_id, event_id, agent_id, severity, action, statement, reason, signature_valid, received_at, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)"
+        ).bind(deliveryId, alert.projectId, alert.incidentId ?? null, alert.eventId ?? null, alert.agentId ?? null, alert.severity ?? null, alert.action ?? null, alert.statement ?? null, alert.reason ?? null, Date.now(), raw).run();
+        console.log({ event: "watchtower.alert.received", deliveryId, projectId: alert.projectId });
+        return json({ received: true, deliveryId }, 202);
       }
 
       // ==================== REMOTE MCP GATEWAY ====================
@@ -552,8 +586,9 @@ export default {
 
       return error("Not found", 404);
     } catch (e) {
-      console.error("Worker error:", e);
       if (e instanceof HttpError) return error(e.message, e.status);
+      if (e instanceof ValidationError) return error(e.message, 400);
+      console.error("Worker error:", e);
       return json({ error: "internal server error" }, 500);
     }
   },
@@ -578,16 +613,8 @@ export default {
 
       try {
         const webhookUrl = alertWebhookUrl(configuredUrl);
-        const body = stableJson(alert);
-        const timestamp = Math.floor(Date.now() / 1_000).toString();
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          "X-Watchtower-Delivery": alert.deliveryId,
-          "X-Watchtower-Timestamp": timestamp,
-        };
-        if (env.WATCHTOWER_ALERT_WEBHOOK_SECRET) {
-          headers["X-Watchtower-Signature"] = `sha256=${await hmacSha256Hex(env.WATCHTOWER_ALERT_WEBHOOK_SECRET, `${timestamp}.${body}`)}`;
-        }
+        const format = alertWebhookFormat(env.WATCHTOWER_ALERT_WEBHOOK_FORMAT);
+        const { body, headers } = await buildAlertDelivery(alert, format, env.WATCHTOWER_ALERT_WEBHOOK_SECRET);
         const response = await fetch(webhookUrl, { method: "POST", headers, body });
         if (!response.ok) throw new Error(`webhook returned HTTP ${response.status}`);
         await guardrail.updateNotification(alert.deliveryId, "delivered");

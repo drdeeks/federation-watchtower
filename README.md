@@ -252,7 +252,17 @@ Watchtower has two independent webhook roles:
 | Direction | Purpose | Current behavior |
 | --- | --- | --- |
 | **Inbound presence/event webhook** | An agent package, CI job, scheduler, or integration posts a signed operational event such as `heartbeat`, `run.started`, `run.failed`, or a validation result. | The existing signed `/api/v1/events` ingress validates the timestamp and HMAC, deduplicates the event, persists it, and arms the per-agent watchdog when the event is a heartbeat. |
-| **Outbound incident webhook** | Watchtower notifies an organization’s chosen endpoint about a watchdog, budget, validation, or control incident. | A Durable Object records the notification, a Queue delivers it, and optional HMAC signing adds delivery, timestamp, and signature headers. No configured destination means a safely recorded `suppressed` delivery, not an accidental outbound request. |
+| **Outbound incident webhook** | Watchtower notifies an organization’s chosen endpoint about a watchdog, budget, validation, or control incident. | A Durable Object records the notification, a Queue delivers it with bounded retries and a dead-letter path, and `WATCHTOWER_ALERT_WEBHOOK_FORMAT` selects the payload: `slack`/`discord` post a readable one-line alert to a channel’s incoming-webhook URL, while `json` (default) posts an HMAC-signed envelope a custom receiver verifies. No configured destination means a safely recorded `suppressed` delivery, not an accidental outbound request. |
+
+To receive incident notifications in Slack or Discord, create an incoming-webhook
+URL for the channel, set it as the `WATCHTOWER_ALERT_WEBHOOK_URL` secret, and set
+`WATCHTOWER_ALERT_WEBHOOK_FORMAT` to `slack` or `discord`; the channel URL is the
+credential, so no signing secret is required. When a watchdog, budget,
+validation, or control incident fires, the queue delivers a readable alert to
+that channel. The default `json` format instead posts a signed envelope that a
+self-hosted receiver (`POST /api/v1/alert-sink`) verifies and records as an
+immutable receipt, surfaced read-only in the operator console. The format set is
+intentionally small so further destinations can be added behind the same switch.
 
 Canonical registration stores a per-agent heartbeat deadline from 30–3600
 seconds (use 1800 seconds for a 30-minute async grace). Every accepted

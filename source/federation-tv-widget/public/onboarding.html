@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Onboarding — Federation Watchtower</title>
+  <link rel="stylesheet" href="/brand/tokens.css">
+  <style>
+    :root { color-scheme: dark; font-family: var(--fed-mono, ui-monospace, SFMono-Regular, Menlo, monospace); background:#101819; color:#edf8f3; }
+    * { box-sizing:border-box; } body { margin:0; min-width:320px; background:linear-gradient(140deg,#101819,#152325 48%,#131718); }
+    a { color:#f4c842; }
+    header { display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:18px clamp(16px,4vw,48px); border-bottom:2px solid #90cbbc; background:#172324; }
+    header img { width:min(300px,60vw); }
+    main { width:min(1080px,100%); margin:auto; padding:22px clamp(14px,3vw,44px) 64px; }
+    h1 { margin:34px 0 8px; font:800 clamp(2rem,6vw,3.6rem)/.95 var(--fed-display,system-ui); text-transform:uppercase; }
+    .lead { color:#bdd4ce; line-height:1.6; max-width:70ch; }
+    .model { margin-top:20px; padding:16px 18px; border:1px solid #3f7168; border-left:4px solid #f4c842; background:#16241f; color:#c9dfd8; line-height:1.55; font-size:.86rem; }
+    .model b { color:#f4c842; }
+    .step { margin-top:22px; border:1px solid #547f78; background:#192727; box-shadow:5px 5px 0 #050909; }
+    .step > h2 { margin:0; padding:13px 16px; border-bottom:1px solid #527f76; background:#213433; font-size:.9rem; text-transform:uppercase; letter-spacing:.08em; display:flex; align-items:center; gap:10px; }
+    .step .body { padding:16px; }
+    .step[aria-disabled=true] { opacity:.5; }
+    .step[aria-disabled=true] .body { pointer-events:none; }
+    .num { display:inline-grid; place-items:center; width:26px; height:26px; background:#f4c842; color:#11201d; font-weight:800; border-radius:50%; }
+    .done .num { background:#91dcaf; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .grid .full { grid-column:1/-1; }
+    label { display:grid; gap:5px; color:#b9d4cf; font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; }
+    input, select, textarea, button { min-height:38px; border:1px solid #84b8ad; border-radius:0; font:inherit; }
+    input, select, textarea { width:100%; color:#eff8f4; background:#0e1717; padding:8px 10px; }
+    textarea { min-height:60px; resize:vertical; }
+    small.hint { color:#8fb1aa; font-size:.66rem; text-transform:none; letter-spacing:0; }
+    button { cursor:pointer; color:#11201d; background:#f4c842; padding:8px 14px; font-weight:800; }
+    button:hover { background:#ffe179; } button.secondary { background:#9bd4c7; } button.ghost { background:#22403a; color:#dff5ee; border-color:#5f9186; }
+    button.danger { background:#e57967; } button:disabled { opacity:.5; cursor:not-allowed; }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; align-items:center; }
+    .msg { margin-top:12px; font-size:.8rem; line-height:1.5; overflow-wrap:anywhere; }
+    .msg.error { color:#ff9582; } .msg.ok { color:#91dcaf; }
+    .token { margin-top:12px; padding:12px; border:1px dashed #f4c842; background:#0e1717; }
+    .token span { display:block; color:#f4c842; font-size:.66rem; text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; }
+    .token .reveal { display:flex; gap:8px; align-items:center; }
+    .token input { font-size:.78rem; }
+    .token p { margin:8px 0 0; color:#e8b98f; font-size:.72rem; }
+    fieldset { border:1px solid #3f7168; margin:0 0 12px; padding:12px; }
+    legend { color:#9fc5bd; font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; padding:0 6px; }
+    .proof, .qa { display:grid; grid-template-columns:150px 1fr auto; gap:8px; margin-bottom:8px; align-items:end; }
+    .qa { grid-template-columns:1fr; }
+    .log { margin-top:14px; max-height:300px; overflow:auto; border:1px solid #35554f; background:#0c1413; padding:10px; font-size:.74rem; line-height:1.5; }
+    .log .entry { padding:6px 0; border-bottom:1px solid #22332f; overflow-wrap:anywhere; }
+    .log .entry:last-child { border:0; }
+    .log .t { color:#8fb1aa; } .log .k { color:#f4c842; } .log .g { color:#91dcaf; } .log .b { color:#ff9582; }
+    .watchlink { margin-top:14px; display:inline-block; font-weight:800; }
+    .note { margin-top:10px; color:#8fb1aa; font-size:.72rem; line-height:1.5; }
+    .confirm { text-align:center; padding:30px 16px; }
+    .confirm h3 { color:#91dcaf; font:800 1.4rem var(--fed-display,system-ui); margin:0 0 10px; }
+    @media (max-width:720px){ .grid{ grid-template-columns:1fr; } .proof{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="/brand/federation-wordmark.svg" alt="Federation Watchtower">
+    <nav class="fed-nav" aria-label="Primary">
+      <a href="https://watch.drdeeks.xyz/">Watch</a>
+      <a href="/federation.html">Federation</a>
+      <a href="https://watch.drdeeks.xyz/organization.html">Organization</a>
+      <a href="/onboarding.html" aria-current="page">Onboarding</a>
+    </nav>
+  </header>
+  <main>
+    <h1>Self-serve onboarding</h1>
+    <p class="lead">Create an owner, register a real agent, and drive its live loop — connect, heartbeat, emit real operational events, disconnect — straight from this page. Every call hits the real Federation control plane; nothing here is faked.</p>
+
+    <div class="model">
+      <b>How this works in production:</b> for durable, hands-off operation your agent installs the
+      <b>@federation-watchtower/sdk</b> package and calls <code>connect / heartbeat / emit</code> from inside its own task loop.
+      Each heartbeat arms a watchdog deadline (your chosen interval, 30–3600s); if your agent stops calling, the watchdog marks it
+      <b>offline</b> and it drops off the Watchtower, then reappears when it heartbeats again. Guardrail leases, validation gates,
+      and tool authorization can deny your next action. The controls below drive those same endpoints live so you can watch it happen.
+    </div>
+
+    <!-- STEP 1 · OWNER -->
+    <section class="step" id="step1">
+      <h2><span class="num">1</span> Create an owner</h2>
+      <div class="body">
+        <div class="grid">
+          <label>Owner ID <input id="ownerId" placeholder="acme-ops" autocomplete="off" spellcheck="false"><small class="hint">letters, digits, . _ : - (start alphanumeric)</small></label>
+          <label>Display name <input id="ownerName" placeholder="Acme Ops" autocomplete="off"></label>
+          <label>Owner type <select id="ownerType"><option value="individual">individual</option><option value="organization">organization</option></select></label>
+        </div>
+        <div class="actions"><button id="createOwner">Create owner</button></div>
+        <div class="msg" id="ownerMsg" role="status"></div>
+        <div class="token" id="ownerToken" hidden>
+          <span>Owner credential · shown once — store it now</span>
+          <div class="reveal"><input id="ownerTokenValue" readonly><button type="button" class="secondary" data-copy="ownerTokenValue">Copy</button></div>
+          <p>This scoped <code>fw_owner_</code> token registers agents and submits organization applications for this owner. It is never an admin or ingestion secret — never paste one of those here.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2 · AGENT -->
+    <section class="step" id="step2" aria-disabled="true">
+      <h2><span class="num">2</span> Register an agent</h2>
+      <div class="body">
+        <div class="grid">
+          <label>Agent ID <input id="agentId" placeholder="build-runner-1" autocomplete="off" spellcheck="false"></label>
+          <label>Display name <input id="agentName" placeholder="Build Runner" autocomplete="off"></label>
+          <label>Project ID <input id="projectId" placeholder="acme-autopilot" autocomplete="off" spellcheck="false"><small class="hint">lowercase letters, digits, hyphens</small></label>
+          <label>Role <input id="agentRole" placeholder="build" autocomplete="off"></label>
+          <label>Capabilities <input id="capabilities" placeholder="build,test" autocomplete="off"><small class="hint">comma-separated, 1–16, unique</small></label>
+          <label>Heartbeat interval (s) <input id="heartbeat" type="number" min="30" max="3600" value="60"></label>
+          <label>Palette <select id="paletteKey"></select></label>
+          <label>Character <select id="characterType"></select></label>
+          <label class="full" style="flex-direction:row;display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;color:#dff5ee;">
+            <input id="publicProjection" type="checkbox" checked style="width:auto;min-height:auto;">
+            Show this agent's real status and events on the public Watchtower (owner consent)
+          </label>
+        </div>
+        <div class="actions"><button id="createAgent">Register agent</button></div>
+        <div class="msg" id="agentMsg" role="status"></div>
+        <div class="token" id="agentToken" hidden>
+          <span>Agent credential · shown once — store it now</span>
+          <div class="reveal"><input id="agentTokenValue" readonly><button type="button" class="secondary" data-copy="agentTokenValue">Copy</button></div>
+          <p>Give this scoped <code>fw_agent_</code> token to your agent host / SDK. It can connect, heartbeat, emit events, and disconnect for this one agent.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3 · LIVE LOOP -->
+    <section class="step" id="step3" aria-disabled="true">
+      <h2><span class="num">3</span> Run the live loop</h2>
+      <div class="body">
+        <p class="note">Pick a real operational action and trigger it. Manual fires once; auto-interval heartbeats + emits on a timer (stop it and the watchdog takes the agent offline); one-shot plays the whole loop end to end. The persisted per-agent action catalog is still to come — for now these select from the approved event set at runtime.</p>
+        <div class="grid">
+          <label>Action (event type) <select id="eventType"></select></label>
+          <label>Severity <select id="severity"><option>info</option><option>success</option><option>warning</option><option>error</option><option>critical</option></select></label>
+          <label class="full">Statement (≤120 chars) <input id="statement" maxlength="120" value="Self-serve loop demo — live from the browser"></label>
+          <label>Auto-interval (s) <input id="loopInterval" type="number" min="5" max="3600" value="30"></label>
+        </div>
+        <div class="actions">
+          <button id="btnConnect" class="ghost">Connect</button>
+          <button id="btnHeartbeat" class="ghost">Heartbeat</button>
+          <button id="btnEmit">Emit action now</button>
+          <button id="btnAuto" class="secondary">Start auto loop</button>
+          <button id="btnOneshot" class="secondary">Run one-shot full loop</button>
+          <button id="btnDisconnect" class="danger">Disconnect</button>
+        </div>
+        <a class="watchlink" id="watchLink" href="https://watch.drdeeks.xyz/" target="_blank" rel="noopener" hidden>View your agent live on the Watchtower →</a>
+        <div class="log" id="log" role="log" aria-live="polite" aria-label="Live loop activity"></div>
+      </div>
+    </section>
+
+    <!-- STEP 4 · ORGANIZATION APPLICATION -->
+    <section class="step" id="step4" aria-disabled="true">
+      <h2><span class="num">4</span> Organization application <small class="hint" style="text-transform:none;letter-spacing:0;">(optional)</small></h2>
+      <div class="body" id="orgBody">
+        <p class="note">Submitting as owner <b id="orgOwnerLabel">—</b>. An application needs a verified contact, an official HTTPS site, two or more non-GitHub social proofs, and exactly five technical questions and answers.</p>
+        <div class="grid">
+          <label>Organization ID <input id="orgId" placeholder="acme-labs" autocomplete="off" spellcheck="false"></label>
+          <label>Name <input id="orgName" placeholder="Acme Labs" autocomplete="off"></label>
+          <label>Contact email <input id="orgEmail" type="email" placeholder="ops@acme.example" autocomplete="off"></label>
+          <label>Official URL (HTTPS) <input id="orgUrl" placeholder="https://acme.example" autocomplete="off" spellcheck="false"></label>
+        </div>
+        <fieldset>
+          <legend>Social proofs (2+ · non-GitHub · HTTPS · unique)</legend>
+          <div id="proofs"></div>
+          <button type="button" class="ghost" id="addProof">+ Add proof</button>
+        </fieldset>
+        <fieldset>
+          <legend>Five technical questions &amp; answers</legend>
+          <div id="qas"></div>
+        </fieldset>
+        <div class="actions"><button id="submitOrg">Submit application</button></div>
+        <div class="msg" id="orgMsg" role="status"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+    const $ = id => document.getElementById(id);
+    const API = (new URLSearchParams(location.search).get('api') || (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'http://localhost:8787' : 'https://fapi.drdeeks.xyz')).replace(/\/$/, '');
+    const WATCH = 'https://watch.drdeeks.xyz/';
+    const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
+
+    // Approved sets mirrored from the server (source of truth). Non-matching input is rejected server-side.
+    const EVENT_TYPES = ["run.started","run.completed","run.failed","heartbeat","validation.passed","validation.failed","policy.blocked","tool.authorized","tool.denied","lease.denied","loop.depth_exceeded","loop.duplicate_detected","attempt.threshold_exceeded","fanout.threshold_exceeded","heartbeat.missed","duration.threshold_exceeded","budget.warning","budget.exceeded","rate.threshold_exceeded","incident.opened","incident.acknowledged","containment.requested","containment.acknowledged","incident.resolved"];
+    const PALETTES = ["operator","build","testing","analysis","security","support","observer"];
+    const CHARACTERS = ["operator","observer","runner","watchdog"];
+
+    // In-memory only. Never persisted to storage.
+    const S = { ownerToken: null, ownerId: null, agentToken: null, agentId: null, projectId: null, roomId: null, auto: null };
+
+    function fillSelect(el, values) { el.innerHTML = values.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join(''); }
+    fillSelect($('paletteKey'), PALETTES); fillSelect($('characterType'), CHARACTERS); fillSelect($('eventType'), EVENT_TYPES);
+    $('paletteKey').value = 'build'; $('characterType').value = 'runner';
+
+    function setMsg(id, text, kind) { const el = $(id); el.textContent = text || ''; el.className = 'msg' + (kind ? ' ' + kind : ''); }
+    function enableStep(step, on) { const s = $(step); if (on) s.setAttribute('aria-disabled','false'); else s.setAttribute('aria-disabled','true'); }
+    function markDone(step) { $(step).classList.add('done'); }
+    function reveal(tokenBox, valueId, token) { $(tokenBox).hidden = false; $(valueId).value = token; }
+
+    async function api(path, { token, body } = {}) {
+      const headers = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (body !== undefined) headers['Content-Type'] = 'application/json';
+      const res = await fetch(`${API}${path}`, { method: 'POST', headers, body: body !== undefined ? JSON.stringify(body) : undefined });
+      const ct = res.headers.get('content-type') || '';
+      const data = ct.includes('application/json') ? await res.json() : await res.text();
+      if (!res.ok) throw new Error(typeof data === 'object' ? (data.error || `HTTP ${res.status}`) : (data || `HTTP ${res.status}`));
+      return data;
+    }
+
+    // ---- copy buttons ----
+    document.addEventListener('click', e => {
+      const b = e.target.closest('button[data-copy]'); if (!b) return;
+      const input = $(b.dataset.copy); input.select();
+      navigator.clipboard?.writeText(input.value).then(() => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1200); }).catch(() => {});
+    });
+
+    // ---- log ----
+    function log(kind, text, cls) {
+      const entry = document.createElement('div');
+      entry.className = 'entry';
+      entry.innerHTML = `<span class="t">${new Date().toLocaleTimeString([], { hour12:false })}</span> <span class="k">${esc(kind)}</span> <span class="${cls || ''}">${esc(text)}</span>`;
+      $('log').insertBefore(entry, $('log').firstChild);
+    }
+
+    // ---- STEP 1 ----
+    $('createOwner').addEventListener('click', async () => {
+      const btn = $('createOwner'); btn.disabled = true; setMsg('ownerMsg', 'Creating owner…');
+      try {
+        const data = await api('/api/v1/owners', { body: {
+          ownerId: $('ownerId').value.trim(), displayName: $('ownerName').value.trim(), ownerType: $('ownerType').value
+        }});
+        S.ownerToken = data.credential.token; S.ownerId = data.owner.ownerId;
+        reveal('ownerToken', 'ownerTokenValue', S.ownerToken);
+        setMsg('ownerMsg', `Owner "${S.ownerId}" created.`, 'ok');
+        markDone('step1'); enableStep('step2', true); enableStep('step4', true);
+        if (!$('agentId').value) $('agentId').value = '';
+        $('orgOwnerLabel').textContent = S.ownerId;
+      } catch (err) { setMsg('ownerMsg', err.message, 'error'); }
+      finally { btn.disabled = false; }
+    });
+
+    // ---- STEP 2 ----
+    $('createAgent').addEventListener('click', async () => {
+      if (!S.ownerToken) return setMsg('agentMsg', 'Create an owner first.', 'error');
+      const btn = $('createAgent'); btn.disabled = true; setMsg('agentMsg', 'Registering agent…');
+      const caps = $('capabilities').value.split(',').map(s => s.trim()).filter(Boolean);
+      const agentId = $('agentId').value.trim();
+      try {
+        const data = await api('/api/v1/agents', { token: S.ownerToken, body: {
+          agentId, displayName: $('agentName').value.trim(), ownerId: S.ownerId,
+          projectId: $('projectId').value.trim(), role: $('agentRole').value.trim(),
+          capabilities: caps,
+          identity: { avatarSeed: agentId, paletteKey: $('paletteKey').value, characterType: $('characterType').value },
+          publicProjection: $('publicProjection').checked,
+          heartbeat: { intervalSeconds: Number($('heartbeat').value) }
+        }});
+        S.agentToken = data.credential.token; S.agentId = data.agent.agentId; S.projectId = data.agent.projectId; S.roomId = data.agent.roomId || null;
+        reveal('agentToken', 'agentTokenValue', S.agentToken);
+        setMsg('agentMsg', `Agent "${S.agentId}" registered in project "${S.projectId}".`, 'ok');
+        markDone('step2'); enableStep('step3', true);
+        if (S.roomId || $('publicProjection').checked) { const l = $('watchLink'); l.hidden = false; }
+      } catch (err) { setMsg('agentMsg', err.message, 'error'); }
+      finally { btn.disabled = false; }
+    });
+
+    // ---- STEP 3 : live loop ----
+    function requireAgent() { if (!S.agentToken) throw new Error('Register an agent first.'); }
+    async function lifecycle(action, extra) {
+      requireAgent();
+      const data = await api(`/api/v1/agents/${encodeURIComponent(S.agentId)}/${action}`, { token: S.agentToken, body: { projectId: S.projectId, ...(extra || {}) } });
+      return data;
+    }
+    async function doConnect() {
+      try { const d = await lifecycle('connect'); log('connect', `state=${d.agent?.lifecycleState || 'connected'} · watchdog ${d.watchdogDeadlineAt ? new Date(d.watchdogDeadlineAt).toLocaleTimeString([], {hour12:false}) : '—'}`, 'g'); $('watchLink').hidden = false; }
+      catch (err) { log('connect', err.message, 'b'); }
+    }
+    async function doHeartbeat() {
+      try { const d = await lifecycle('heartbeat'); log('heartbeat', `deadline ${d.watchdogDeadlineAt ? new Date(d.watchdogDeadlineAt).toLocaleTimeString([], {hour12:false}) : '—'}`, 'g'); }
+      catch (err) { log('heartbeat', err.message, 'b'); }
+    }
+    async function doEmit() {
+      try {
+        const d = await lifecycle('events', { eventType: $('eventType').value, severity: $('severity').value, statement: $('statement').value.trim() });
+        const guard = d.guardrail ? ` · guardrail ${d.guardrail.duplicate ? 'duplicate' : (d.guardrail.decisions?.length ? d.guardrail.decisions.map(x => x.action).join(',') : 'observe')}` : '';
+        log('emit ' + $('eventType').value, `accepted=${d.accepted !== false}${guard}`, 'g');
+      } catch (err) { log('emit', err.message, 'b'); }
+    }
+    async function doDisconnect() {
+      stopAuto();
+      try { const d = await lifecycle('disconnect'); log('disconnect', `state=${d.agent?.lifecycleState || 'offline'}`, 'g'); }
+      catch (err) { log('disconnect', err.message, 'b'); }
+    }
+    function stopAuto() {
+      if (S.auto) { clearInterval(S.auto); S.auto = null; $('btnAuto').textContent = 'Start auto loop'; $('btnAuto').classList.remove('danger'); $('btnAuto').classList.add('secondary'); }
+    }
+    function startAuto() {
+      const secs = Math.max(5, Number($('loopInterval').value) || 30);
+      log('auto', `started · every ${secs}s (stop to let the watchdog take it offline)`, 'g');
+      const tick = async () => { await doHeartbeat(); await doEmit(); };
+      tick();
+      S.auto = setInterval(tick, secs * 1000);
+      $('btnAuto').textContent = 'Stop auto loop'; $('btnAuto').classList.remove('secondary'); $('btnAuto').classList.add('danger');
+    }
+    async function oneShot() {
+      stopAuto(); log('one-shot', 'sequence started', 'g');
+      await doConnect(); await sleep(700); await doHeartbeat(); await sleep(700); await doEmit(); await sleep(1200); await doDisconnect();
+      log('one-shot', 'sequence complete', 'g');
+    }
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    $('btnConnect').addEventListener('click', doConnect);
+    $('btnHeartbeat').addEventListener('click', doHeartbeat);
+    $('btnEmit').addEventListener('click', doEmit);
+    $('btnDisconnect').addEventListener('click', doDisconnect);
+    $('btnOneshot').addEventListener('click', () => { $('btnOneshot').disabled = true; oneShot().finally(() => $('btnOneshot').disabled = false); });
+    $('btnAuto').addEventListener('click', () => { if (S.auto) stopAuto(); else startAuto(); });
+    window.addEventListener('beforeunload', stopAuto);
+
+    // ---- STEP 4 : organization application ----
+    function proofRow() {
+      const div = document.createElement('div'); div.className = 'proof';
+      div.innerHTML = `<label>Platform <input class="p-plat" placeholder="linkedin" autocomplete="off"></label><label>URL (HTTPS) <input class="p-url" placeholder="https://…" autocomplete="off" spellcheck="false"></label><button type="button" class="danger p-del" title="Remove">✕</button>`;
+      div.querySelector('.p-del').addEventListener('click', () => div.remove());
+      return div;
+    }
+    $('addProof').addEventListener('click', () => $('proofs').appendChild(proofRow()));
+    $('proofs').appendChild(proofRow()); $('proofs').appendChild(proofRow());
+    for (let i = 1; i <= 5; i++) {
+      const div = document.createElement('div'); div.className = 'qa';
+      div.innerHTML = `<label>Question ${i} <input class="q-q" maxlength="500" autocomplete="off"></label><label>Answer ${i} <textarea class="q-a" maxlength="2000"></textarea></label>`;
+      $('qas').appendChild(div);
+    }
+    $('submitOrg').addEventListener('click', async () => {
+      if (!S.ownerToken) return setMsg('orgMsg', 'Create an owner first (Step 1).', 'error');
+      const btn = $('submitOrg'); btn.disabled = true; setMsg('orgMsg', 'Submitting application…');
+      const socialProofs = [...document.querySelectorAll('#proofs .proof')]
+        .map(r => ({ platform: r.querySelector('.p-plat').value.trim(), url: r.querySelector('.p-url').value.trim() }))
+        .filter(p => p.platform || p.url);
+      const technicalQuestions = [...document.querySelectorAll('#qas .qa')]
+        .map(r => ({ question: r.querySelector('.q-q').value.trim(), answer: r.querySelector('.q-a').value.trim() }));
+      try {
+        const data = await api('/api/v1/organizations/applications', { token: S.ownerToken, body: {
+          organizationId: $('orgId').value.trim(), name: $('orgName').value.trim(),
+          contactEmail: $('orgEmail').value.trim(), officialUrl: $('orgUrl').value.trim(),
+          socialProofs, technicalQuestions
+        }});
+        $('orgBody').innerHTML = `<div class="confirm"><h3>We appreciate your interest</h3><p class="lead" style="margin:auto">Your organization application for <b>${esc(data.application.organizationId)}</b> was received (status: <b>${esc(data.application.status)}</b>). We'll review your proofs and answers and get back to you as soon as possible.</p></div>`;
+        markDone('step4');
+      } catch (err) { setMsg('orgMsg', err.message, 'error'); btn.disabled = false; }
+    });
+  </script>
+</body>
+</html>

@@ -167,6 +167,47 @@ export class FederationAgentClient {
   }
 }
 
+/**
+ * Owner-scoped registration client. Unlike WatchtowerClient it never receives
+ * the shared ingestion secret; unlike FederationAgentClient it can create the
+ * owner and register the agent, then hand back a ready lifecycle client. It
+ * mirrors the live onboarding flow (POST /api/v1/owners, POST /api/v1/agents),
+ * not the legacy administrative registration route.
+ */
+export class FederationOwnerClient {
+  constructor(options) {
+    if (!options || typeof options.ownerToken !== "string" || !options.ownerToken.startsWith("fw_owner_")) throw new TypeError("an fw_owner_ scoped owner token is required");
+    this.gateway = (options.gateway ?? DEFAULT_GATEWAY).replace(/\/+$/, "");
+    this.ownerToken = options.ownerToken;
+    this.ownerId = options.ownerId;
+    this.fetch = options.fetch ?? globalThis.fetch;
+    if (typeof this.fetch !== "function") throw new TypeError("a fetch implementation is required");
+  }
+
+  static async createOwner(options) {
+    const gateway = (options?.gateway ?? DEFAULT_GATEWAY).replace(/\/+$/, "");
+    const doFetch = options?.fetch ?? globalThis.fetch;
+    if (typeof doFetch !== "function") throw new TypeError("a fetch implementation is required");
+    const body = stableJson({ ownerId: options.ownerId, displayName: options.displayName, ownerType: options.ownerType });
+    const response = await doFetch(`${gateway}/api/v1/owners`, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+    const result = await parseResponse(response);
+    if (!response.ok) throw new WatchtowerApiError(response.status, result);
+    const client = new FederationOwnerClient({ gateway, ownerToken: result.credential.token, ownerId: result.owner.ownerId, fetch: doFetch });
+    return { owner: result.owner, credential: result.credential, client };
+  }
+
+  async registerAgent(manifest) {
+    const body = stableJson(manifest);
+    const response = await this.fetch(`${this.gateway}/api/v1/agents`, {
+      method: "POST", headers: { "Authorization": `Bearer ${this.ownerToken}`, "Content-Type": "application/json" }, body,
+    });
+    const result = await parseResponse(response);
+    if (!response.ok) throw new WatchtowerApiError(response.status, result);
+    const client = new FederationAgentClient({ gateway: this.gateway, agentToken: result.credential.token, projectId: result.agent.projectId, agentId: result.agent.agentId, fetch: this.fetch });
+    return { agent: result.agent, credential: result.credential, next: result.next, client };
+  }
+}
+
 async function parseResponse(response) {
   const text = await response.text();
   if (!text) return undefined;
