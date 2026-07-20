@@ -1,0 +1,23 @@
+{
+  "description": "Functional tests for crew-config-manager.py",
+  "tests": [
+    {
+      "description": "Shows help with --help flag",
+      "args": ["--help"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["crew-config-manager", "list", "switch", "create"],
+        "stderr_empty": true
+      }
+    },
+    {
+      "description": "Lists crews with list command",
+      "args": ["list"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["Crew ID", "Config dir", "Workspace root", "Active crew"],
+        "stderr_empty": true
+      }
+    }
+  ]
+}

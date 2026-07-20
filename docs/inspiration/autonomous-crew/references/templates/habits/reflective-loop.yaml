@@ -1,0 +1,40 @@
+name: "reflective-loop"
+version: "1.0.0"
+type: "internalized_habit"
+description: "Mandatory reflection after tool execution and on completion claims. Logs insights to memory pipeline."
+
+triggers:
+  - event: "after_tool_invocation"
+    priority: 50
+  - event: "completion_claimed"
+    priority: 100
+  - event: "heartbeat_received"
+    priority: 75
+
+behavior:
+  steps:
+    - "Question: Did the tool actually accomplish the stated intent?"
+    - "Question: Are there validation tests that should run?"
+    - "Question: Did I hardcode anything that should be configurable?"
+    - "Question: What would the next agent inheriting this work need to know?"
+    - "Log insight/decision/error to memory pipeline via memory-log.sh"
+    - "Update knowledge index with new [[wikilinks]] if discovered"
+    - "Update habit metrics in .agent/metrics/"
+  timeout_seconds: 5
+
+enforcement:
+  level: "reflection_required"
+  on_violation:
+    - "Log incomplete reflection to .agent/logs/habit-violations.jsonl"
+    - "Require explicit reflection before next tool invocation"
+    - "Mark completion claim as ungated"
+
+auto_fix: {}
+
+metrics:
+  - "reflections_completed"
+  - "insights_logged"
+  - "decisions_logged"
+  - "errors_logged"
+  - "completion_claims_gated"
+  - "completion_claims_ungated"

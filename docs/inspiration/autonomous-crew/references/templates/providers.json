@@ -1,0 +1,65 @@
+{
+  "version": "1.0.0",
+  "description": "Provider and model configuration for crew-manager.py",
+  
+  "providers": {
+    "dashscope": {
+      "name": "DashScope (Alibaba Cloud)",
+      "api_base": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "env_key": "DASHSCOPE_API_KEY",
+      "models": {
+        "text": ["qwen3-max-preview", "qwen-plus-latest", "qwen3-235b-a22b-thinking-2507", "qwen-turbo-latest"],
+        "vision": ["qwen-vl-plus-latest", "qwen-vl-max-latest"],
+        "embedding": ["text-embedding-v3"]
+      }
+    },
+    "openai": {
+      "name": "OpenAI",
+      "api_base": "https://api.openai.com/v1",
+      "env_key": "OPENAI_API_KEY",
+      "models": {
+        "text": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
+        "vision": ["gpt-4o", "gpt-4-turbo"],
+        "embedding": ["text-embedding-3-large", "text-embedding-3-small"]
+      }
+    },
+    "anthropic": {
+      "name": "Anthropic",
+      "api_base": "https://api.anthropic.com/v1",
+      "env_key": "ANTHROPIC_API_KEY",
+      "models": {
+        "text": ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
+        "vision": ["claude-3-5-sonnet-20241022"],
+        "embedding": []
+      }
+    },
+    "local": {
+      "name": "Local (llama.cpp / Ollama)",
+      "api_base": "http://localhost:11434/v1",
+      "env_key": "",
+      "models": {
+        "text": ["qwen3-14b", "qwen3-4b", "qwen3-coder-flash-202507"],
+        "vision": [],
+        "embedding": ["nomic-embed-text"]
+      }
+    }
+  },
+  
+  "role_model_mapping": {
+    "lead": "reasoning",
+    "creative": "creative",
+    "reasoning": "reasoning", 
+    "general": "general",
+    "edge": "edge",
+    "vision": "vision",
+    "embedding": "embedding"
+  },
+  
+  "quota_tracking": {
+    "enabled": true,
+    "model_json_path": "${WORKSPACE_ROOT}/model.json",
+    "rotation_strategy": "round_robin",
+    "per_model_limit": 1000000,
+    "fallback": "model-not-configured"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "description": "Maps each crew agent to a model ROLE and an execution profile handle. Provider/platform AGNOSTIC: no model IDs, provider names, API keys, or absolute paths. Concrete model+provider resolved by the profile (or MODEL_ROLE_<ROLE> env).",
+  "resolution": {
+    "method": "profile",
+    "note": "Each agent_id maps to 'profile' (the platform runtime binding carrying model+provider). Env override: MODEL_ROLE_<ROLE>='model:provider'.",
+    "env_overrides": {
+      "MODEL_ROLE_REASONING": "optional: 'model:provider'",
+      "MODEL_ROLE_CODING": "optional: 'model:provider'",
+      "MODEL_ROLE_CREATIVE": "optional: 'model:provider'",
+      "MODEL_ROLE_GENERAL": "optional: 'model:provider'",
+      "MODEL_ROLE_EDGE": "optional: 'model:provider'"
+    }
+  },
+  "roles": {
+    "reasoning": "Complex reasoning, architecture, memory/analysis",
+    "coding": "Code generation and implementation",
+    "creative": "Creative writing and generative content",
+    "general": "General collaboration, planning, oversight",
+    "edge": "Lightweight edge inference"
+  },
+  "agents": {
+    "EXAMPLE-lead-1":      { "role": "reasoning", "profile": "EXAMPLE-lead" },
+    "EXAMPLE-ingestion-1": { "role": "coding",    "profile": "EXAMPLE-ingestion" },
+    "EXAMPLE-recall-1":    { "role": "reasoning", "profile": "EXAMPLE-memory" }
+  }
+}

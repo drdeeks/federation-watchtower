@@ -1,0 +1,46 @@
+# Crew Habits Reference
+# This file indexes all habit definitions for crew agents
+# Actual habit YAML files are in templates/habits/
+
+## Core Identity Habits (from agent-identity-architecture)
+# Installed by default for every crew agent
+
+### identity-enforcement
+Purpose: Enforces identity constitution at t=0 and before every action
+Triggers: before_any_action (200), agent_initialization (1), completion_claimed (100), heartbeat_received (50)
+Behavior: Verifies constitution exists, computes identity hash, compares with enforcer, blocks on drift
+Enforcement: blocking - blocks tool execution, requires re-verification
+Auto-fix: disabled (identity is not auto-fixable)
+Metrics: identity_checks_passed, identity_checks_failed, drift_detections
+
+### tool-enforcement
+Purpose: Validates workspace hygiene before every tool invocation
+Triggers: before_tool_invocation (100), agent_initialization (10), workspace_change (50)
+Behavior: Runs enforce.sh, checks 5 required tools, verifies permissions, checks forbidden patterns
+Enforcement: blocking - blocks execution, attempts auto-remediation, requires reflection
+Auto-fix: enabled - creates dirs, fixes perms, restores tools from templates
+Metrics: tool_checks_passed, tool_checks_failed, auto_fixes_applied
+
+### reflective-loop
+Purpose: Mandatory reflection after tool execution and on completion claims
+Triggers: after_tool_invocation (50), completion_claimed (100), heartbeat_received (75)
+Behavior: Validates intent accomplished, checks tests, finds hardcoded values, logs insights
+Enforcement: reflection_required - logs incomplete, requires explicit reflection
+Auto-fix: disabled
+Metrics: reflections_completed, insights_logged, decisions_logged, completion_claims_gated
+
+## Crew-Specific Habits
+
+### crew-phase-gate
+Purpose: Enforces crew phase transition gates via loop-enforcer integration
+Triggers: crew_phase_transition (150), completion_claimed (100), checkpoint_created (75)
+Behavior: Verifies phase tasks complete, runs reflection, confirms identity, reports to orchestrator
+Enforcement: blocking - blocks transition, logs to crew audit, requires lead override
+Auto-fix: disabled
+Metrics: phase_transitions_blocked, phase_transitions_passed, peer_readiness_wait_time, reflection_completion_rate
+
+Habit files available in templates/habits/:
+- identity-enforcement.yaml
+- tool-enforcement.yaml
+- reflective-loop.yaml
+- crew-phase-gate.yaml

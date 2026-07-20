@@ -1,0 +1,118 @@
+{
+  "version": "1.0.0",
+  "description": "Qwen model quota tracking and assignment for hackathon projects",
+  "updated_at": "2026-07-09T05:00:00Z",
+  
+  "models": {
+    "qwen3-max-preview": {
+      "tier": "premium",
+      "daily_limit": 500,
+      "current_usage": 0,
+      "description": "Creative writing, complex reasoning, governance"
+    },
+    "qwen-vl-max-latest": {
+      "tier": "premium",
+      "daily_limit": 500,
+      "current_usage": 0,
+      "description": "Vision tasks (video analysis, image understanding)"
+    },
+    "qwen3-235b-a22b-thinking-2507": {
+      "tier": "high",
+      "daily_limit": 1000,
+      "current_usage": 0,
+      "description": "Complex analysis, reasoning pipeline"
+    },
+    "qwen-plus-latest": {
+      "tier": "standard",
+      "daily_limit": 5000,
+      "current_usage": 0,
+      "description": "General generation, workflow tasks"
+    },
+    "qwen-vl-plus-latest": {
+      "tier": "standard",
+      "daily_limit": 2000,
+      "current_usage": 0,
+      "description": "Vision tasks (shotlist, storyboard)"
+    },
+    "qwen3-coder-flash-202507": {
+      "tier": "specialized",
+      "daily_limit": 2000,
+      "current_usage": 0,
+      "description": "Code generation"
+    },
+    "qwen-turbo-latest": {
+      "tier": "economy",
+      "daily_limit": 10000,
+      "current_usage": 0,
+      "description": "Simple tasks, batch processing"
+    },
+    "text-embedding-v3": {
+      "tier": "embedding",
+      "daily_limit": 10000,
+      "current_usage": 0,
+      "description": "Vector embeddings for memory search"
+    },
+    "qwen3-14b": {
+      "tier": "lightweight",
+      "daily_limit": 10000,
+      "current_usage": 0,
+      "description": "Edge inference (fallback)"
+    },
+    "qwen3-4b": {
+      "tier": "lightweight",
+      "daily_limit": 20000,
+      "current_usage": 0,
+      "description": "Edge deployment (Edgewalker)"
+    }
+  },
+  
+  "projects": {
+    "mnemosyne": {
+      "primary": "qwen-plus-latest",
+      "reasoning": "qwen3-235b-a22b-thinking-2507",
+      "embedding": "text-embedding-v3",
+      "track": "Track 1: MemoryAgent"
+    },
+    "aires": {
+      "primary": "qwen3-max-preview",
+      "vision": "qwen-vl-plus-latest",
+      "track": "Track 2: AI Showrunner"
+    },
+    "autopilot": {
+      "reasoning": "qwen3-235b-a22b-thinking-2507",
+      "general": "qwen-plus-latest",
+      "track": "Track 4: Autopilot Agent"
+    },
+    "agora": {
+      "governance": "qwen3-max-preview",
+      "collaboration": "qwen-plus-latest",
+      "track": "Track 3: Agent Society"
+    },
+    "edgewalker": {
+      "edge": "qwen3-4b",
+      "fallback": "qwen3-14b",
+      "track": "Track 5: EdgeAgent"
+    }
+  },
+  
+  "quota_management": {
+    "shared_api_key": true,
+    "key_location": "${HOME}/.hermes/workspaces/hackathon-2026/.env",
+    "cost_optimization": [
+      "Use qwen-turbo-latest for simple tasks",
+      "Batch similar requests",
+      "Cache embedding results",
+      "Use qwen3-4b/14b for edge deployment"
+    ],
+    "model_selection_guide": {
+      "creative_writing": "qwen3-max-preview",
+      "complex_reasoning": "qwen3-max-preview or qwen3-235b-a22b-thinking-2507",
+      "general_generation": "qwen-plus-latest",
+      "code_generation": "qwen3-coder-flash-202507",
+      "vision_tasks": "qwen-vl-plus-latest or qwen-vl-max-latest",
+      "edge_deployment": "qwen3-4b or qwen3-14b",
+      "simple_tasks": "qwen-turbo-latest",
+      "embeddings": "text-embedding-v3"
+    }
+  }
+}

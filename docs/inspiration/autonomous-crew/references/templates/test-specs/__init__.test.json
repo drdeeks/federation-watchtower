@@ -1,0 +1,14 @@
+{
+  "description": "Functional tests for __init__.py (package init - no functional tests needed)",
+  "tests": [
+    {
+      "description": "Package init file exists and is valid Python",
+      "args": [],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": [],
+        "stderr_empty": true
+      }
+    }
+  ]
+}

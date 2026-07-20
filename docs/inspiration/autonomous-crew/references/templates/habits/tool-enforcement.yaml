@@ -1,0 +1,45 @@
+name: "tool-enforcement"
+version: "1.0.0"
+type: "internalized_habit"
+description: "Validates workspace hygiene before every tool invocation. Auto-remediates from templates."
+
+triggers:
+  - event: "before_tool_invocation"
+    priority: 100
+  - event: "agent_initialization"
+    priority: 10
+  - event: "workspace_change"
+    priority: 50
+
+behavior:
+  steps:
+    - "Run enforce.sh - validate workspace structure"
+    - "Check all 5 required tools present and executable"
+    - "Verify file permissions (scripts 755, docs 644, secrets 600)"
+    - "Check .secrets/ directory permissions (700)"
+    - "Scan pending command for forbidden patterns (chmod 777, sudo, rm -rf, eval, exec)"
+    - "Verify workspace hash matches enforcer baseline"
+  timeout_seconds: 10
+
+enforcement:
+  level: "blocking"
+  on_violation:
+    - "Block tool execution"
+    - "Attempt auto-remediation from .agent/templates/tool-enforcement/"
+    - "Log to .agent/logs/habit-violations.jsonl"
+    - "Require reflection entry before retry"
+
+auto_fix:
+  enabled: true
+  templates_dir: ".agent/templates/tool-enforcement/"
+  actions:
+    - "create_missing_directories"
+    - "fix_file_permissions"
+    - "restore_missing_tools_from_templates"
+    - "regenerate_encryption_key_if_missing"
+
+metrics:
+  - "tool_checks_passed"
+  - "tool_checks_failed"
+  - "auto_fixes_applied"
+  - "reflections_required"

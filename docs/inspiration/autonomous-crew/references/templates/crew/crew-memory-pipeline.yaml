@@ -1,0 +1,80 @@
+# Crew Memory Pipeline Reference
+# Shared and per-agent memory pipeline for autonomous crews
+
+memory_pipeline:
+  # Per-agent memory (isolated, enforcer-owned workspace)
+  per_agent:
+    daily:
+      path: "memory/daily/YYYY-MM-DD.md"
+      format: "markdown with timestamped entries"
+      retention_days: 14
+      entry_types:
+        - "SESSION - general session notes"
+        - "DECISION - architectural/design decisions"
+        - "NOTE - general notes"
+        - "ERROR - errors and issues"
+        - "INSIGHT - patterns and learnings"
+        - "LESSON - promoted lessons"
+        - "PATTERN - recurring patterns"
+      wikilinks: "[[entity]] syntax for knowledge graph"
+    
+    weekly:
+      path: "memory/weekly/YYYY-WNN.md"
+      format: "markdown with curated sections"
+      retention_weeks: 12
+      sections:
+        - "Insights"
+        - "Decisions"
+        - "Knowledge Links"
+      promotion_criteria:
+        - daily file older than 1 day
+        - not already promoted (checked by date marker)
+        - contains LESSON, INSIGHT, DECISION, or PATTERN keywords
+    
+    long_term:
+      path: "memory/long-term/MEMORY.md"
+      format: "markdown with dated sections"
+      retention: "permanent"
+      promotion_from_weekly: true
+    
+    knowledge_index:
+      path: "memory/knowledge-index.json"
+      format: "json with entity -> entries mapping"
+      update_on: "every daily log with wikilinks"
+      query: "grep [[entity]] from knowledge-index.json"
+  
+  # Shared crew memory (crew workspace, accessible to all agents)
+  shared:
+    daily:
+      path: "shared/memory/daily/YYYY-MM-DD.md"
+      format: "crew-level decisions, cross-agent insights"
+      writable_by: "all agents via enforcer proxy"
+    
+    knowledge_index:
+      path: "shared/knowledge-index.json"
+      format: "cross-agent entity index"
+      update_on: "any agent logs wikilink"
+      purpose: "discover related work across agents"
+  
+  # Curator automation
+  curator:
+    schedule: "daily at 02:00 UTC (configurable)"
+    agent: "memory_curator.py per agent"
+    shared_curator: "shared-memory-curator.py for crew-wide"
+    actions:
+      - "curate daily to weekly"
+      - "promote weekly to long-term"
+      - "update knowledge index"
+      - "emit curation metrics"
+  
+  # Crew integration
+  crew_integration:
+    phase_gate_logging: "log phase transitions to shared memory"
+    checkpoint_logging: "log checkpoints to all agent dailies"
+    knowledge_sharing: "wikilinks in shared index discoverable by all"
+    lesson_promotion: "LESSON entries in any agent daily -> crew long-term"
+  
+  references:
+    - "agent-identity-architecture memory_curator.py"
+    - "agent-memory skill"
+    - "memory-tiering skill"

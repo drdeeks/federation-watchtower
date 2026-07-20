@@ -1,0 +1,78 @@
+# Crew Workflow Phases Reference
+# Blueprint phase definitions for autonomous crew orchestration
+
+phases:
+  - name: "planning"
+    order: 1
+    description: "Define project scope, success criteria, agent assignments, timeline"
+    required_agents: ["lead", "architecture"]
+    deliverables:
+      - "blueprint.json with phases, checkpoints, success measures"
+      - "agent assignments per phase"
+      - "risk assessment"
+    gates:
+      - "lead_approves_blueprint"
+      - "architecture_validates_feasibility"
+    checkpoint_on_exit: true
+
+  - name: "confirmation"
+    order: 2
+    description: "Validate plan, confirm resources, align team, create initial checkpoint"
+    required_agents: ["lead", "validation"]
+    deliverables:
+      - "validated blueprint"
+      - "resource allocation confirmed"
+      - "initial checkpoint created"
+    gates:
+      - "all_agents_ready"
+      - "resources_confirmed"
+    checkpoint_on_exit: true
+
+  - name: "acting"
+    order: 3
+    description: "Execute work per blueprint. Agents operate in parallel with phase gates."
+    required_agents: ["all_assigned"]
+    deliverables:
+      - "phase-specific outputs per agent"
+      - "daily memory logs"
+      - "progress reports"
+    gates:
+      - "agent_claims_completion"  # triggers reflective-loop
+      - "peer_readiness"           # triggers crew-phase-gate
+      - "enforcer_validates"       # identity + tool + workspace
+    checkpoint_on_exit: true
+
+  - name: "validation"
+    order: 4
+    description: "Validate outputs against success criteria, run tests, review"
+    required_agents: ["validation", "lead"]
+    deliverables:
+      - "test results"
+      - "validation report"
+      - "compliance check"
+    gates:
+      - "validation_passes"
+      - "lead_accepts"
+    checkpoint_on_exit: true
+
+  - name: "completed"
+    order: 5
+    description: "Finalize, archive, promote memory, close crew"
+    required_agents: ["lead"]
+    deliverables:
+      - "final deliverables packaged"
+      - "memory promoted to long-term"
+      - "lessons learned documented"
+      - "crew archive"
+    gates:
+      - "all_memory_promoted"
+      - "archive_verified"
+    checkpoint_on_exit: false  # final
+
+phase_gate_rules:
+  - "No phase transition without all active agents claiming completion"
+  - "Completion claim requires reflective-loop habit pass"
+  - "Phase transition requires crew-phase-gate habit pass"
+  - "Each transition creates checkpoint with rollback capability"
+  - "Validation phase requires independent validation agent"
+  - "Completed phase requires memory promotion + knowledge index update"

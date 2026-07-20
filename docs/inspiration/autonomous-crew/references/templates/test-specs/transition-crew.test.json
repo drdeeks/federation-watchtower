@@ -1,0 +1,23 @@
+{
+  "description": "Functional tests for transition-crew.py",
+  "tests": [
+    {
+      "description": "Shows help with --help flag",
+      "args": ["--help"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["transition-crew", "source", "target", "--mode"],
+        "stderr_empty": true
+      }
+    },
+    {
+      "description": "Shows usage on missing source (returns 0, shows help)",
+      "args": [],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["transition-crew", "source", "target"],
+        "stderr_empty": true
+      }
+    }
+  ]
+}

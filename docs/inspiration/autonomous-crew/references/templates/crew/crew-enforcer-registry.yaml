@@ -1,0 +1,57 @@
+# Crew Enforcer Registry Reference
+# Central registry for all crew agent enforcers
+
+enforcer_registry:
+  path: ".enforcer-registry.json"
+  format: "json"
+  description: "Tracks all crew agent enforcers for health monitoring and RPC routing"
+  
+  structure:
+    crew_id: "string"
+    enforcers:
+      agent_id:
+        socket: "path/to/.agent/enforcer.sock"
+        pid: "integer"
+        status: "running|stopped|unhealthy"
+        last_heartbeat: "unix_timestamp"
+        identity_hash: "16-char-hash"
+        workspace: "absolute/path"
+        started_utc: "iso_timestamp"
+  
+  operations:
+    register:
+      - "Called by create-crew-agent.sh on agent creation"
+      - "Updates registry with enforcer metadata"
+      - "Creates symlink in shared/enforcers/ for discovery"
+    
+    heartbeat:
+      - "crew-heartbeat.sh polls all registered enforcers"
+      - "Updates last_heartbeat timestamp"
+      - "Marks unhealthy if stale > 600s"
+    
+    unregister:
+      - "Called on agent decommission"
+      - "Removes from registry"
+      - "Cleans up symlinks"
+  
+  health_monitoring:
+    check_interval_seconds: 30
+    stale_threshold_seconds: 600
+    auto_restart: false  # requires manual intervention
+    alert_on_unhealthy: true
+  
+  rpc_routing:
+    discovery: "shared/enforcers/<agent_id>.sock -> actual socket"
+    load_balancing: "round-robin per agent"
+    timeout_seconds: 5
+    retry_attempts: 3
+  
+  crew_operations:
+    aggregate_heartbeat: "crew-heartbeat.sh --json"
+    verify_all: "verify-crew-identity.sh"
+    restart_all: "requires crew lead approval"
+  
+  references:
+    - "agent-identity-architecture enforcer daemon"
+    - "crew-heartbeat.sh"
+    - "verify-crew-identity.sh"

@@ -1,0 +1,93 @@
+# Production Crew Workspace Template
+# Used by init-prod-crew.sh
+
+crew_id: "REPLACE_WITH_CREW_ID"
+crew_type: "production"
+created_utc: "REPLACE_WITH_ISO_TIMESTAMP"
+workspace: "REPLACE_WITH_WORKSPACE_PATH"
+agents_dir: "REPLACE_WITH_AGENTS_DIR"
+shared_dir: "REPLACE_WITH_SHARED_DIR"
+index_dir: "REPLACE_WITH_INDEX_DIR"
+agent_types: []
+semantic_enabled: false
+secrets_mode: "real"
+persistence: "long-term"
+ventoy_mount: ""
+
+# Agent directory structure (per agent)
+agent_structure:
+  knowledge:
+    architecture: []
+    api: []
+    ui: []
+    infra: []
+    process: []
+    debugging: []
+    research: []
+  .agent:  # enforcer-owned identity layer
+    constitution.yaml: ""
+    genesis.md: ""
+    habits: []
+    logs: {}
+    metrics: {}
+    templates: {}
+    constitutions: []
+  memory:
+    daily: []
+    weekly: []
+    long-term: {}
+    knowledge-index.json: ""
+  tools: []
+
+# Shared directory structure (cross-agent)
+shared:
+  knowledge:
+    architecture: []
+    api: []
+    ui: []
+    infra: []
+    process: []
+    debugging: []
+    research: []
+  communications:
+    messages: []
+    threads: []
+    broadcasts: []
+  documents:
+    decisions: []
+    learnings: []
+    specs: []
+    communications: []
+
+# Crew-level index
+index:
+  by-category: {}
+  by-agent: {}
+  by-tag: {}
+  semantic: {}
+
+# Enforcer registry
+enforcer_registry: {}
+
+# Communication protocol
+communication:
+  protocol_version: "1.0"
+  message_types:
+    - "sync"
+    - "question"
+    - "proposal"
+    - "decision"
+    - "broadcast"
+    - "alert"
+  priorities:
+    - "low"
+    - "normal"
+    - "high"
+    - "urgent"
+  storage:
+    messages_dir: "messages"
+    threads_dir: "threads"
+    broadcasts_dir: "broadcasts"
+  threading:
+    enabled: true
+    max_depth: 10
