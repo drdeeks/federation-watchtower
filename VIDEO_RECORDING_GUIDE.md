@@ -37,12 +37,14 @@
 
 ### Recording Steps
 
-#### 1. Introduction (10 seconds)
+#### 1. Introduction (15 seconds)
 **Navigate to:** Watchtower (Tab 1)
 
-**Say:** *"Hi, I'm [your name]. This is Federation Watchtower - a developer tool that makes autonomous agent work visible before it becomes expensive."*
+**Say:** *"Hi, I'm [your name]. This is Federation Watchtower - a developer tool that makes autonomous agent work visible before it becomes expensive. Built with Codex during OpenAI Build Week."*
 
 **Show:** The main Watchtower page with the camera view, agent roster, and event feed.
+
+**Mention:** *"It provides observability and coordination for autonomous agents with security-camera-style presentation."*
 
 ---
 
@@ -126,22 +128,28 @@
 
 ---
 
-#### 6. Show Admin Console (30 seconds)
+#### 6. Show Admin Console (45 seconds)
 **Navigate to:** Manage (https://federation.drdeeks.xyz/manage.html)
 
-**Say:** *"For operators, there's an admin console..."*
+**Say:** *"For operators, there's full god-view management..."*
 
 **Do:**
 1. Show the connection screen (or connect if you have admin token)
-2. **Say:** *"Admins can pause, resume, or revoke agents"*
-3. **Point to:** Agent table with columns: Agent, Project, Room, Status, Actions
-4. **Say:** *"Revoke invalidates credentials but preserves event history"*
-5. If connected, show the **"Alert webhook"** section at bottom
-   - Say: *"Alert deliveries are provable - signed and receipted"*
+2. **Show three sections:**
+   - **Agents table** - Say: *"Pause, resume, or revoke any agent in any project"*
+   - **Room management** - Say: *"Create rooms for organizations, delete empty demo rooms"*
+   - **Organization applications** - Say: *"Review applications with 5 technical Q&A and social proofs"*
+3. **Click "Review"** on a submitted org application
+4. **Show the dialog** with:
+   - Contact info and official URL
+   - Social proofs (LinkedIn, Twitter, etc.)
+   - All 5 technical questions and answers
+5. **Say:** *"Approval adds to verified_federations with elevated privileges"*
+6. **Point to alert webhook section** - Say: *"All alert deliveries are signed and receipted for audit"*
 
 ---
 
-#### 7. Explain Codex Usage (20 seconds)
+#### 7. Explain Codex Usage (25 seconds)
 **Navigate to:** GitHub README (Tab 3)
 
 **Say:** *"I built this with Codex during OpenAI Build Week..."*
@@ -152,7 +160,9 @@
    - *"Codex helped consolidate the repository"*
    - *"Wire and test Worker surfaces"*
    - *"Build the camera-style Watchtower UI"*
-   - *"Document the operational lifecycle"*
+   - *"Implement full admin management capabilities"*
+   - *"Document the operational lifecycle and testing"*
+3. **Scroll to test scripts section** - Say: *"All paths validated - 29/29 tests passing"*
 
 ---
 

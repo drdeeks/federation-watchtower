@@ -640,3 +640,40 @@ Phase       : PHASE-7 submission ready; video recording and final Devpost
 Rollback Ref: restore previous README structure and remove judge testing
               section, narrative sections, and webhook test script
 ```
+
+## CL-0025 — Full Admin Room and Organization Management
+
+```
+Date        : 2026-07-20
+Contributor : Claude
+Modules     : [MOD-002, MOD-004, MOD-011, MOD-015]
+Section Tags: [[ADMIN-MGMT-v1], [ROOM-LIFECYCLE-v1], [ORG-VERIFICATION-v1]]
+Files Changed: [source/federation-serverless/src/management.ts,
+               source/federation-tv-widget/public/manage.html,
+               source/federation-serverless/src/management.test.ts,
+               AGENTS.md, docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : Implemented complete admin management console capabilities.
+              Backend: Added 7 new admin endpoints for room and organization
+              management: GET/POST /api/v1/admin/rooms, DELETE /api/v1/admin/rooms/{id},
+              GET /api/v1/admin/organizations, GET /api/v1/admin/organizations/{id},
+              POST /api/v1/admin/organizations/{id}/approve|reject|suspend. All
+              endpoints gated by requireAdmin(), input validation via custom
+              helpers (readBoundedJsonBody, text, integer), SQL injection
+              prevention via parameterized queries, and audit logging via
+              appendLifecycle. Room deletion blocked if agents present (409).
+              Organization approval creates verified_federations record.
+              Frontend: Added room management section (create/delete dialogs),
+              organization applications section (review/approve/reject/suspend),
+              auto-refresh enabled by default, removed redundant manual refresh
+              button. Tests: Added 10 new unit tests in management.test.ts
+              covering agent filters, room presentation, organization
+              presentation, alert receipts, and validation helpers.
+Tests Passing: source/federation-serverless: npm run types PASS; node
+               --experimental-strip-types --test src/*.test.ts 34/34 (10 new);
+               packages/watchtower-sdk: npm test 8/8; node --check on
+               tv-widget.js; git diff --check clean
+Phase       : PHASE-6 governance and safety — admin can now manage any agent,
+              any room, any organization with full audit trail
+Rollback Ref: remove room/organization endpoints from management.ts, remove
+              UI sections from manage.html, remove management.test.ts
+```
