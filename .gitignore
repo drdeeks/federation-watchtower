@@ -176,13 +176,14 @@ Sessionx.vim
 *.localhistory
 
 # ============================================================
-# AI ASSISTANT FILES (KEEP OPTIONAL)
+# AI ASSISTANT FILES (EXCLUDED - LOCAL DEVELOPMENT ONLY)
 # ============================================================
-# Claude/Anthropic - commented out if you want to track
-# .claude/
-# CLAUDE.md
-# .cursor/
-# .cursorrules
+# AI assistant configuration and skills - never commit
+.agents/
+.claude/
+.codex/
+.cursor/
+.cursorrules
 
 # ============================================================
 # TYPESCRIPT & JAVASCRIPT
