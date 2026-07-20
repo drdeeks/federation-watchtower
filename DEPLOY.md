@@ -135,8 +135,13 @@ curl https://fapi.drdeeks.xyz/health
 # 3. Check public Watchtower
 open https://watch.drdeeks.xyz
 
-# 4. Check admin console
+# 4. Check admin console (full management capabilities)
 open https://federation.drdeeks.xyz/manage.html
+# → Manage agents (pause/resume/revoke)
+# → Manage rooms (create/delete empty)
+# → Manage organizations (approve/reject/suspend)
+# → View alert receipts
+# → Export evidence
 ```
 
 ---
@@ -187,6 +192,24 @@ Set these in Cloudflare Dashboard OR via `wrangler secret`:
 | `WATCHTOWER_ADMIN_TOKEN` | ✅ | `wrangler secret put WATCHTOWER_ADMIN_TOKEN` |
 | `WATCHTOWER_ALERT_WEBHOOK_URL` | Optional | `wrangler secret put WATCHTOWER_ALERT_WEBHOOK_URL` |
 | `WATCHTOWER_ALERT_WEBHOOK_SECRET` | Optional | `wrangler secret put WATCHTOWER_ALERT_WEBHOOK_SECRET` |
+| `WATCHTOWER_ALERT_WEBHOOK_FORMAT` | Optional | `wrangler secret put WATCHTOWER_ALERT_WEBHOOK_FORMAT` (slack/discord/json) |
+
+---
+
+## Admin Capabilities (Post-Deploy)
+
+After deploy, access `https://federation.drdeeks.xyz/manage.html` with admin token to:
+
+| Capability | How To Use |
+|------------|------------|
+| **Create rooms** | Click "+ Add room" → Enter roomId, projectId, capacity |
+| **Delete rooms** | Click "Delete" on empty rooms only (blocked if agents present) |
+| **Review organizations** | Click "Review" on submitted applications |
+| **Approve organizations** | Review 5 Q&A + social proofs → Click "Approve" → Adds to verified_federations |
+| **Reject/Suspend orgs** | Click "Reject" or "Suspend" with optional notes |
+| **Manage agents** | Search/filter → Pause/Resume/Revoke any agent |
+| **View alerts** | Scroll to alert webhook section (shows all delivered alerts) |
+| **Export evidence** | Click "Export evidence" → 30-day R2 retention |
 
 ---
 

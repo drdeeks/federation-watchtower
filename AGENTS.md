@@ -89,11 +89,13 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
 - Public Watchtower camera shell, room selection, agent roster/detail panel,
   public event terminal, reduced-motion mode, and feed-only mode.
 - Operator management console (`federation.drdeeks.xyz/manage.html`, admin-token
-  only): list every canonical agent with owner/room/state, pause/resume, and
-  revoke, plus status tiles and the embedded live floor. "Revoke" invalidates the
-  credential and drops the agent from the public scene but preserves its event
-  evidence. Backed by `/api/v1/admin/agents*` (`src/management.ts`). Room
-  lifecycle management is the next increment.
+  only): full god-view control over agents, rooms, and organizations.
+  - **Agents**: list/filter/search, pause/resume/revoke any agent in any project
+  - **Rooms**: create new rooms for organizations, delete empty demo/test rooms
+  - **Organizations**: review applications (5 Q&A + social proofs), approve/reject/suspend
+  - **Alerts**: view all webhook delivery receipts with HMAC verification
+  - **Evidence**: export project evidence to R2 with configurable retention
+  Backed by `/api/v1/admin/*` endpoints (`src/management.ts`). All mutations logged via `federation_lifecycle_events`.
 - Provable outbound alert webhook. When a guardrail rule fires, the Worker
   signs the alert and POSTs it to the configured `WATCHTOWER_ALERT_WEBHOOK_URL`
   (opt-in; unset means deliveries are recorded `suppressed`). A self-hosted
