@@ -49,3 +49,6 @@ skills-reference/
 brand/assets/
 # Legacy raster sprite sheets — the widget now draws agents/floor procedurally
 source/federation-tv-widget/public/sprites/
+
+# Local one-off debug/verification scripts (hardcoded dev ports/paths/tokens)
+/manage-drive.mjs

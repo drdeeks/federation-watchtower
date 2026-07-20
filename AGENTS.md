@@ -88,6 +88,12 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   Worker-handled paths, not static files.
 - Public Watchtower camera shell, room selection, agent roster/detail panel,
   public event terminal, reduced-motion mode, and feed-only mode.
+- Operator management console (`federation.drdeeks.xyz/manage.html`, admin-token
+  only): list every canonical agent with owner/room/state, pause/resume, and
+  revoke, plus status tiles and the embedded live floor. "Revoke" invalidates the
+  credential and drops the agent from the public scene but preserves its event
+  evidence. Backed by `/api/v1/admin/agents*` (`src/management.ts`). Room
+  lifecycle management is the next increment.
 
 ### Important work that is not done
 
