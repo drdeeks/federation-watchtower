@@ -35,7 +35,28 @@ npm run deploy
 
 ---
 
-### Step 3: Set Secrets (First Deploy Only)
+### Step 3: Apply Migrations (First Deploy Only)
+
+⚠️ **Migrations are NOT auto-applied.** Run these in order:
+
+```bash
+cd /home/drdeek/projects/federation/source/federation-serverless
+
+# Apply all 6 migrations (adds tables, no destructive changes)
+npm run migrate:watchtower      # 0001: Core enforcement (agents, rooms, feed)
+npm run migrate:control-loop    # 0002: Watchdog, audit, sessions
+npm run migrate:access-gateway  # 0003: Owner credentials, org applications
+npm run migrate:lifecycle       # 0004: Canonical lifecycle events
+npm run migrate:management      # 0005: Admin management tables
+npm run migrate:alert-sink      # 0006: Alert webhook receipts
+
+# Or run all at once:
+for m in src/migrations/*.sql; do wrangler d1 execute federation-db --remote --file="$m"; done
+```
+
+---
+
+### Step 4: Set Secrets (First Deploy Only)
 
 ```bash
 cd /home/drdeek/projects/federation/source/federation-serverless
@@ -47,11 +68,12 @@ wrangler secret put WATCHTOWER_ADMIN_TOKEN
 # Optional secrets
 wrangler secret put WATCHTOWER_ALERT_WEBHOOK_URL
 wrangler secret put WATCHTOWER_ALERT_WEBHOOK_SECRET
+wrangler secret put WATCHTOWER_ALERT_WEBHOOK_FORMAT  # slack, discord, or json
 ```
 
 ---
 
-### Step 4: Verify Deploy
+### Step 5: Verify Deploy
 
 ```bash
 # Health check
@@ -71,7 +93,7 @@ open https://watch.drdeeks.xyz
 
 ## Rollback (If Something Breaks)
 
-### Option 1: Instant Rollback
+### Option 1: Instant Rollback (Worker Code Only)
 
 ```bash
 cd /home/drdeek/projects/federation/source/federation-serverless
@@ -82,6 +104,8 @@ wrangler deployments list
 # Rollback to previous (replace ID with the one before latest)
 wrangler deployments rollback <DEPLOYMENT_ID>
 ```
+
+⚠️ **Note:** Rollback does NOT undo migrations. D1 schema changes are additive and backward-compatible. If you need to revert schema changes, contact Cloudflare support or restore from backup.
 
 ### Option 2: Redeploy Previous Commit
 
@@ -105,6 +129,23 @@ npm run deploy
 
 ---
 
+### Migration Rollback Notes
+
+Migrations are **additive only** (CREATE TABLE, ADD COLUMN, CREATE INDEX). No destructive operations. Safe to run multiple times. If you need to inspect migration state:
+
+```bash
+# Check which tables exist
+wrangler d1 execute federation-db --remote --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+
+# Check migration 0004 (lifecycle) applied
+wrangler d1 execute federation-db --remote --command "SELECT COUNT(*) FROM federation_lifecycle_events;"
+
+# Check migration 0006 (alert receipts) applied
+wrangler d1 execute federation-db --remote --command "SELECT COUNT(*) FROM alert_webhook_receipts;"
+```
+
+---
+
 ## Pre-Deploy Checklist
 
 ```bash
@@ -119,6 +160,9 @@ git status
 # 3. Verify wrangler config
 cd source/federation-serverless
 wrangler deploy --dry-run
+
+# 4. Verify migrations are ready
+ls src/migrations/*.sql  # Should show 0001-0006
 ```
 
 ---
@@ -129,13 +173,19 @@ wrangler deploy --dry-run
 # 1. Health check
 curl https://fapi.drdeeks.xyz/health
 
-# 2. Test agent lifecycle
+# 2. Verify migrations applied
+cd source/federation-serverless
+wrangler d1 execute federation-db --remote --command "SELECT COUNT(*) as tables FROM sqlite_master WHERE type='table';"
+# Should show 15+ tables
+
+# 3. Test agent lifecycle
+cd /home/drdeek/projects/federation
 ./scripts/e2e-agent-lifecycle.sh
 
-# 3. Check public Watchtower
+# 4. Check public Watchtower
 open https://watch.drdeeks.xyz
 
-# 4. Check admin console (full management capabilities)
+# 5. Check admin console (full management capabilities)
 open https://federation.drdeeks.xyz/manage.html
 # → Manage agents (pause/resume/revoke)
 # → Manage rooms (create/delete empty)
@@ -219,10 +269,18 @@ After deploy, access `https://federation.drdeeks.xyz/manage.html` with admin tok
 # DEPLOY
 cd source/federation-serverless && npm run deploy
 
+# MIGRATE (first deploy only, in order)
+npm run migrate:watchtower
+npm run migrate:control-loop
+npm run migrate:access-gateway
+npm run migrate:lifecycle
+npm run migrate:management
+npm run migrate:alert-sink
+
 # VERIFY
 curl https://fapi.drdeeks.xyz/health
 
-# ROLLBACK
+# ROLLBACK (worker only, not migrations)
 wrangler deployments rollback <ID>
 ```
 
