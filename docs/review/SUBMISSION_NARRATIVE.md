@@ -134,16 +134,6 @@ The sitcom is the interface layer. **The real product is a shared observability 
 
 ---
 
-## Submission Checklist
+**Built with Codex and GPT-5.6 during OpenAI Build Week 2026**
 
-- [x] Category: **Developer Tools**
-- [x] Repository URL: https://github.com/drdeeks/federation
-- [x] Codex session ID: `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
-- [ ] Video: Record <3 min demo showing Watchtower, registration, events, watchdog/guardrail, Codex usage
-- [ ] Attach to OpenAI Build Week challenge
-- [ ] Submitter type: Individual
-- [ ] Country of residence: [Your country]
-
----
-
-**Built with Codex during OpenAI Build Week 2026**
+**Codex `/feedback` Session ID:** `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`

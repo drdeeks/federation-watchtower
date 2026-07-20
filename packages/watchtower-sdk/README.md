@@ -145,18 +145,7 @@ await agent.emit({
 });
 ```
 
-## Release checklist
-
-Before publishing a new version:
-
-- [ ] All tests pass: `npm test` (8/8 tests)
-- [ ] Pack check passes: `npm run pack:check`
-- [ ] No secrets in package: verify no `.env`, `.dev.vars`, tokens, or credentials
-- [ ] Version bumped in `package.json` (semver: major.minor.patch)
-- [ ] README.md updated with any API changes
-- [ ] TypeScript types (`index.d.ts`) match `index.js` exports
-- [ ] npm 2FA enabled for publisher account
-- [ ] Published from clean git commit
+## Release verification
 
 ```bash
 cd packages/watchtower-sdk

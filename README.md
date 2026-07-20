@@ -581,59 +581,6 @@ Federation Watchtower fits the Developer Tools track because it provides:
 - **Security & monitoring** - Audit trails, incident tracking, budget guardrails
 - **Developer experience** - Public observability, SDK integration, MCP support
 
-### Submission checklist
-
-#### Required submission fields (per [Official Rules](https://openai.devpost.com/rules))
-
-- [ ] Select **Developer Tools** category in Devpost.
-- [ ] Add the public repository URL (or share a private repository with both `testing@devpost.com` and `build-week-event@openai.com`).
-- [ ] Record a public YouTube video **under 3 minutes** with audio that:
-  - Shows a clear demo of the project working (Watchtower, registration, events, watchdog/guardrail)
-  - Explains what you built and how you used Codex and GPT-5.6
-  - Does not include third-party trademarks or copyrighted material
-  - Video link is correct in the Devpost form
-- [x] Add the `/feedback` Codex session ID: **`019f6d08-6448-7d50-ad6d-8d92bde8c5f3`**
-- [ ] Provide judge testing instructions in the Submission form; this README supplies live URLs and local testing commands above.
-- [ ] In your README (this file), describe how you collaborated with Codex throughout the project (see "How Codex accelerated the work" table above).
-- [x] Answer all required Devpost fields:
-  - Submitter type (individual/team/organization) ✅
-  - Country of residence ✅
-  - Category (Developer Tools) ✅
-  - Repository URL ✅
-  - `/feedback` session ID: `019f6d08-6448-7d50-ad6d-8d92bde8c5f3` ✅
-  - Optional: developer-tool testing instructions ✅
-- [ ] Submit the **Federation Watchtower** Devpost project to OpenAI Build Week (attach to the `openai` challenge) rather than leaving it only as a published standalone project.
-
-#### Pre-submission verification
-
-- [x] All tests pass: `npm test` in serverless and SDK packages
-- [x] TypeScript compilation: `npm run types`
-- [x] JavaScript syntax check: `node --check` on widget files
-- [x] Navigation standardized across all 9 HTML pages
-- [x] Public Watchtower UI cleaned and functional
-- [x] Codex `/feedback` session ID obtained: `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
-- [ ] Video demo recorded and uploaded to YouTube (public, <3 min)
-- [ ] Final submission button pressed in Devpost (attach to OpenAI Build Week challenge)
-
-### 🚀 Final Pre-Submit Checklist
-
-**BEFORE YOU HIT SUBMIT, RUN THROUGH THIS LIST:**
-
-- [ ] 🎬 My demo video is under 3 minutes, public on YouTube, and the link is correct in the form
-- [ ] 🎙️ My voiceover explains what I built, how I used Codex, and how I used GPT-5.6
-- [ ] 🔑 My `/feedback` Codex Session ID is retrieved and entered in the form: `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
-- [ ] 🔒 My private code repo is shared with Devpost & OpenAI (if private): `testing@devpost.com` and `build-week-event@openai.com`
-- [ ] 📋 My README has setup instructions and explains how Codex and GPT-5.6 were used (see "How Codex and GPT-5.6 accelerated the work" table)
-- [ ] 🔌 If I'm submitting a plugin or developer tool, I've included installation instructions and a testing path for judges (see "For Judges / Testing Instructions" section)
-- [ ] 👥 All team members have been added and have accepted their invitations (if team submission)
-- [ ] 🎯 I have selected a category: **Developer Tools**
-- [ ] ✅ My submission is not saved as a draft
-- [ ] 🎯 Project is attached to **OpenAI Build Week** challenge (not just published standalone)
-
-**Status:** Repository, live services, Codex session ID, and documentation are ready. **Video demo and final Devpost submission attachment remain** - record your 3-minute demo and attach the project to the OpenAI Build Week challenge before the deadline.
-
-**Deadline:** July 21, 2026 @ 5:00pm PDT
-
 ## Documentation
 
 - [**AGENTS.md**](AGENTS.md) - Operational guide for people and coding agents working in this repository
@@ -641,8 +588,8 @@ Federation Watchtower fits the Developer Tools track because it provides:
 - [**System Specification**](docs/review/FEDERATION_SYSTEM_SPEC.md) - Expanded product context and technical details
 - [**Access and Onboarding**](docs/review/ACCESS_AND_ONBOARDING.md) - Agent, owner, organization, and administrator boundaries
 - [**Host Surface Contract**](docs/review/HOST_SURFACE_CONTRACT.md) - Current domain boundaries and explicit gaps
-- [**Submission Notes**](docs/review/OPENAI_SUBMISSION_NOTES.md) - Devpost submission status and requirements
-- [**Video Script**](docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md) - Three-minute demo plan
+- [**Submission Runbook**](docs/review/SUBMISSION_RUNBOOK.md) - Complete submission checklist and deployment guide
+- [**Video Script**](VIDEO_RECORDING_GUIDE.md) - Three-minute demo plan
 
 ## License
 
@@ -650,4 +597,6 @@ MIT. See [LICENSE](LICENSE).
 
 ---
 
-**Built with Codex during OpenAI Build Week 2026**
+**Built with Codex and GPT-5.6 during OpenAI Build Week 2026**
+
+**Codex `/feedback` Session ID:** `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
