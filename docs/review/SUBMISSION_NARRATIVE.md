@@ -39,6 +39,31 @@ From burning 25,000 credits, using almost half my allocation on Codex, persisten
 
 ---
 
+## What I Learned
+
+- **Visibility is the product.** Operational truth matters more than theatrical presentation. The sitcom is the hook; the audit trail is the value.
+- **Guardrails must fire before side effects.** A denied lease, failed validation, or watchdog expiry must stop work before the next irreversible action.
+- **Additive migrations are safer than destructive changes.** All 6 D1 migrations are CREATE TABLE or ADD COLUMN — no DROP, no ALTER that breaks existing data.
+- **Scoped credentials beat shared secrets.** Owner-scoped and agent-scoped credentials (`fw_agent_...`) prevent impersonation and enable audit attribution.
+- **Resource constraints force creativity.** Building on a 2013 ThinkPad with 4GB RAM means every dependency matters. The dependency-free widget wasn't an aesthetic choice — it was necessity.
+- **Codex accelerates consolidation, not invention.** The idea was mine; Codex made it feasible, wired the surfaces, and produced the documentation. The collaboration worked because I brought a clear vision and Codex brought execution speed.
+
+---
+
+## Challenges I Faced
+
+| Challenge | How I Overcame It |
+| --- | --- |
+| **25,000 credits lost to runaway loops** | Built guardrail enforcement, watchdog expiry, and cooperative leases that stop work before the next side effect |
+| **Five disjointed project demos** | Used Codex to consolidate into one functional repository with shared infrastructure |
+| **Running out of Codex credits mid-build** | Switched to Claude for final implementation, then documented everything for reproducibility |
+| **Building on 2013 hardware (4GB RAM)** | Eliminated unnecessary dependencies, used dependency-free widget, kept bundle size minimal |
+| **Keeping secrets out of the repository** | `.gitignore` for `.dev.vars`, Worker secrets via `wrangler secret put`, scoped credentials never logged |
+| **Aligning presentation with operational truth** | Ambient cameos explicitly labelled `ambient presentation · no event` — never fabricate an agent, event, or heartbeat |
+| **Meeting OpenAI Build Week requirements** | Created SUBMISSION_RUNBOOK.md, VIDEO_RECORDING_GUIDE.md, and this narrative to ensure all fields are complete |
+
+---
+
 ## The Problem
 
 Autonomous coding agents can silently recurse, duplicate work, burn credits, lose track of state, or fail without a useful human-facing signal. The surrounding systems may already have logs, validators, policy checks, and recovery workers, but operators still need a shared surface that makes the whole system understandable.
@@ -74,6 +99,43 @@ The sitcom is the interface layer. **The real product is a shared observability 
 | **Documentation** | Produced operational lifecycle docs, setup flow, testing guides, submission materials |
 
 Codex saw the vision, made it feasible, and brought it to life. From burning 25,000 credits to having a functional, deployable system — the difference is having faith in the ideas and the discipline to build them properly.
+
+---
+
+## How I Built This
+
+**Timeline:** ~2 weeks during OpenAI Build Week 2026
+
+**Phase 1 — Concept (Days 1-3):**
+- Extracted the Federation idea from a comical afterthought into a formal concept
+- Created FOREVER-SYSTEM protocol as foundational architecture
+- Defined agent lifecycle state machine with explicit transitions
+
+**Phase 2 — Infrastructure (Days 4-7):**
+- Set up Cloudflare Worker with Durable Objects, D1, R2, Queue/DLQ bindings
+- Wrote 6 additive migrations (0001-0006) for persistent storage
+- Implemented owner/agent credential system with scoped tokens
+
+**Phase 3 — Guardrails (Days 8-10):**
+- Built duplicate/runaway detection, budget thresholds, validation gates
+- Implemented watchdog expiry with offline transitions
+- Created hash-chained audit decisions and incident records
+
+**Phase 4 — Presentation (Days 11-13):**
+- Built camera-style Watchtower UI with 35-agent capacity
+- Created procedural SVG avatars (deterministic from agentId/avatarSeed)
+- Added event bubbles, feed-only mode, reduced-motion support
+
+**Phase 5 — Admin & Submission (Days 14-15):**
+- Implemented full admin management (agents, rooms, organizations)
+- Added alert webhooks with receipts (Slack/Discord/json formats)
+- Wrote testing scripts, deployment guide, video script, submission docs
+
+**Tools Used:**
+- Codex (primary implementation partner)
+- Claude (fallback when Codex credits ran out)
+- Cloudflare Workers (edge runtime)
+- TypeScript, Node.js, SQLite (D1), R2 storage
 
 ---
 
