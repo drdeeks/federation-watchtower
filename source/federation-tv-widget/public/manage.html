@@ -94,7 +94,38 @@
         </table>
       </div>
     </section>
+
+    <section class="card" style="margin-top:20px;">
+      <h2><span class="grow">Room management</span>
+        <button id="addRoom" class="secondary" disabled>+ Add room</button>
+        <button id="refreshRooms" class="ghost" disabled>⟳ Refresh</button>
+      </h2>
+      <p class="sub" style="padding:9px 12px 0;">Create rooms for organizations, delete empty demo/test rooms. Rooms must be empty before deletion.</p>
+      <div class="tablewrap" style="max-height:340px;">
+        <table>
+          <thead><tr><th>Room ID</th><th>Project</th><th>Index</th><th>Capacity</th><th>Used</th><th>Agents</th><th>Actions</th></tr></thead>
+          <tbody id="roomRows"><tr><td colspan="7" class="empty">Connect to load rooms.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:20px;">
+      <h2><span class="grow">Organization applications</span>
+        <select id="orgFilter" style="max-width:140px;min-height:30px;"><option value="">all states</option><option value="submitted">submitted</option><option value="active">active</option><option value="rejected">rejected</option><option value="suspended">suspended</option></select>
+        <button id="refreshOrgs" class="ghost" disabled>⟳ Refresh</button>
+      </h2>
+      <p class="sub" style="padding:9px 12px 0;">Review organization applications. Approve adds to verified federations with elevated privileges.</p>
+      <div class="tablewrap" style="max-height:420px;">
+        <table>
+          <thead><tr><th>Organization</th><th>Contact</th><th>Official URL</th><th>Status</th><th>Applied</th><th>Actions</th></tr></thead>
+          <tbody id="orgRows"><tr><td colspan="6" class="empty">Connect to load organizations.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
   </main>
+
+  <dialog id="roomDialog"><form method="dialog"><h2>Create room</h2><label>Room ID <input id="newRoomId" required pattern="[A-Za-z0-9][A-Za-z0-9._:-]{0,63}"></label><label>Project ID <input id="newRoomProject" required></label><label>Capacity <input id="newRoomCapacity" type="number" min="1" max="100" value="35"></label><menu><button value="cancel" class="secondary">Cancel</button><button value="create" class="danger">Create</button></menu></form></dialog>
+  <dialog id="orgDialog"><form method="dialog"><h2 id="orgDialogTitle">Review organization</h2><div id="orgDetails" style="max-height:400px;overflow:auto;margin-bottom:12px;"></div><label>Review notes <textarea id="orgNotes" maxlength="500" placeholder="Optional notes for this decision"></textarea></label><menu><button value="cancel" class="secondary">Cancel</button><button id="orgApprove" value="approve" class="secondary">Approve</button><button id="orgReject" value="reject" class="danger">Reject</button><button id="orgSuspend" value="suspend">Suspend</button></menu></form></dialog>
 
   <dialog id="confirm"><form method="dialog"><h2 id="confirmTitle">Confirm</h2><p class="sub" id="confirmBody"></p><menu><button value="cancel" class="secondary">Cancel</button><button id="confirmGo" value="go" class="danger">Confirm</button></menu></form></dialog>
 
@@ -193,9 +224,15 @@
       try {
         await load();
         $('refresh').disabled = false;
+        $('addRoom').disabled = false;
+        $('refreshRooms').disabled = false;
+        $('refreshOrgs').disabled = false;
+        $('orgFilter').disabled = false;
         mountViz();
         if (state.timer) clearInterval(state.timer);
         state.timer = setInterval(load, 15000);
+        await loadRooms();
+        await loadOrgs();
       } catch (e) { setStatus(e.message, true); }
       finally { $('connect').disabled = false; }
     }
@@ -225,6 +262,94 @@
       if ($('confirm').returnValue === 'go' && state.pending) act(state.pending.op, state.pending.p, state.pending.a);
       state.pending = null;
     });
+
+    // ==================== ROOM MANAGEMENT ====================
+    let currentOrg = null;
+    async function loadRooms() {
+      try {
+        const data = await request('/api/v1/admin/rooms');
+        const rows = data.rooms.map(r => `<tr><td>${esc(r.roomId)}</td><td>${esc(r.projectId)}</td><td>${r.roomIndex}</td><td>${r.capacity}</td><td>${r.usedCount}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">${esc((r.agentIds || []).join(', '))}</td><td class="act">${r.usedCount === 0 ? `<button class="danger" data-op="delete-room" data-room="${esc(r.roomId)}">Delete</button>` : '<span class="sub">in use</span>'}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">No rooms found.</td></tr>';
+        $('roomRows').innerHTML = rows;
+        setStatus(`Rooms loaded (${data.count} total)`);
+      } catch (e) { setStatus(e.message, true); }
+    }
+
+    $('addRoom').addEventListener('click', () => { $('newRoomId').value = ''; $('newRoomProject').value = ''; $('newRoomCapacity').value = 35; $('roomDialog').showModal(); });
+    $('roomDialog').addEventListener('close', async () => {
+      if ($('roomDialog').returnValue !== 'create') return;
+      try {
+        await request('/api/v1/admin/rooms', {
+          method: 'POST',
+          body: JSON.stringify({ roomId: $('newRoomId').value.trim(), projectId: $('newRoomProject').value.trim(), capacity: Number($('newRoomCapacity').value) })
+        });
+        await loadRooms();
+        setStatus('Room created');
+      } catch (e) { setStatus(`Failed: ${e.message}`, true); }
+    });
+
+    $('roomRows').addEventListener('click', async e => {
+      const b = e.target.closest('button[data-op="delete-room"]'); if (!b) return;
+      const roomId = b.dataset.room;
+      if (!confirm(`Delete room "${roomId}"? This cannot be undone.`)) return;
+      try {
+        await request(`/api/v1/admin/rooms/${encodeURIComponent(roomId)}`, { method: 'DELETE' });
+        await loadRooms();
+        setStatus('Room deleted');
+      } catch (e) { setStatus(`Failed: ${e.message}`, true); }
+    });
+
+    $('refreshRooms').addEventListener('click', loadRooms);
+
+    // ==================== ORGANIZATION MANAGEMENT ====================
+    async function loadOrgs() {
+      try {
+        const status = $('orgFilter').value;
+        const url = status ? `/api/v1/admin/organizations?status=${encodeURIComponent(status)}` : '/api/v1/admin/organizations';
+        const data = await request(url);
+        const rows = data.organizations.map(o => `<tr><td><b>${esc(o.name)}</b><small>${esc(o.organizationId)}</small></td><td>${esc(o.contactEmail)}</td><td><a href="${esc(o.officialUrl)}" target="_blank" rel="noopener">${esc(o.officialUrl)}</a></td><td><span class="pill ${o.status === 'active' ? 'live' : (o.status === 'rejected' ? 'revoked' : 'paused')}">${esc(o.status)}</span></td><td>${date(o.createdAt)}</td><td class="act">${o.status === 'submitted' ? `<button class="secondary" data-op="review-org" data-org="${esc(o.organizationId)}">Review</button>` : '<span class="sub">decided</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No organizations found.</td></tr>';
+        $('orgRows').innerHTML = rows;
+      } catch (e) { setStatus(e.message, true); }
+    }
+
+    $('orgFilter').addEventListener('change', loadOrgs);
+    $('refreshOrgs').addEventListener('click', loadOrgs);
+
+    $('orgRows').addEventListener('click', async e => {
+      const b = e.target.closest('button[data-op="review-org"]'); if (!b) return;
+      const orgId = b.dataset.org;
+      try {
+        const org = await request(`/api/v1/admin/organizations/${encodeURIComponent(orgId)}`);
+        currentOrg = org.organization;
+        $('orgDialogTitle').textContent = `Review: ${org.organization.name}`;
+        $('orgDetails').innerHTML = `
+          <p><b>Organization ID:</b> ${esc(org.organization.organizationId)}</p>
+          <p><b>Owner:</b> ${esc(org.organization.ownerId)}</p>
+          <p><b>Contact:</b> ${esc(org.organization.contactEmail)}</p>
+          <p><b>Official URL:</b> <a href="${esc(org.organization.officialUrl)}" target="_blank">${esc(org.organization.officialUrl)}</a></p>
+          <p><b>Social Proofs:</b></p><ul>${(org.organization.socialProofs || []).map(p => `<li>${esc(p.platform)}: <a href="${esc(p.url)}" target="_blank">${esc(p.url)}</a></li>`).join('')}</ul>
+          <p><b>Technical Questions:</b></p><ol>${(org.organization.technicalQuestions || []).map((q, i) => `<li><b>Q${i+1}:</b> ${esc(q.question)}<br><b>A:</b> ${esc(q.answer)}</li>`).join('')}</ol>
+        `;
+        $('orgNotes').value = '';
+        $('orgDialog').showModal();
+      } catch (e) { setStatus(e.message, true); }
+    });
+
+    async function orgAction(action) {
+      if (!currentOrg) return;
+      try {
+        await request(`/api/v1/admin/organizations/${encodeURIComponent(currentOrg.organizationId)}/${action}`, {
+          method: 'POST',
+          body: JSON.stringify({ notes: $('orgNotes').value.trim() })
+        });
+        await loadOrgs();
+        setStatus(`Organization ${action}d`);
+        currentOrg = null;
+      } catch (e) { setStatus(`Failed: ${e.message}`, true); }
+    }
+
+    $('orgApprove').addEventListener('click', () => orgAction('approve'));
+    $('orgReject').addEventListener('click', () => orgAction('reject'));
+    $('orgSuspend').addEventListener('click', () => orgAction('suspend'));
   </script>
 </body>
 </html>

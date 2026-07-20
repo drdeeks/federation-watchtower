@@ -5,6 +5,20 @@ import { appendLifecycle, projectPublicScene } from "./lifecycle.ts";
 
 type Json = (data: unknown, status?: number) => Response;
 
+// Helper functions for validation (mirroring lifecycle.ts patterns)
+function readBoundedJsonBody(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new ValidationError("request body must be a JSON object");
+  return value as Record<string, unknown>;
+}
+function text(value: unknown, label: string, max: number): string {
+  if (typeof value !== "string" || !(value = value.trim()) || value.length > max) throw new ValidationError(`${label} must be a non-empty string up to ${max} characters`);
+  return value;
+}
+function integer(value: unknown, label: string, min: number, max: number): number {
+  if (!Number.isInteger(value) || (value as number) < min || (value as number) > max) throw new ValidationError(`${label} must be an integer from ${min} to ${max}`);
+  return value as number;
+}
+
 // Admin operator management for canonical agents. Every route here is gated by
 // requireAdmin() in index.ts before this handler runs. "Remove" is a revoke,
 // never a delete — federation_lifecycle_events (evidence) is preserved.
@@ -92,6 +106,107 @@ export async function handleManagementRequest(input: {
     return json({ alerts, count: alerts.length, requestId: crypto.randomUUID() });
   }
 
+  // ==================== ROOM MANAGEMENT ====================
+  // List all rooms (optionally filtered by project)
+  if (path === "/api/v1/admin/rooms" && method === "GET") {
+    const url = new URL(request.url);
+    const projectFilter = url.searchParams.get("projectId");
+    const binds: unknown[] = [];
+    const where = projectFilter ? " WHERE r.project_id = ?" : "";
+    if (projectFilter) binds.push(validateProjectId(projectFilter));
+    const rows = await env.DB.prepare(
+      `SELECT r.id, r.project_id, r.room_index, r.capacity, r.created_at,
+        (SELECT COUNT(*) FROM agents WHERE room_id = r.id) as used_count,
+        (SELECT GROUP_CONCAT(a.agent_id) FROM agents a WHERE a.room_id = r.id) as agent_ids
+       FROM rooms r${where} ORDER BY r.project_id, r.room_index`
+    ).bind(...binds).all<RoomRow>();
+    const rooms = (rows.results || []).map(presentRoom);
+    return json({ rooms, count: rooms.length, requestId: crypto.randomUUID() });
+  }
+
+  // Create a new room
+  if (path === "/api/v1/admin/rooms" && method === "POST") {
+    if (!request.body) throw new ValidationError("request body is required");
+    const value = await request.json();
+    const body = readBoundedJsonBody(value);
+    const roomId = validateAgentId(body.roomId);
+    const projectId = validateProjectId(body.projectId);
+    const capacity = body.capacity === undefined ? 35 : integer(body.capacity, "capacity", 1, 100);
+    const now = Date.now();
+    // Get next room_index for this project
+    const maxIndex = await env.DB.prepare("SELECT MAX(room_index) as max_idx FROM rooms WHERE project_id = ?").bind(projectId).first<{ max_idx: number | null }>();
+    const roomIndex = (maxIndex?.max_idx ?? 0) + 1;
+    await env.DB.prepare(
+      "INSERT INTO rooms (id, project_id, room_index, capacity, created_at) VALUES (?, ?, ?, ?, ?)"
+    ).bind(roomId, projectId, roomIndex, capacity, now).run();
+    await appendLifecycle(env, `room:${roomId}`, "room.created", `mgmt-room-create-${now}`, { projectId, capacity, roomIndex }, now);
+    return json({ room: { roomId, projectId, roomIndex, capacity, createdAt: now }, requestId: crypto.randomUUID() }, 201);
+  }
+
+  // Delete a room (only if empty)
+  const roomDelete = path.match(/^\/api\/v1\/admin\/rooms\/([^/]+)$/);
+  if (roomDelete && method === "DELETE") {
+    const roomId = validateAgentId(decodeURIComponent(roomDelete[1]));
+    const room = await env.DB.prepare("SELECT id, project_id FROM rooms WHERE id = ?").bind(roomId).first<{ id: string; project_id: string }>();
+    if (!room) return json({ error: "room not found" }, 404);
+    const agentCount = await env.DB.prepare("SELECT COUNT(*) as cnt FROM agents WHERE room_id = ?").bind(roomId).first<{ cnt: number }>();
+    if ((agentCount?.cnt ?? 0) > 0) return json({ error: "room must be empty before deletion", agentCount: agentCount?.cnt }, 409);
+    await env.DB.prepare("DELETE FROM rooms WHERE id = ?").bind(roomId).run();
+    await appendLifecycle(env, `room:${roomId}`, "room.deleted", `mgmt-room-delete-${Date.now()}`, { projectId: room.project_id }, Date.now());
+    return json({ deleted: true, roomId }, 200);
+  }
+
+  // ==================== ORGANIZATION MANAGEMENT ====================
+  // List all organization applications
+  if (path === "/api/v1/admin/organizations" && method === "GET") {
+    const url = new URL(request.url);
+    const statusFilter = url.searchParams.get("status");
+    const binds: unknown[] = [];
+    const where = statusFilter ? " WHERE status = ?" : "";
+    if (statusFilter) binds.push(statusFilter);
+    const rows = await env.DB.prepare(
+      `SELECT id, organization_id, owner_id, name, contact_email, official_url, status, created_at, updated_at
+       FROM federation_organizations${where} ORDER BY created_at DESC`
+    ).bind(...binds).all<OrgRow>();
+    const organizations = (rows.results || []).map(presentOrg);
+    return json({ organizations, count: organizations.length, requestId: crypto.randomUUID() });
+  }
+
+  // Get single organization with full details
+  const orgGet = path.match(/^\/api\/v1\/admin\/organizations\/([^/]+)$/);
+  if (orgGet && method === "GET") {
+    const orgId = validateAgentId(decodeURIComponent(orgGet[1]));
+    const org = await env.DB.prepare("SELECT * FROM federation_organizations WHERE id = ?").bind(orgId).first<OrgRow>();
+    if (!org) return json({ error: "organization not found" }, 404);
+    const proofs = await env.DB.prepare("SELECT platform, url, created_at FROM federation_organization_social_proofs WHERE organization_id = ?").bind(orgId).all();
+    const questions = await env.DB.prepare("SELECT position, question, answer, created_at FROM federation_organization_questions WHERE organization_id = ? ORDER BY position").bind(orgId).all();
+    return json({ organization: { ...presentOrg(org), socialProofs: proofs.results || [], technicalQuestions: questions.results || [] } });
+  }
+
+  // Approve organization application
+  const orgApprove = path.match(/^\/api\/v1\/admin\/organizations\/([^/]+)\/(approve|reject|suspend)$/);
+  if (orgApprove && method === "POST") {
+    const orgId = validateAgentId(decodeURIComponent(orgApprove[1]));
+    const action = orgApprove[2];
+    if (!request.body) throw new ValidationError("request body is required");
+    const value = await request.json();
+    const body = readBoundedJsonBody(value);
+    const notes = text(body.notes || "", "notes", 500);
+    const now = Date.now();
+    const org = await env.DB.prepare("SELECT id, status FROM federation_organizations WHERE id = ?").bind(orgId).first<{ id: string; status: string }>();
+    if (!org) return json({ error: "organization not found" }, 404);
+    const newStatus = action === "approve" ? "active" : action === "reject" ? "rejected" : "suspended";
+    await env.DB.prepare("UPDATE federation_organizations SET status = ?, updated_at = ? WHERE id = ?").bind(newStatus, now, orgId).run();
+    // If approved, add to verified_federations
+    if (action === "approve") {
+      const orgData = await env.DB.prepare("SELECT * FROM federation_organizations WHERE id = ?").bind(orgId).first<any>();
+      await env.DB.prepare(
+        "INSERT OR REPLACE INTO verified_federations (id, name, org_email, official_repo, social_profiles, status, reviewed_by, reviewed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'verified', ?, ?, ?, ?)"
+      ).bind(orgData.organization_id, orgData.name, orgData.contact_email, orgData.official_url, orgData.social_profiles || "[]", "admin", now, orgData.created_at, now).run();
+    }
+    return json({ organization: { organizationId: orgId, status: newStatus, notes }, requestId: crypto.randomUUID() });
+  }
+
   return null;
 }
 
@@ -133,5 +248,34 @@ export function present(a: AgentRow) {
     lifecycleState: a.lifecycle_state, paused: a.paused_at != null, pausedAt: a.paused_at || undefined,
     roomId: a.room_id || undefined, connectedAt: a.connected_at || undefined, lastHeartbeatAt: a.last_heartbeat_at || undefined,
     disconnectedAt: a.disconnected_at || undefined, createdAt: a.created_at, eventCount: a.event_count,
+  };
+}
+
+interface RoomRow {
+  id: string; project_id: string; room_index: number; capacity: number; created_at: number;
+  used_count: number; agent_ids: string | null;
+}
+
+export function presentRoom(r: RoomRow) {
+  return {
+    roomId: r.id, projectId: r.project_id, roomIndex: r.room_index, capacity: r.capacity,
+    usedCount: r.used_count, agentIds: r.agent_ids ? r.agent_ids.split(',') : [],
+    createdAt: r.created_at,
+  };
+}
+
+interface OrgRow {
+  id: number; organization_id: string; owner_id: string; name: string; contact_email: string;
+  official_url: string; social_profiles: string | null; tech_questions: string | null;
+  status: string; created_at: number; updated_at: number;
+}
+
+export function presentOrg(o: OrgRow) {
+  return {
+    id: o.id, organizationId: o.organization_id, ownerId: o.owner_id, name: o.name,
+    contactEmail: o.contact_email, officialUrl: o.official_url,
+    socialProfiles: o.social_profiles ? JSON.parse(o.social_profiles) : [],
+    technicalQuestions: o.tech_questions ? JSON.parse(o.tech_questions) : [],
+    status: o.status, createdAt: o.created_at, updatedAt: o.updated_at,
   };
 }

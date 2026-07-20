@@ -44,9 +44,8 @@
     </section>
     <section class="toolbar">
       <label>Project <select id="project" disabled><option>Connect first</option></select></label>
-      <button id="refresh" class="secondary" disabled>⟳ Refresh</button>
       <label style="flex-direction:row;display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0;color:#b8d8d4;">
-        <input id="autoRefresh" type="checkbox" style="width:auto;min-height:auto;"> Auto-refresh 30s
+        <input id="autoRefresh" type="checkbox" style="width:auto;min-height:auto;" checked> Auto-refresh 30s
       </label>
       <button id="copyAgents" class="secondary" disabled>📋 Copy agent list</button>
       <button id="export" class="secondary" disabled>Export evidence</button>
@@ -118,11 +117,11 @@
     }
     let autoRefreshInterval = null;
     $('connect').addEventListener('click', connect);
-    $('refresh').addEventListener('click', refresh);
     project.addEventListener('change', refresh);
     $('autoRefresh').addEventListener('change', (e) => {
       if (e.target.checked) {
         autoRefreshInterval = setInterval(refresh, 30000);
+        refresh();
         setStatus('Auto-refresh enabled (30s)');
       } else {
         if (autoRefreshInterval) clearInterval(autoRefreshInterval);
