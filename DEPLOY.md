@@ -1,5 +1,36 @@
 # Federation Watchtower - Deploy Guide
 
+## ⚠️ CRITICAL: Deploy Code FIRST, Then Migrate
+
+**Order matters:** 
+1. `npm run deploy` - deploys worker code
+2. `npm run migrate:*` - applies database schema (6 migrations, IN ORDER)
+
+**Migrations are NOT auto-applied.** You must run them manually AFTER deploy.
+
+```bash
+cd source/federation-serverless
+
+# Step 1: Deploy worker code
+npm run deploy
+
+# Step 2: Apply migrations (AFTER deploy completes)
+npm run migrate:watchtower      # 0001: Core tables (agents, rooms, feed_events)
+npm run migrate:control-loop    # 0002: Watchdog, audit, sessions
+npm run migrate:access-gateway  # 0003: Owners, credentials, org applications
+npm run migrate:lifecycle       # 0004: Canonical lifecycle events
+npm run migrate:management      # 0005: Admin management tables
+npm run migrate:alert-sink      # 0006: Alert webhook receipts
+```
+
+**Why manual?** Cloudflare Workers deploy code only. D1 database schema changes require explicit migration execution.
+
+**Order matters:** Each migration builds on the previous. Running out of order will fail.
+
+**Safe to retry:** All migrations are additive (CREATE TABLE, ADD COLUMN, CREATE INDEX). No destructive operations.
+
+---
+
 ## Quick Deploy (5 minutes)
 
 ### Step 1: Merge to Main (if using git)
