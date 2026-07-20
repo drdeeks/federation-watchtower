@@ -2,12 +2,19 @@
 
 Small, dependency-free ESM client for the signed Federation Watchtower producer API.
 
-It is designed for server-side agents, Workers, and Node.js services that need to emit operational events and honor cooperative control decisions. It does **not** provide browser authentication, administrator APIs, agent registration, billing, x402 payments, or the prototype access/monetization roadmap.
+It is designed for server-side agents, Workers, and Node.js services that need to emit operational events and honor cooperative control decisions. It does **not** provide browser authentication, administrator APIs, billing, x402 payments, or the prototype access/monetization roadmap.
 
-It now also includes `FederationAgentClient`, the package-facing runtime client
-for an owner-issued `fw_agent_` credential. It lets an agent connect, send
-webhook-style heartbeats/events, disconnect, and return later without holding a
-WebSocket open or carrying the shared ingestion secret.
+It also includes two canonical lifecycle clients:
+
+- `FederationOwnerClient` — creates an owner and registers canonical agents
+  against the current lifecycle API, mirroring the live onboarding flow. It
+  returns a ready `FederationAgentClient` so a host can go from nothing to a
+  running agent without hand-assembling requests. It carries only the scoped
+  `fw_owner_` credential, never the shared ingestion secret.
+- `FederationAgentClient` — the package-facing runtime client for an
+  owner-issued `fw_agent_` credential. It lets an agent connect, send
+  webhook-style heartbeats/events, disconnect, and return later without holding
+  a WebSocket open or carrying the shared ingestion secret.
 
 ## Install
 
@@ -72,12 +79,43 @@ The client signs the exact UTF-8 JSON body with HMAC-SHA-256 and sends `X-Watcht
 
 `WatchtowerApiError` exposes `status` and a parsed `body` for denied or malformed responses.
 
+### Owner onboarding and registration
+
+`FederationOwnerClient` drives the canonical onboarding methods
+(`POST /api/v1/owners`, then owner-authenticated `POST /api/v1/agents`). Neither
+call sees the shared ingestion secret. Persist the returned `fw_owner_` and
+`fw_agent_` credentials in that host’s secret store — they are not browser
+tokens.
+
+```js
+import { FederationOwnerClient } from "@federation-watchtower/sdk";
+
+// One-time: create the owner and keep credential.token (fw_owner_...) server-side.
+const { client: owner } = await FederationOwnerClient.createOwner({
+  ownerId: "acme", displayName: "Acme", ownerType: "individual",
+});
+
+// Register a canonical agent; the returned client is ready to run the loop.
+const { agent, credential } = await owner.registerAgent({
+  agentId: "build-01", displayName: "Build 01", ownerId: "acme", projectId: "autopilot",
+  role: "testing", capabilities: ["testing", "reporting"],
+  identity: { avatarSeed: "build-01", paletteKey: "testing", characterType: "operator" },
+  publicProjection: true, heartbeat: { intervalSeconds: 30 },
+});
+// credential.token is the fw_agent_ secret; `agent` is a wired FederationAgentClient.
+await agent.connect();
+```
+
+If you already hold an `fw_owner_` token, construct the client directly:
+`new FederationOwnerClient({ ownerToken: process.env.FEDERATION_OWNER_TOKEN })`.
+
 ### Scoped agent lifecycle
 
-After an owner registers a canonical agent at `POST /api/v1/agents`, persist the
-returned credential in that agent host’s secret store. It is not a browser
-token. A heartbeat resets the durable watchdog deadline; absence transitions the
-same agent offline, while a later `connect` or `heartbeat` resumes it.
+An `fw_agent_` credential is returned once from registration (above, or by an
+out-of-band `POST /api/v1/agents`). Persist it in that agent host’s secret
+store. It is not a browser token. A heartbeat resets the durable watchdog
+deadline; absence transitions the same agent offline, while a later `connect` or
+`heartbeat` resumes it.
 
 ```js
 import { FederationAgentClient } from "@federation-watchtower/sdk";
@@ -107,7 +145,7 @@ npm run pack:check
 npm view @federation-watchtower/sdk version
 ```
 
-The current repository release is `0.1.0`. The package contains no secret,
+The current repository release is `0.2.0`. The package contains no secret,
 token, `.env`, test fixture, or Worker deployment configuration. Future releases
 should be tested and packed from a clean, reviewed commit with npm 2FA enabled.
 

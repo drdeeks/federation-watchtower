@@ -1,10 +1,11 @@
-export type EventSeverity = "debug" | "info" | "warning" | "error" | "critical";
+export type EventSeverity = "info" | "success" | "warning" | "error" | "critical";
 export type OperationalEventType =
   | "run.started" | "run.completed" | "run.failed" | "heartbeat"
   | "validation.passed" | "validation.failed" | "policy.blocked" | "tool.authorized" | "tool.denied" | "lease.denied"
   | "loop.depth_exceeded" | "loop.duplicate_detected" | "attempt.threshold_exceeded" | "fanout.threshold_exceeded"
   | "heartbeat.missed" | "duration.threshold_exceeded" | "budget.warning" | "budget.exceeded" | "rate.threshold_exceeded"
-  | "incident.opened" | "incident.acknowledged" | "containment.requested";
+  | "incident.opened" | "incident.acknowledged" | "containment.requested"
+  | "containment.acknowledged" | "incident.resolved";
 
 export interface WatchtowerClientOptions {
   /** Hosted gateway URL. Defaults to https://fapi.drdeeks.xyz. */
@@ -67,7 +68,7 @@ export interface AgentLifecycleEvent {
   eventId?: string;
   idempotencyKey?: string;
   eventType: OperationalEventType;
-  severity: Exclude<EventSeverity, "debug"> | "success";
+  severity: EventSeverity;
   occurredAt?: string;
   statement: string;
   metadata?: Record<string, unknown>;
@@ -78,4 +79,65 @@ export class FederationAgentClient {
   heartbeat(input?: { idempotencyKey?: string }): Promise<unknown>;
   disconnect(input?: { idempotencyKey?: string }): Promise<unknown>;
   emit(input: AgentLifecycleEvent): Promise<unknown>;
+}
+
+/**
+ * Canonical agent identity manifest submitted at registration. Mirrors the
+ * shape validated by the Worker's `validateLifecycleManifest` and the live
+ * onboarding flow — not the legacy administrative registration payload.
+ */
+export interface AgentManifest {
+  agentId: string;
+  displayName: string;
+  ownerId: string;
+  projectId: string;
+  role: string;
+  capabilities: string[];
+  identity: { avatarSeed: string; paletteKey: string; characterType: string };
+  publicProjection: boolean;
+  heartbeat: { intervalSeconds: number };
+  organizationId?: string;
+}
+
+export interface CreateOwnerInput {
+  gateway?: string;
+  ownerId: string;
+  displayName: string;
+  ownerType: "individual" | "organization";
+  fetch?: typeof globalThis.fetch;
+}
+
+export interface FederationOwnerClientOptions {
+  gateway?: string;
+  /** Scoped `fw_owner_` credential returned once from owner creation. Keep it server-side. */
+  ownerToken: string;
+  ownerId?: string;
+  fetch?: typeof globalThis.fetch;
+}
+
+export interface RegisteredAgent {
+  agent: { agentId: string; projectId: string; roomId?: string; [key: string]: unknown };
+  credential: { token: string; scopes?: string[]; issuedAt?: number };
+  next?: Record<string, string>;
+  /** A ready-to-use lifecycle client bound to the new `fw_agent_` credential. */
+  client: FederationAgentClient;
+}
+
+export interface CreatedOwner {
+  owner: { ownerId: string; [key: string]: unknown };
+  credential: { token: string; scopes?: string[]; issuedAt?: number };
+  /** An owner client bound to the new `fw_owner_` credential. */
+  client: FederationOwnerClient;
+}
+
+/**
+ * Owner-scoped registration client. Creates an owner and registers canonical
+ * agents against the current lifecycle API, returning a wired
+ * `FederationAgentClient` so a host can go from nothing to a running agent
+ * without hand-assembling requests. Never carries the shared ingestion secret.
+ */
+export class FederationOwnerClient {
+  constructor(options: FederationOwnerClientOptions);
+  static createOwner(input: CreateOwnerInput): Promise<CreatedOwner>;
+  registerAgent(manifest: AgentManifest): Promise<RegisteredAgent>;
 }

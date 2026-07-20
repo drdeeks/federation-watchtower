@@ -1,6 +1,6 @@
 {
   "name": "@federation-watchtower/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Signed producer client for Federation Watchtower operational control loops.",
   "license": "MIT",
   "type": "module",
