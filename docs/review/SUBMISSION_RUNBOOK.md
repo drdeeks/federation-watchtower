@@ -8,9 +8,27 @@ or private production evidence.
 From `source/federation-serverless/`:
 
 ```bash
+# Step 1: Verify build
 npm run types
 npm test
+
+# Step 2: Deploy worker
 npx wrangler deploy
+```
+
+⚠️ **CRITICAL: Apply migrations manually (NOT auto-applied)**
+
+```bash
+# Run these 6 migrations IN ORDER after deploy:
+npm run migrate:watchtower      # 0001: Core tables
+npm run migrate:control-loop    # 0002: Watchdog, audit
+npm run migrate:access-gateway  # 0003: Owners, credentials
+npm run migrate:lifecycle       # 0004: Lifecycle events
+npm run migrate:management      # 0005: Admin management
+npm run migrate:alert-sink      # 0006: Alert receipts
+
+# Or one-liner:
+for m in src/migrations/*.sql; do wrangler d1 execute federation-db --remote --file="$m"; done
 ```
 
 Then confirm all three public surfaces:
@@ -21,11 +39,19 @@ https://fapi.drdeeks.xyz/health
 https://federation.drdeeks.xyz/
 ```
 
-For this room-scene release, register or reconnect one disposable public agent,
-send `run.started`, and refresh the selected Watchtower room. The agent must
-appear at a supplied scene position; a watchdog expiry must transition it
-offline. The browser may show `AMBIENT` only with the exact label
-`ambient choreography · no operational event`.
+Test the full lifecycle: register/connect a disposable public agent, send
+`run.started`, and refresh the Watchtower room. The agent must appear at a
+scene position; watchdog expiry must transition it offline. The browser may
+show `AMBIENT` only with the exact label `ambient presentation · no event`.
+
+**Test admin management** (new for CL-0025):
+
+```text
+https://federation.drdeeks.xyz/manage.html
+```
+
+Enter admin token, verify: agent pause/resume/revoke, room create/delete,
+organization review/approve/reject, alert receipt viewing, evidence export.
 
 ## 2. Commit and publish source
 
@@ -53,43 +79,63 @@ credential in the package.
 
 ## 3. Record one real public demo — under three minutes
 
-Follow [the demo script](OPENAI_SUBMISSION_VIDEO_SCRIPT.md), updated with this
-order of proof:
+Follow [the demo script](VIDEO_RECORDING_GUIDE.md), updated with this order of proof:
 
-1. Open `watch.drdeeks.xyz` and select one room.
-2. Register/connect a disposable public agent through the API or package.
-3. Send a real `run.started` event and show its sourced room movement/log.
-4. Trigger a validation failure or watchdog expiry and show the alert/offline
-   state plus its underlying feed/evidence.
-5. Point out an `AMBIENT` label only if it appears; never call it agent work.
-6. State accurately how Codex and GPT-5.6 were used.
+1. **Intro (15s):** Open `watch.drdeeks.xyz`, state what Federation Watchtower is
+2. **Problem (15s):** Explain the 25,000 credits invisibility problem
+3. **Live demo (60s):** Register owner → register agent with lease → connect → heartbeat → emit `run.started` → disconnect
+4. **Watchtower (20s):** Show agent live on public camera view, event feed
+5. **Admin console (45s):** Open `manage.html`, show agent management, room create/delete, org review/approve
+6. **Codex usage (25s):** Show README, explain how Codex accelerated the work
+7. **Wrap up (10s):** Call to action
 
-Upload the recording publicly to YouTube. Do not use an unlisted/private video
-if the event requires a public link.
+Upload the recording publicly to YouTube (unlisted is OK for hackathon submission).
 
 ## 4. Complete the Devpost form manually
 
-- Select **Developer Tools**.
-- Attach the existing Federation Watchtower project to **OpenAI Build Week**;
-  publishing the standalone project alone is not submission.
-- Add the public repository URL and public YouTube link.
-- Use the project description in [OPENAI_SUBMISSION_NOTES.md](OPENAI_SUBMISSION_NOTES.md),
-  revising claims to match the deployed build.
-- State submitter type, country/residence, and any team information truthfully.
-- Add the Codex `/feedback` session ID from the session containing the primary
-  implementation work. Do not invent an ID.
-- Supply only public judge instructions. If a private repository is used, share
-  it with the two event-required review addresses listed in
-  [OPENAI_BUILD_WEEK_READINESS.md](OPENAI_BUILD_WEEK_READINESS.md).
+- **Project:** Federation Watchtower (ID: `1346118`)
+- **Challenge:** Attach to **OpenAI Build Week** (required for submission)
+- **Category:** Developer Tools
+- **Repository:** Your GitHub fork URL
+- **Video:** Public YouTube URL from Step 3
+- **Submitter type:** Individual
+- **Country:** Your country of residence
+- **Codex session ID:** `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
+- **Demo instructions:** Judges can visit `watch.drdeeks.xyz` (public) and test
+  agent registration at `federation.drdeeks.xyz/onboarding.html`. Admin features
+  at `manage.html` require `WATCHTOWER_ADMIN_TOKEN` (provide on request).
+- **Description:** Use [OPENAI_SUBMISSION_NOTES.md](OPENAI_SUBMISSION_NOTES.md),
+  revised to match deployed build. Mention: admin management (agents/rooms/orgs),
+  signed event ingestion, watchdog expiry, alert webhooks, camera-style UI.
 
 ## 5. Final truth check
 
 Before pressing Submit, verify each claim says either **implemented** or
-**planned** correctly. In particular, do not claim that payments, subscription
-tier enforcement, reviewer RBAC, private rooms, per-organization webhook
-configuration, public statement moderation, or complete sprite-asset use are
-live.
+**planned** correctly:
 
-The only remaining human-only work is license confirmation for optional art,
-the video, Devpost identity/form fields, `/feedback` session ID, and pressing
-the submission action.
+**Implemented (can claim):**
+- ✅ Owner/agent lifecycle with scoped credentials
+- ✅ Lease authentication (agents prove identity with `fw_agent_`)
+- ✅ Auto-lease registration option
+- ✅ Admin management: agents (pause/resume/revoke), rooms (create/delete empty), orgs (review/approve/reject/suspend)
+- ✅ Signed event ingestion with HMAC
+- ✅ Watchdog expiry and offline transitions
+- ✅ Alert webhooks with receipts (Slack/Discord/json formats)
+- ✅ Evidence exports to R2
+- ✅ Camera-style Watchtower UI (35-agent capacity)
+- ✅ Procedural sprite generation
+- ✅ Reduced-motion and feed-only modes
+- ✅ MCP server and published npm SDK (`@federation-watchtower/sdk@0.1.0`)
+
+**Not implemented (do NOT claim):**
+- ❌ Payments, subscriptions, x402 settlement
+- ❌ Statement moderation queue
+- ❌ Per-organization webhook configuration
+- ❌ Reviewer RBAC UI (org approval is admin-only)
+- ❌ Unix socket CLI
+- ❌ Mirror rooms and relief crews
+
+The only remaining human-only work: video recording, Devpost form fields,
+and pressing Submit.
+
+**Deadline:** July 21, 2026 @ 5:00pm PDT
