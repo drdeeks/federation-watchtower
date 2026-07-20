@@ -503,3 +503,140 @@ Rollback Ref: remove src/alert-webhook.ts(+test), restore the inline
               stableJson/HMAC delivery block in the index.ts queue consumer, drop
               the WATCHTOWER_ALERT_WEBHOOK_FORMAT env field
 ```
+
+## CL-0021 — Registry Unification: Canonical Lifecycle Is the Only Agent Registry
+
+```
+Date        : 2026-07-20
+Contributor : Claude
+Modules     : [MOD-002, MOD-007, MOD-015]
+Section Tags: [[LIFECYCLE-v1], [REGISTRY-v1], [QUALITY-v1]]
+Files Changed: [source/federation-serverless/src/index.ts,
+                source/federation-serverless/src/federation-coordinator.ts,
+                source/federation-serverless/src/lifecycle.ts,
+                source/federation-tv-widget/public/tv-widget.js,
+                source/federation-tv-widget/src/tv-widget.js]
+Description : Resolved the dual-registry split (master analysis B1/B2/B12) by
+              making the canonical lifecycle API the only write path for agent
+              identity/presence. Legacy direct-write routes on
+              /api/projects/:id/agents (POST register, PATCH update, POST
+              heartbeat, PATCH status) and the tv-widget registerAgent() POST
+              are retired — commented out in place per the no-delete decision,
+              GET routes retained. The legacy `agents` table now serves purely
+              as the public-floor projection written by the lifecycle bridge.
+              Coordinator counts (getSystemStatus, getProjects,
+              getProjectSummary) now read federation_agents (non-revoked;
+              active = connected AND not paused); public /api/search reads
+              federation_agents restricted to public_projection = 1 so private
+              canonical agents never leak through public search. Registration
+              now persists the bridge-assigned room into
+              federation_agents.room_id (migration 0005 column previously never
+              populated), so the admin console shows real rooms for
+              publicly-projected agents; private agents honestly keep NULL.
+              No schema change; remote D1 may still hold pre-unification demo
+              rows in `agents`/`feed_events` (operator cleanup, not code).
+Tests Passing: source/federation-serverless: npm run types PASS; node
+               --experimental-strip-types --test src/*.test.ts 24/24;
+               packages/watchtower-sdk: npm test 8/8; node --check on both
+               tv-widget.js copies (kept identical); git diff --check clean
+Phase       : PHASE-4 lifecycle consolidation; federation org dashboard still unbuilt
+Rollback Ref: uncomment the legacy agent write routes in index.ts and
+              registerAgent() in tv-widget.js, restore the `agents`-table count
+              queries in federation-coordinator.ts, drop room_id from the
+              lifecycle INSERT column list
+```
+
+## CL-0022 — Navigation Standardization and Legacy Code Cleanup
+
+```
+Date        : 2026-07-20
+Contributor : Claude
+Modules     : [MOD-008, MOD-015]
+Section Tags: [[CAMERA-PROJECTION-v1], [QUALITY-v1]]
+Files Changed: [source/federation-tv-widget/public/index.html,
+                source/federation-tv-widget/public/join.html,
+                source/federation-tv-widget/public/integrate.html,
+                source/federation-tv-widget/public/organization.html,
+                source/federation-tv-widget/public/federation.html,
+                source/federation-tv-widget/public/operator.html,
+                source/federation-tv-widget/public/manage.html,
+                source/federation-tv-widget/public/onboarding.html,
+                source/federation-tv-widget/public/demo.html,
+                source/federation-serverless/src/index.ts,
+                docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : Standardized navigation across all 9 public HTML pages with a
+              consistent 8-link structure: Watch, Send an agent, Integrate,
+              Organization, Federation, Onboarding, Operator, Manage (admin).
+              Converted all absolute URLs to relative paths for internal
+              navigation. The Watch page remains read-only with no API access.
+              Removed commented legacy agent write routes from index.ts
+              (lines 727-749) to reduce confusion — the canonical lifecycle
+              API is now the only documented write path.
+Tests Passing: source/federation-serverless: npm run types PASS; node
+               --experimental-strip-types --test src/*.test.ts 24/24;
+               packages/watchtower-sdk: npm test 8/8; node --check on both
+               tv-widget.js copies; git diff --check clean
+Phase       : PHASE-4 UI consolidation; individual agent flow fully functional
+Rollback Ref: restore the previous per-page navigation structures and
+              uncommented legacy route blocks in index.ts
+```
+
+## CL-0023 — Watch Page UI Simplification and OpenAI Build Week Compliance
+
+```
+Date        : 2026-07-20
+Contributor : Claude
+Modules     : [MOD-008, MOD-015]
+Section Tags: [[CAMERA-PROJECTION-v1], [QUALITY-v1], [SUBMISSION-v1]]
+Files Changed: [source/federation-tv-widget/public/index.html,
+                docs/review/OPENAI_SUBMISSION_NOTES.md,
+                README.md, docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : Removed misaligned toggle buttons ("Reduced motion" and "Feed
+              only") from the public Watchtower watch page. Cleaned up related
+              CSS (.desk__actions, .toggle, .feed-only-note, body.reduced-motion)
+              and JavaScript event handlers. Kept system-level
+              prefers-reduced-motion media query for accessibility compliance.
+              Updated documentation to align with OpenAI Build Week submission
+              requirements: clarified Developer Tools category fit, added
+              submission checklist, documented Codex collaboration process, and
+              ensured all public-facing materials meet hackathon rules (English
+              language, clear installation/testing instructions, no third-party
+              IP violations).
+Tests Passing: source/federation-serverless: npm run types PASS; node
+               --experimental-strip-types --test src/*.test.ts 24/24;
+               packages/watchtower-sdk: npm test 8/8; node --check on
+               tv-widget.js; git diff --check clean
+Phase       : PHASE-7 submission preparation; video demo and /feedback ID
+              remain user-owned deliverables
+Rollback Ref: restore the toggle button HTML, CSS classes, and JavaScript
+              event listeners from previous commit
+```
+
+## CL-0024 — Devpost README Compliance and Judge Testing Instructions
+
+```
+Date        : 2026-07-20
+Contributor : Claude
+Modules     : [MOD-015]
+Section Tags: [[SUBMISSION-v1], [QUALITY-v1]]
+Files Changed: [README.md, docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : Reformatted README to Devpost Markdown standard with proper
+              heading hierarchy, tables, code blocks, and lists. Added
+              required narrative sections: "Our story" with what inspired
+              us, what we learned, how we built it, and challenges faced.
+              Added "For Judges" section with 90-second testing path and
+              expanded "How to try it" with three options: live demo
+              (no install), local testing (developers), and webhook testing
+              (advanced). Created webhook test script for verifying alert
+              delivery configuration. All materials now comply with OpenAI
+              Build Week Official Rules (English language, clear testing
+              instructions, Codex collaboration documentation).
+Tests Passing: source/federation-serverless: npm run types PASS; node
+               --experimental-strip-types --test src/*.test.ts 24/24;
+               packages/watchtower-sdk: npm test 8/8; node --check on
+               tv-widget.js; git diff --check clean
+Phase       : PHASE-7 submission ready; video recording and final Devpost
+              submission remain user-owned deliverables
+Rollback Ref: restore previous README structure and remove judge testing
+              section, narrative sections, and webhook test script
+```

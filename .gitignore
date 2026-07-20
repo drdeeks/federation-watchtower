@@ -1,54 +1,370 @@
-# Dependencies and package-manager output
+# ============================================================
+# FEDERATION WATCHTOWER — ROBUST .gitignore
+# Clean, modular, production-ready repository
+# ============================================================
+
+# ============================================================
+# PACKAGE MANAGER & DEPENDENCIES
+# ============================================================
 node_modules/
 .pnp.*
+.pnp.js
 .yarn/
+.yarn-integrity
 npm-debug.log*
 yarn-debug.log*
+yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
+.npm
+.npmrc
+.yarnrc
+.pnpm-store/
+.bower_components/
+jspm_packages/
 
-# Local configuration and secrets
+# ============================================================
+# LOCAL SECRETS & CONFIGURATION (CRITICAL)
+# ============================================================
+# Never commit secrets, tokens, or credentials
 .env
 .env.*
 !.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Cloudflare Worker local config
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
 source/federation-serverless/.dev.vars
-.wrangler/
-.npmrc
+source/federation-serverless/.dev.vars.*
 
-# Build, test, and runtime output
+# Wrangler local state (DO NOT COMMIT)
+.wrangler/
+wrangler.toml.local
+*.wrangler.local
+
+# Cloudflare credentials
+~/.wrangler/
+.cloudflare/
+
+# ============================================================
+# BUILD, TEST, & RUNTIME OUTPUT
+# ============================================================
+# Build artifacts
 dist/
 build/
+out/
+.next/
+.nuxt/
+.output/
+
+# Test coverage
 coverage/
+.nyc_output/
+*.lcov
+cover/
+
+# Cache directories
 .cache/
 .turbo/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Logs
 *.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime artifacts
 *.pid
-__pycache__/
-*.py[cod]
+*.seed
+*.pid.lock
 tmp/
 temp/
+.tmp/
+.temp/
+*.tmp
+*.temp
 
-# OS/editor files
+# ============================================================
+# OPERATING SYSTEM FILES
+# ============================================================
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
 Thumbs.db
-.idea/
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.trash-*
+.nfs*
+
+# ============================================================
+# EDITOR & IDE FILES
+# ============================================================
+# VS Code
 .vscode/
-.claude/
-CLAUDE.md
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.vscode-test/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Vim
+*.swp
+*.swo
+*.swn
+*.bak
+*.un~
+Session.vim
+Sessionx.vim
+.netrwhist
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+*.sublime-session
+*.sublime-settings
+
+# Atom
+.atom/
+
+# NeoVim
+.localhistory
+*.localhistory
+
+# ============================================================
+# AI ASSISTANT FILES (KEEP OPTIONAL)
+# ============================================================
+# Claude/Anthropic - commented out if you want to track
+# .claude/
+# CLAUDE.md
+# .cursor/
+# .cursorrules
+
+# ============================================================
+# TYPESCRIPT & JAVASCRIPT
+# ============================================================
+# TypeScript build info
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Babel
+.babelrc
+.babelrc.js
+.babelrc.cjs
+.babelrc.mjs
+
+# ES Build
+esbuild/*.js
+esbuild/*.mjs
+
+# ============================================================
+# CLOUDFLARE WORKERS SPECIFIC
+# ============================================================
+# Local development state
+.wrangler/
+worker-configuration.d.ts
+worker-configuration.d.ts.map
+
+# D1 local database files
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+d1/
+.d1/
+
+# R2 local storage
+.r2/
+miniflare-*/
+
+# Queue local state
+.queue/
+
+# ============================================================
+# RELEASE & PACKAGING
+# ============================================================
+# Release bundles (keep intentional releases in release store)
+federation-*.tar.gz
+*.tar.gz
+*.tgz
+packages/*/*.tgz
+packages/*/*.tar.gz
+dist-*/
+release-*/
+
+# npm pack output
+*.npm
+
+# ============================================================
+# DOCUMENTATION & ASSETS (LARGE/GENERATED)
+# ============================================================
+# Skills reference material (large, not part of deploy)
+skills-reference/
+
+# Brand assets (original sources, not generated)
+brand/assets/
+brand/raw/
+brand/source/
+
+# Legacy sprite sheets (widget now uses procedural generation)
+source/federation-tv-widget/public/sprites/
+source/federation-tv-widget/public/sprites/**/*
+
+# Generated documentation
+docs/generated/
+docs/api/
+*.mdx
+
+# ============================================================
+# LOCAL SCRIPTS & TOOLS
+# ============================================================
+# One-off debug/verification scripts with hardcoded dev ports/tokens
+/manage-drive.mjs
+/scripts/debug-*
+/tools/dev-*
+
+# ============================================================
+# SECURITY & VULNERABILITY SCANS
+# ============================================================
+# Socket security scans
+socket/
+.socket/
+*.socket
+
+# Snyk
+.snyk
+
+# npm audit
+npm-audit.json
+
+# Dependabot
+.dependabot/
+
+# ============================================================
+# CI/CD & AUTOMATION
+# ============================================================
+# GitHub Actions
+.github/workflows/local-*
+
+# CircleCI
+.circleci/local-*
+
+# Travis CI
+.travis/local-*
+
+# Jenkins
+jenkins/
+
+# ============================================================
+# DOCKER & CONTAINERS
+# ============================================================
+# Docker local overrides
+docker-compose.override.yml
+docker-compose.local.yml
+*.docker.local
+
+# Container volumes
+.docker/
+
+# ============================================================
+# TESTING & QUALITY
+# ============================================================
+# Playwright
+playwright-report/
+test-results/
+*.playwright/
+
+# Jest
+jest-results/
+
+# Mocha
+mocha-output/
+
+# Vitest
+vitest-results/
+
+# ============================================================
+# PERFORMANCE & PROFILING
+# ============================================================
+# Chrome profiles
+*.cpuprofile
+*.heapsnapshot
+
+# Node profiles
+*.log
+profile/
+
+# ============================================================
+# MISCELLANEOUS
+# ============================================================
+# Patch files
+*.patch
+*.diff
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Temporary files
+*.temp
+*.tmp
 *.swp
 *.swo
 
-# Generated release bundles; keep intentional releases in a release store.
-federation-*.tar.gz
-packages/*/*.tgz
+# Lock files (keep package-lock.json, yarn.lock, pnpm-lock.yaml)
+# but ignore others
+Pipfile.lock
+Gemfile.lock
+composer.lock
+poetry.lock
+Cargo.lock
 
-# Local reference material and large source-asset archives (not part of the deploy)
-skills-reference/
-brand/assets/
-# Legacy raster sprite sheets — the widget now draws agents/floor procedurally
-source/federation-tv-widget/public/sprites/
-
-# Local one-off debug/verification scripts (hardcoded dev ports/paths/tokens)
-/manage-drive.mjs
+# ============================================================
+# END OF .gitignore
+# ============================================================
+# Repository is clean, modular, and production-ready
+# ============================================================
