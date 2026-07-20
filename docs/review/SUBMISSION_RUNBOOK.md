@@ -12,14 +12,14 @@ From `source/federation-serverless/`:
 npm run types
 npm test
 
-# Step 2: Deploy worker
+# Step 2: Deploy worker (code only - migrations NOT auto-applied)
 npx wrangler deploy
 ```
 
-⚠️ **CRITICAL: Apply migrations manually (NOT auto-applied)**
+⚠️ **CRITICAL: Apply migrations manually AFTER deploy**
 
 ```bash
-# Run these 6 migrations IN ORDER after deploy:
+# Run these 6 migrations IN ORDER (deploys code, then you migrate DB):
 npm run migrate:watchtower      # 0001: Core tables
 npm run migrate:control-loop    # 0002: Watchdog, audit
 npm run migrate:access-gateway  # 0003: Owners, credentials
