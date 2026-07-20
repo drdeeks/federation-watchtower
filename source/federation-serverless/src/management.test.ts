@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { agentStateFilter, present } from "./management.ts";
+import { agentStateFilter, present, presentAlertReceipt } from "./management.ts";
 
 test("agentStateFilter maps known states and rejects unknown", () => {
   assert.deepEqual(agentStateFilter("paused"), { clause: "a.paused_at IS NOT NULL" });
@@ -27,4 +27,24 @@ test("present flags paused agents, keeps evidence count, and coerces flags", () 
   assert.equal(active.paused, false);
   assert.equal(active.pausedAt, undefined);
   assert.equal(active.publicProjection, false);
+});
+
+test("presentAlertReceipt exposes a verified webhook delivery and drops nulls", () => {
+  const p = presentAlertReceipt({
+    delivery_id: "notify_1", project_id: "autopilot", incident_id: "inc_1", event_id: "evt_1",
+    agent_id: "build-01", severity: "critical", action: "pause", statement: "chain depth exceeded",
+    reason: "chain depth 6 exceeds 5", signature_valid: 1, received_at: 42,
+  });
+  assert.equal(p.deliveryId, "notify_1");
+  assert.equal(p.projectId, "autopilot");
+  assert.equal(p.signatureValid, true);
+  assert.equal(p.receivedAt, 42);
+
+  const sparse = presentAlertReceipt({
+    delivery_id: "notify_2", project_id: "autopilot", incident_id: null, event_id: null,
+    agent_id: null, severity: null, action: null, statement: null, reason: null, signature_valid: 0, received_at: 7,
+  });
+  assert.equal(sparse.agentId, undefined);
+  assert.equal(sparse.statement, undefined);
+  assert.equal(sparse.signatureValid, false);
 });

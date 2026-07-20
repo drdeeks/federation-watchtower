@@ -404,3 +404,70 @@ Phase       : PHASE-6 operator tooling, partial (agent-level only)
 Rollback Ref: drop the 0005 migration columns/indexes, remove management.ts
               and its route wiring in index.ts, remove manage.html
 ```
+
+## CL-0018 — SDK Canonical Onboarding Client and Enum Truth
+
+```
+Date        : 2026-07-19
+Contributor : Claude
+Modules     : [MOD-005, MOD-014]
+Section Tags: [[INTEGRATION-v1], [IDENTITY-ACCESS-v1], [QUALITY-v1]]
+Files Changed: [packages/watchtower-sdk/src/index.js,
+                packages/watchtower-sdk/src/index.d.ts,
+                packages/watchtower-sdk/test/index.test.js,
+                packages/watchtower-sdk/README.md,
+                packages/watchtower-sdk/package.json]
+Description : Brought @federation-watchtower/sdk onto the current canonical
+              lifecycle. Added FederationOwnerClient (static createOwner ->
+              POST /api/v1/owners; registerAgent -> owner-bearer
+              POST /api/v1/agents) which returns a wired FederationAgentClient,
+              mirroring the live onboarding flow and carrying only scoped
+              fw_owner_/fw_agent_ credentials (never the shared ingestion
+              secret). Fixed a stale published type contract: EventSeverity
+              wrongly advertised "debug" (the Worker rejects it) and omitted
+              "success" (the Worker accepts it); OperationalEventType was
+              missing containment.acknowledged and incident.resolved. Both now
+              match watchtower.ts exactly (verified programmatically). Version
+              0.1.0 -> 0.2.0.
+Tests Passing: SDK node --test 8/8 (4 new: createOwner body/binding,
+               non-owner-token rejection, registerAgent wiring, 400 surfacing);
+               npm run pack:check clean (no secrets); enum parity with the
+               Worker confirmed
+Phase       : PHASE-3 integration; publish to npm remains a separate credentialed
+              step (not performed here)
+Rollback Ref: revert the five SDK files; the published 0.1.0 remains usable
+```
+
+## CL-0019 — Provable Outbound Alert Webhook
+
+```
+Date        : 2026-07-19
+Contributor : Claude
+Modules     : [MOD-007, MOD-013, MOD-015]
+Section Tags: [[WATCHDOG-v1], [GOVERNANCE-v1], [QUALITY-v1]]
+Files Changed: [source/federation-serverless/src/index.ts,
+                source/federation-serverless/src/management.ts,
+                source/federation-serverless/src/management.test.ts,
+                source/federation-serverless/src/migrations/0006_alert_webhook_receipts.sql,
+                source/federation-serverless/package.json,
+                source/federation-tv-widget/public/manage.html, AGENTS.md]
+Description : Made the outbound alert webhook observable and demonstrable end to
+              end instead of merely wired. The queue consumer already signs and
+              POSTs guardrail alerts to WATCHTOWER_ALERT_WEBHOOK_URL (opt-in;
+              unset => 'suppressed'). Added a self-hosted receiver
+              POST /api/v1/alert-sink that verifies the HMAC signature and
+              appends an immutable receipt (alert_webhook_receipts, migration
+              0006; delivery_id UNIQUE keeps redelivery idempotent), an admin
+              read GET /api/v1/admin/alerts, and a manage.html "Alert webhook"
+              panel. Pointing the webhook URL at the sink yields a self-contained
+              working webhook with no external dependency. Per-owner webhook
+              destinations remain unbuilt.
+Tests Passing: node --experimental-strip-types --test src/*.test.ts 21/21
+               (adds presentAlertReceipt); npm run types PASS; end-to-end drive
+               against a local Worker: valid signature -> 202 + stored receipt,
+               tampered signature -> 401, admin read shows signatureValid:true,
+               idempotent redelivery keeps count at 1
+Phase       : PHASE-6 governance/observability, partial (single global webhook)
+Rollback Ref: drop the 0006 table, remove the alert-sink route + /api/v1/admin/alerts
+              handler + presentAlertReceipt, revert the manage.html panel
+```
