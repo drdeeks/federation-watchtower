@@ -11,6 +11,8 @@
     "migrate:control-loop": "wrangler d1 execute federation-db --remote --file=src/migrations/0002_watchtower_control_loop.sql",
     "migrate:access-gateway": "wrangler d1 execute federation-db --remote --file=src/migrations/0003_watchtower_access_gateway.sql",
     "migrate:lifecycle": "wrangler d1 execute federation-db --remote --file=src/migrations/0004_federation_lifecycle.sql",
+    "migrate:management": "wrangler d1 execute federation-db --remote --file=src/migrations/0005_management.sql",
+    "migrate:alert-sink": "wrangler d1 execute federation-db --remote --file=src/migrations/0006_alert_webhook_receipts.sql",
     "test": "node --experimental-strip-types --test src/*.test.ts",
     "security:socket": "socket scan create --report --no-interactive .",
     "security:socket:dry-run": "socket scan create --dry-run --no-interactive ."

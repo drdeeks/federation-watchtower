@@ -366,3 +366,140 @@ Phase       : PHASE-3 partial implementation; owner-scoped webhook and
               organization integration controls remain incomplete
 Rollback Ref: restore pre-publication wording if the npm release is withdrawn
 ```
+
+## CL-0017 — Operator Agent Management Console
+
+```
+Date        : 2026-07-19
+Contributor : Codex
+Modules     : [MOD-002, MOD-003, MOD-013, MOD-015]
+Section Tags: [[IDENTITY-ACCESS-v1], [AGENT-REGISTRY-v1], [GOVERNANCE-v1]]
+Files Changed: [source/federation-serverless/src/management.ts,
+                source/federation-serverless/src/management.test.ts,
+                source/federation-serverless/src/migrations/0005_management.sql,
+                source/federation-serverless/src/index.ts,
+                source/federation-serverless/src/lifecycle.ts,
+                source/federation-serverless/package.json,
+                source/federation-tv-widget/public/manage.html,
+                source/federation-tv-widget/public/federation.html,
+                source/federation-tv-widget/public/operator.html, AGENTS.md]
+Description : Added an admin-token-gated operator console (`manage.html`) and
+              backing `/api/v1/admin/agents*` routes to list every canonical
+              agent with owner/room/state, and pause, resume, or revoke it.
+              Pause and revoke both stop the agent's Watchdog, drop it from the
+              public scene, and now also block its bearer credential from
+              authenticating further heartbeats/events (0005 migration adds
+              `paused_at`/`room_id` to `federation_agents`); revoke additionally
+              invalidates the stored credential. Both preserve
+              `federation_lifecycle_events` evidence — verified end-to-end
+              against a local Worker (create owner -> register -> pause ->
+              heartbeat 401 -> resume -> heartbeat 200 -> revoke -> heartbeat
+              401 -> eventCount unchanged). Room-level lifecycle management
+              (archive/transfer per PHASE-6.1) is a separate future increment.
+Tests Passing: node --experimental-strip-types --test src/*.test.ts (20/20,
+               including agentStateFilter and present in management.test.ts);
+               manual end-to-end admin pause/resume/revoke drive against a
+               local wrangler dev Worker
+Phase       : PHASE-6 operator tooling, partial (agent-level only)
+Rollback Ref: drop the 0005 migration columns/indexes, remove management.ts
+              and its route wiring in index.ts, remove manage.html
+```
+
+## CL-0018 — SDK Canonical Onboarding Client and Enum Truth
+
+```
+Date        : 2026-07-19
+Contributor : Claude
+Modules     : [MOD-005, MOD-014]
+Section Tags: [[INTEGRATION-v1], [IDENTITY-ACCESS-v1], [QUALITY-v1]]
+Files Changed: [packages/watchtower-sdk/src/index.js,
+                packages/watchtower-sdk/src/index.d.ts,
+                packages/watchtower-sdk/test/index.test.js,
+                packages/watchtower-sdk/README.md,
+                packages/watchtower-sdk/package.json]
+Description : Brought @federation-watchtower/sdk onto the current canonical
+              lifecycle. Added FederationOwnerClient (static createOwner ->
+              POST /api/v1/owners; registerAgent -> owner-bearer
+              POST /api/v1/agents) which returns a wired FederationAgentClient,
+              mirroring the live onboarding flow and carrying only scoped
+              fw_owner_/fw_agent_ credentials (never the shared ingestion
+              secret). Fixed a stale published type contract: EventSeverity
+              wrongly advertised "debug" (the Worker rejects it) and omitted
+              "success" (the Worker accepts it); OperationalEventType was
+              missing containment.acknowledged and incident.resolved. Both now
+              match watchtower.ts exactly (verified programmatically). Version
+              0.1.0 -> 0.2.0.
+Tests Passing: SDK node --test 8/8 (4 new: createOwner body/binding,
+               non-owner-token rejection, registerAgent wiring, 400 surfacing);
+               npm run pack:check clean (no secrets); enum parity with the
+               Worker confirmed
+Phase       : PHASE-3 integration; publish to npm remains a separate credentialed
+              step (not performed here)
+Rollback Ref: revert the five SDK files; the published 0.1.0 remains usable
+```
+
+## CL-0019 — Provable Outbound Alert Webhook
+
+```
+Date        : 2026-07-19
+Contributor : Claude
+Modules     : [MOD-007, MOD-013, MOD-015]
+Section Tags: [[WATCHDOG-v1], [GOVERNANCE-v1], [QUALITY-v1]]
+Files Changed: [source/federation-serverless/src/index.ts,
+                source/federation-serverless/src/management.ts,
+                source/federation-serverless/src/management.test.ts,
+                source/federation-serverless/src/migrations/0006_alert_webhook_receipts.sql,
+                source/federation-serverless/package.json,
+                source/federation-tv-widget/public/manage.html, AGENTS.md]
+Description : Made the outbound alert webhook observable and demonstrable end to
+              end instead of merely wired. The queue consumer already signs and
+              POSTs guardrail alerts to WATCHTOWER_ALERT_WEBHOOK_URL (opt-in;
+              unset => 'suppressed'). Added a self-hosted receiver
+              POST /api/v1/alert-sink that verifies the HMAC signature and
+              appends an immutable receipt (alert_webhook_receipts, migration
+              0006; delivery_id UNIQUE keeps redelivery idempotent), an admin
+              read GET /api/v1/admin/alerts, and a manage.html "Alert webhook"
+              panel. Pointing the webhook URL at the sink yields a self-contained
+              working webhook with no external dependency. Per-owner webhook
+              destinations remain unbuilt.
+Tests Passing: node --experimental-strip-types --test src/*.test.ts 21/21
+               (adds presentAlertReceipt); npm run types PASS; end-to-end drive
+               against a local Worker: valid signature -> 202 + stored receipt,
+               tampered signature -> 401, admin read shows signatureValid:true,
+               idempotent redelivery keeps count at 1
+Phase       : PHASE-6 governance/observability, partial (single global webhook)
+Rollback Ref: drop the 0006 table, remove the alert-sink route + /api/v1/admin/alerts
+              handler + presentAlertReceipt, revert the manage.html panel
+```
+
+## CL-0020 — Destination-Aware Alert Webhook (Slack/Discord)
+
+```
+Date        : 2026-07-19
+Contributor : Claude
+Modules     : [MOD-007, MOD-015]
+Section Tags: [[WATCHDOG-v1], [INTEGRATION-v1], [QUALITY-v1]]
+Files Changed: [source/federation-serverless/src/alert-webhook.ts,
+                source/federation-serverless/src/alert-webhook.test.ts,
+                source/federation-serverless/src/index.ts,
+                source/federation-serverless/src/agent-registry.ts, AGENTS.md]
+Description : Made the outbound alert webhook deliver to real external chat
+              destinations, not only a self-hosted receiver. Added
+              WATCHTOWER_ALERT_WEBHOOK_FORMAT (slack | discord | json, default
+              json): slack posts {text}, discord posts {content} as a readable
+              one-line alert to a free incoming-webhook URL (URL is the secret,
+              no signature); json keeps the generic HMAC-signed envelope that
+              /api/v1/alert-sink verifies. Extracted the payload builder into
+              src/alert-webhook.ts so the queue consumer just selects a format,
+              keeping the set small and extensible for future destinations
+              (PagerDuty, Teams, email). Transport (retries, DLQ, delivery audit)
+              is unchanged.
+Tests Passing: node --experimental-strip-types --test src/*.test.ts 24/24
+               (adds alert-webhook.test.ts: format normalisation, message
+               shape, slack/discord/json body + signature rules); npm run types
+               PASS
+Phase       : PHASE-6 governance/observability; per-owner destinations still unbuilt
+Rollback Ref: remove src/alert-webhook.ts(+test), restore the inline
+              stableJson/HMAC delivery block in the index.ts queue consumer, drop
+              the WATCHTOWER_ALERT_WEBHOOK_FORMAT env field
+```

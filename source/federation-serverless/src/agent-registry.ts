@@ -3,6 +3,7 @@ import { DurableObject } from "cloudflare:workers";
 export type WatchtowerEnv = Env & {
   WATCHTOWER_ALERT_WEBHOOK_URL?: string;
   WATCHTOWER_ALERT_WEBHOOK_SECRET?: string;
+  WATCHTOWER_ALERT_WEBHOOK_FORMAT?: string; // slack | discord | json (default)
 };
 
 export interface Agent {
