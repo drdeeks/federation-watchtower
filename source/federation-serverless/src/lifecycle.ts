@@ -163,7 +163,7 @@ async function authenticateOwner(request: Request, env: WatchtowerEnv): Promise<
 
 async function authenticateAgent(request: Request, env: WatchtowerEnv, projectId: string, agentId: string): Promise<CanonicalAgent | null> {
   const token = bearer(request, AGENT_PREFIX); if (!token) return null;
-  return env.DB.prepare(`SELECT a.* FROM federation_agents a JOIN federation_agent_credentials c ON c.agent_id = a.id WHERE a.project_id = ? AND a.agent_id = ? AND a.lifecycle_state != 'revoked' AND c.credential_hash = ? AND c.revoked_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > ?)`)
+  return env.DB.prepare(`SELECT a.* FROM federation_agents a JOIN federation_agent_credentials c ON c.agent_id = a.id WHERE a.project_id = ? AND a.agent_id = ? AND a.lifecycle_state != 'revoked' AND a.paused_at IS NULL AND c.credential_hash = ? AND c.revoked_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > ?)`)
     .bind(projectId, agentId, await sha256Hex(token), Date.now()).first<CanonicalAgent>();
 }
 
@@ -179,10 +179,10 @@ export function validateLifecycleManifest(value: unknown): Manifest {
   return { agentId: validateAgentId(body.agentId), displayName: text(body.displayName, "displayName", 80), ownerId: validateAgentId(body.ownerId), projectId: validateProjectId(body.projectId), role: text(body.role, "role", 80), capabilities, identity: { avatarSeed: validateAgentId(identity.avatarSeed), paletteKey, characterType }, publicProjection: body.publicProjection, heartbeatSeconds, organizationId: body.organizationId === undefined ? undefined : validateAgentId(body.organizationId) };
 }
 
-async function appendLifecycle(env: WatchtowerEnv, agentId: string, eventType: string, idempotencyKey: string | undefined, detail: Record<string, unknown>, occurredAt: number): Promise<void> {
+export async function appendLifecycle(env: WatchtowerEnv, agentId: string, eventType: string, idempotencyKey: string | undefined, detail: Record<string, unknown>, occurredAt: number): Promise<void> {
   await env.DB.prepare("INSERT OR IGNORE INTO federation_lifecycle_events (id, agent_id, event_type, idempotency_key, detail, occurred_at) VALUES (?, ?, ?, ?, ?, ?)").bind(`life-${crypto.randomUUID()}`, agentId, eventType, idempotencyKey || null, JSON.stringify(detail), occurredAt).run();
 }
-async function projectPublicScene(env: WatchtowerEnv, agent: Agent, lifecycleState: string, eventType: string, sourceEventId: string, occurredAt: number): Promise<void> {
+export async function projectPublicScene(env: WatchtowerEnv, agent: Agent, lifecycleState: string, eventType: string, sourceEventId: string, occurredAt: number): Promise<void> {
   if (!agent.roomId) return;
   const scene = env.ROOM_SCENE.get(env.ROOM_SCENE.idFromName(agent.roomId)) as DurableObjectStub<RoomScene>;
   await scene.project({

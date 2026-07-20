@@ -7,6 +7,7 @@ import { ProjectGuardrail, type AlertDispatch } from "./project-guardrail";
 import { createMcpHandler } from "agents/mcp";
 import { createWatchtowerMcpServer, isIpAllowed, parseMcpCredential, toMcpPrincipal, verifyMcpApiKey } from "./mcp";
 import { handleLifecycleRequest } from "./lifecycle";
+import { handleManagementRequest } from "./management";
 import {
   constantTimeEqual, hmacSha256Hex, sha256Hex, stableJson, validateAgentId,
   validateCommandAcknowledgement, validateControlledToolAuthorizationRequest, validateLeaseRequest, validateLeaseValidationRequest,
@@ -181,7 +182,7 @@ export default {
     // privileged surface is the token-protected operator console.
     if (isFederationHost) {
       if (path === "/") return Response.redirect(new URL("/federation.html", request.url), 302);
-      const allowed = path === "/" || path === "/federation.html" || path === "/operator.html" || path === "/onboarding.html" || path.startsWith("/brand/");
+      const allowed = path === "/" || path === "/federation.html" || path === "/operator.html" || path === "/onboarding.html" || path === "/manage.html" || path === "/tv-widget.js" || path.startsWith("/brand/");
       if ((method !== "GET" && method !== "HEAD") || !allowed) return error("not found", 404);
       return env.ASSETS.fetch(new Request(new URL(path, request.url), request));
     }
@@ -215,6 +216,14 @@ export default {
 
       const lifecycleResponse = await handleLifecycleRequest({ request, path, method, env, coordinator, json, readBoundedJson });
       if (lifecycleResponse) return lifecycleResponse;
+
+      // Operator god-view management (agents/rooms). Admin-token only.
+      if (path.startsWith("/api/v1/admin/")) {
+        const denied = requireAdmin(request, env);
+        if (denied) return denied;
+        const managementResponse = await handleManagementRequest({ request, path, method, env, json });
+        if (managementResponse) return managementResponse;
+      }
 
       // A public scene is a read-only projection. It contains location and
       // presentation provenance, never a credential or mutation capability.

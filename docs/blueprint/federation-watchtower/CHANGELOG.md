@@ -366,3 +366,41 @@ Phase       : PHASE-3 partial implementation; owner-scoped webhook and
               organization integration controls remain incomplete
 Rollback Ref: restore pre-publication wording if the npm release is withdrawn
 ```
+
+## CL-0017 — Operator Agent Management Console
+
+```
+Date        : 2026-07-19
+Contributor : Codex
+Modules     : [MOD-002, MOD-003, MOD-013, MOD-015]
+Section Tags: [[IDENTITY-ACCESS-v1], [AGENT-REGISTRY-v1], [GOVERNANCE-v1]]
+Files Changed: [source/federation-serverless/src/management.ts,
+                source/federation-serverless/src/management.test.ts,
+                source/federation-serverless/src/migrations/0005_management.sql,
+                source/federation-serverless/src/index.ts,
+                source/federation-serverless/src/lifecycle.ts,
+                source/federation-serverless/package.json,
+                source/federation-tv-widget/public/manage.html,
+                source/federation-tv-widget/public/federation.html,
+                source/federation-tv-widget/public/operator.html, AGENTS.md]
+Description : Added an admin-token-gated operator console (`manage.html`) and
+              backing `/api/v1/admin/agents*` routes to list every canonical
+              agent with owner/room/state, and pause, resume, or revoke it.
+              Pause and revoke both stop the agent's Watchdog, drop it from the
+              public scene, and now also block its bearer credential from
+              authenticating further heartbeats/events (0005 migration adds
+              `paused_at`/`room_id` to `federation_agents`); revoke additionally
+              invalidates the stored credential. Both preserve
+              `federation_lifecycle_events` evidence — verified end-to-end
+              against a local Worker (create owner -> register -> pause ->
+              heartbeat 401 -> resume -> heartbeat 200 -> revoke -> heartbeat
+              401 -> eventCount unchanged). Room-level lifecycle management
+              (archive/transfer per PHASE-6.1) is a separate future increment.
+Tests Passing: node --experimental-strip-types --test src/*.test.ts (20/20,
+               including agentStateFilter and present in management.test.ts);
+               manual end-to-end admin pause/resume/revoke drive against a
+               local wrangler dev Worker
+Phase       : PHASE-6 operator tooling, partial (agent-level only)
+Rollback Ref: drop the 0005 migration columns/indexes, remove management.ts
+              and its route wiring in index.ts, remove manage.html
+```

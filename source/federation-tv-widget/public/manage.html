@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Federation Watchtower — Management Console</title>
+  <link rel="stylesheet" href="/brand/tokens.css">
+  <style>
+    :root { color-scheme: dark; font-family: var(--fed-mono, ui-monospace, SFMono-Regular, Menlo, monospace); background:#111718; color:#eef5ee; }
+    * { box-sizing:border-box; } body { margin:0; min-width:320px; background:linear-gradient(140deg,#101819,#152325 48%,#131718); }
+    header { display:flex; gap:16px; align-items:center; padding:18px clamp(16px,4vw,48px); border-bottom:2px solid #90cbbc; background:#172324; }
+    header img { width:44px; height:44px; } h1 { margin:0; font:800 clamp(1.2rem,4vw,1.9rem)/1 var(--fed-display,system-ui); letter-spacing:.04em; text-transform:uppercase; } .sub { color:#a4c8c3; font-size:.74rem; margin-top:5px; }
+    main { width:min(1400px,100%); margin:auto; padding:18px clamp(14px,3vw,40px) 56px; }
+    .connect, .toolbar, .card { border:1px solid #547f78; background:#192727; box-shadow:5px 5px 0 #050909; }
+    .connect { display:grid; grid-template-columns:minmax(160px,1fr) minmax(160px,1fr) auto; gap:10px; padding:12px; margin-bottom:20px; }
+    label { display:grid; gap:5px; color:#b9d4cf; font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; }
+    input, select, button { min-height:38px; border:1px solid #84b8ad; border-radius:0; font:inherit; }
+    input, select { width:100%; color:#eff8f4; background:#0e1717; padding:7px 9px; } input[type=password] { letter-spacing:.08em; }
+    button { cursor:pointer; color:#11201d; background:#f4c842; padding:7px 12px; font-weight:800; } button:hover { background:#ffe179; }
+    button.secondary { background:#9bd4c7; } button.ghost { background:#22403a; color:#dff5ee; border-color:#5f9186; } button.danger { background:#e57967; } button:disabled { opacity:.5; cursor:not-allowed; }
+    nav.fed-nav { margin-bottom:16px; }
+    .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:20px; }
+    .metric { min-height:96px; padding:15px; border:1px solid #3f7168; background:#1a2928; } .metric span { display:block; color:#9fc5bd; font-size:.66rem; text-transform:uppercase; letter-spacing:.08em; } .metric strong { display:block; margin-top:8px; font:800 clamp(1.3rem,4vw,2.1rem)/1 var(--fed-display,system-ui); color:#f4c842; }
+    .split { display:grid; grid-template-columns:1.35fr .95fr; gap:20px; align-items:start; }
+    .viz { border:2px solid #101a1c; border-radius:6px; overflow:hidden; background:#07100f; }
+    .card { overflow:hidden; } .card h2 { margin:0; padding:11px 14px; border-bottom:1px solid #527f76; font-size:.82rem; text-transform:uppercase; letter-spacing:.08em; background:#213433; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .card h2 .grow { flex:1; } .card h2 input, .card h2 select { max-width:150px; min-height:30px; }
+    .tablewrap { max-height:560px; overflow:auto; }
+    table { width:100%; border-collapse:collapse; font-size:.76rem; }
+    th, td { text-align:left; padding:8px 10px; border-bottom:1px solid #2d4a44; vertical-align:middle; }
+    th { position:sticky; top:0; background:#182726; color:#9fc5bd; font-size:.64rem; text-transform:uppercase; letter-spacing:.06em; z-index:1; }
+    td.name b { display:block; } td.name small { color:#9cb9b3; }
+    .pill { display:inline-block; padding:2px 7px; border:1px solid currentColor; border-radius:10px; font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; }
+    .pill.live { color:#91dcaf; } .pill.paused { color:#f5ce62; } .pill.revoked { color:#c9a29b; } .pill.idle { color:#8fb1aa; }
+    td.act { white-space:nowrap; } td.act button { min-height:28px; font-size:.66rem; padding:4px 8px; margin-right:5px; }
+    #status { color:#b8d8d4; font-size:.76rem; } .barrow { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; } .barrow #status { margin-left:auto; }
+    .empty { color:#9ab6b0; padding:18px 10px; font-size:.8rem; }
+    dialog { max-width:min(460px,calc(100% - 30px)); border:2px solid #e57967; color:#ecf5ef; background:#172626; box-shadow:8px 8px 0 #000; } dialog::backdrop { background:#000b; } dialog form { display:grid; gap:12px; } dialog h2 { margin:0; color:#e57967; } dialog menu { display:flex; justify-content:end; gap:8px; margin:0; padding:0; }
+    @media (max-width:900px){ .split{ grid-template-columns:1fr; } .metrics{ grid-template-columns:repeat(2,1fr); } .connect{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="/brand/federation-f-mark.svg" alt="Federation Watchtower">
+    <div><h1>Watchtower Management</h1><div class="sub">Operator god-view · credentials stay in this tab only</div></div>
+  </header>
+  <main>
+    <nav class="fed-nav" aria-label="Primary"><a href="https://watch.drdeeks.xyz/">Watch</a><a href="/federation.html">Federation</a><a href="/operator.html">Operator</a><a href="/manage.html" aria-current="page">Manage</a><a href="/onboarding.html">Onboarding</a></nav>
+
+    <section class="connect" aria-label="Connection settings">
+      <label>API endpoint <input id="api" autocomplete="url" spellcheck="false"></label>
+      <label>Admin bearer token <input id="token" type="password" autocomplete="off" placeholder="Never stored"></label>
+      <button id="connect">Connect</button>
+    </section>
+
+    <section class="metrics" aria-live="polite">
+      <div class="metric"><span>Total agents</span><strong id="m-total">—</strong></div>
+      <div class="metric"><span>Live</span><strong id="m-live">—</strong></div>
+      <div class="metric"><span>Paused</span><strong id="m-paused">—</strong></div>
+      <div class="metric"><span>Revoked</span><strong id="m-revoked">—</strong></div>
+    </section>
+
+    <section class="split">
+      <div class="card">
+        <h2><span class="grow">Agents</span>
+          <input id="search" placeholder="search name / id / owner" autocomplete="off">
+          <select id="filter"><option value="">all states</option><option value="connected">live</option><option value="paused">paused</option><option value="offline">offline</option><option value="registered">registered</option><option value="revoked">revoked</option></select>
+          <button id="refresh" class="secondary" disabled>Refresh</button>
+          <a href="/onboarding.html" class="button" style="text-decoration:none;background:#9bd4c7;color:#11201d;padding:7px 10px;font-weight:800;">+ Add agent</a>
+        </h2>
+        <div class="barrow" style="padding:8px 12px 0;"><span id="status" role="status">Disconnected — enter the admin token and connect.</span></div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Agent</th><th>Project</th><th>Room</th><th>Status</th><th>Last heartbeat</th><th>Events</th><th>Actions</th></tr></thead>
+            <tbody id="rows"><tr><td colspan="7" class="empty">Connect to load agents.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Live floor</h2>
+        <div class="viz" id="viz"></div>
+        <p class="sub" style="padding:10px 12px;">Read-only public projection of what everyone sees. Pause/revoke here removes an agent from this floor.</p>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="confirm"><form method="dialog"><h2 id="confirmTitle">Confirm</h2><p class="sub" id="confirmBody"></p><menu><button value="cancel" class="secondary">Cancel</button><button id="confirmGo" value="go" class="danger">Confirm</button></menu></form></dialog>
+
+  <script src="/tv-widget.js"></script>
+  <script>
+    "use strict";
+    const $ = id => document.getElementById(id);
+    const api = $('api'), token = $('token'), status = $('status');
+    api.value = new URLSearchParams(location.search).get('api') || (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'http://localhost:8787' : 'https://fapi.drdeeks.xyz');
+    const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
+    const date = v => v ? new Date(v).toLocaleString() : '—';
+    const state = { agents: [], viz: null, timer: null, pending: null };
+
+    function setStatus(msg, err = false) { status.textContent = msg; status.style.color = err ? '#ff9582' : '#b8d8d4'; }
+
+    async function request(path, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (token.value.trim()) headers.Authorization = `Bearer ${token.value.trim()}`;
+      if (options.body) headers['Content-Type'] = 'application/json';
+      const res = await fetch(`${api.value.replace(/\/$/,'')}${path}`, { ...options, headers });
+      const ct = res.headers.get('content-type') || '';
+      const body = ct.includes('application/json') ? await res.json() : await res.text();
+      if (!res.ok) throw new Error(typeof body === 'object' ? (body.error || `HTTP ${res.status}`) : (body || `HTTP ${res.status}`));
+      return body;
+    }
+
+    function agentStatus(a) {
+      if (a.paused) return 'paused';
+      if (a.lifecycleState === 'revoked') return 'revoked';
+      if (a.lifecycleState === 'connected') return 'live';
+      return 'idle';
+    }
+
+    function render() {
+      const q = $('search').value.trim().toLowerCase();
+      const rows = state.agents.filter(a => !q || [a.agentId, a.displayName, a.ownerId, a.projectId].some(v => String(v).toLowerCase().includes(q)));
+      $('rows').innerHTML = rows.length ? rows.map(a => {
+        const st = agentStatus(a);
+        const revoked = a.lifecycleState === 'revoked';
+        return `<tr>
+          <td class="name"><b>${esc(a.displayName)}</b><small>${esc(a.agentId)} · owner ${esc(a.ownerId)}</small></td>
+          <td>${esc(a.projectId)}</td>
+          <td>${esc(a.roomId || '—')}</td>
+          <td><span class="pill ${st}">${st}</span></td>
+          <td>${date(a.lastHeartbeatAt)}</td>
+          <td>${a.eventCount}</td>
+          <td class="act">
+            ${revoked ? '' : (a.paused
+              ? `<button class="ghost" data-op="resume" data-p="${esc(a.projectId)}" data-a="${esc(a.agentId)}">Resume</button>`
+              : `<button class="secondary" data-op="pause" data-p="${esc(a.projectId)}" data-a="${esc(a.agentId)}">Pause</button>`)}
+            ${revoked ? '<span class="sub">revoked</span>' : `<button class="danger" data-op="revoke" data-p="${esc(a.projectId)}" data-a="${esc(a.agentId)}" data-name="${esc(a.displayName)}">Revoke</button>`}
+          </td></tr>`;
+      }).join('') : '<tr><td colspan="7" class="empty">No agents match.</td></tr>';
+    }
+
+    async function load() {
+      try {
+        const qs = $('filter').value ? `?state=${encodeURIComponent($('filter').value)}` : '';
+        const data = await request(`/api/v1/admin/agents${qs}`);
+        state.agents = data.agents || [];
+        const s = data.summary || {};
+        $('m-total').textContent = s.total ?? state.agents.length;
+        $('m-live').textContent = s.live ?? 0;
+        $('m-paused').textContent = s.paused ?? 0;
+        $('m-revoked').textContent = s.revoked ?? 0;
+        render();
+        setStatus(`Live · ${state.agents.length} agents · ${new Date().toLocaleTimeString()}`);
+      } catch (e) { setStatus(e.message, true); }
+    }
+
+    function mountViz() {
+      if (state.viz || !window.FederationTV) return;
+      try { state.viz = new window.FederationTV({ projectId:'all', roomId:'all', container:'#viz', gatewayUrl:api.value.replace(/\/$/,''), presentationMode:'camera', refreshInterval:15000 }); } catch (e) {}
+    }
+
+    async function connect() {
+      $('connect').disabled = true; setStatus('Connecting…');
+      try {
+        await load();
+        $('refresh').disabled = false;
+        mountViz();
+        if (state.timer) clearInterval(state.timer);
+        state.timer = setInterval(load, 15000);
+      } catch (e) { setStatus(e.message, true); }
+      finally { $('connect').disabled = false; }
+    }
+
+    async function act(op, projectId, agentId) {
+      try { await request(`/api/v1/admin/agents/${encodeURIComponent(projectId)}/${encodeURIComponent(agentId)}/${op}`, { method:'POST' }); await load(); }
+      catch (e) { setStatus(e.message, true); }
+    }
+
+    $('connect').addEventListener('click', connect);
+    $('refresh').addEventListener('click', load);
+    $('search').addEventListener('input', render);
+    $('filter').addEventListener('change', load);
+    $('rows').addEventListener('click', e => {
+      const b = e.target.closest('button[data-op]'); if (!b) return;
+      const { op, p, a, name } = b.dataset;
+      if (op === 'revoke') {
+        state.pending = { op, p, a };
+        $('confirmTitle').textContent = `Revoke ${a}`;
+        $('confirmBody').textContent = `Permanently revoke "${name}" (${a})? Its credential is invalidated and it drops off the floor. Operational event history is preserved.`;
+        $('confirm').showModal();
+        return;
+      }
+      act(op, p, a);
+    });
+    $('confirm').addEventListener('close', () => {
+      if ($('confirm').returnValue === 'go' && state.pending) act(state.pending.op, state.pending.p, state.pending.a);
+      state.pending = null;
+    });
+  </script>
+</body>
+</html>
