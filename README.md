@@ -65,7 +65,7 @@ The colorful TV presentation is intentionally a hook, not a substitute for contr
 
 It is being built with Codex during OpenAI Build Week. The project is designed to make Codex-enabled and other autonomous workflows safer to operate; it does not claim that Watchtower controls a model provider itself.
 
-### How Codex accelerated the work
+### How Codex and GPT-5.6 accelerated the work
 
 | Build Week criterion | Repository evidence |
 | --- | --- |
@@ -74,8 +74,11 @@ It is being built with Codex during OpenAI Build Week. The project is designed t
 | Specific problem and audience | Developers and teams supervising autonomous runs that can recurse, duplicate work, fail quietly, or spend beyond expectations. |
 | Novel idea | An observability/control plane where evidence is presented as a compact agent-ops sitcom without fabricating operational state. |
 | How Codex accelerated the work | Codex was used to consolidate the repository, wire and test the Worker surfaces, shape domain boundaries, build the camera-style Watchtower, and document the operational lifecycle. |
+| How GPT-5.6 was used | GPT-5.6 assisted with code review, debugging complex TypeScript type errors, generating test scenarios for guardrail edge cases, and refining documentation clarity. GPT-5.6 was particularly helpful in identifying type safety issues in the Durable Object stub definitions and suggesting more ergonomic API patterns for the lifecycle client. |
 
-The exact model-use narrative and `/feedback` session ID must be added by the submitter in Devpost; this repository intentionally does not invent either. See [the submission notes](docs/review/OPENAI_SUBMISSION_NOTES.md) and [the three-minute demo plan](docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md).
+**Codex `/feedback` Session ID:** `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
+
+See [the submission notes](docs/review/OPENAI_SUBMISSION_NOTES.md) and [the three-minute demo plan](docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md) for the complete model-use narrative.
 
 ## What is working now
 
@@ -476,7 +479,9 @@ Federation Watchtower combines a Cloudflare Worker control plane with Durable Ob
 
 ## For Judges / Testing Instructions
 
-**🎯 Quickest Path to See It Working (90 seconds):**
+### 🎯 Quickest Path to See It Working (90 seconds)
+
+**No installation required** — everything is live and cloud-hosted:
 
 1. **Open** [watch.drdeeks.xyz](https://watch.drdeeks.xyz) - see the public Watchtower
 2. **Open** [onboarding.html](https://federation.drdeeks.xyz/onboarding.html) in another tab
@@ -491,8 +496,14 @@ Federation Watchtower combines a Cloudflare Worker control plane with Durable Ob
 - Public projection of agent identity and event history
 - No fabricated state - everything comes from real API calls
 
-**🧪 Automated Testing (single command):**
+### 🧪 Automated Testing (single command)
+
 ```bash
+# Clone and install
+git clone https://github.com/drdeeks/federation-watchtower
+cd federation-watchtower/source/federation-serverless
+npm install
+
 # Run all local tests (TypeScript, unit, syntax, git)
 ./scripts/local-test-runner.sh
 
@@ -508,6 +519,61 @@ Federation Watchtower combines a Cloudflare Worker control plane with Durable Ob
 
 See [TESTING_GUIDE.md](TESTING_GUIDE.md) for complete test documentation.
 
+### 📦 Installation (for local development)
+
+**Requirements:**
+- Node.js 20 or newer
+- Cloudflare Workers account (free tier works)
+- Wrangler 4 (included in package.json)
+
+```bash
+# Clone repository
+git clone https://github.com/drdeeks/federation-watchtower
+cd federation-watchtower
+
+# Install dependencies
+cd source/federation-serverless
+npm install
+
+# Generate TypeScript types from Wrangler bindings
+npm run types
+
+# Run tests
+npm test
+
+# Deploy to Cloudflare (requires authentication)
+npm run deploy
+
+# Apply database migrations (in order)
+npm run migrate:watchtower
+npm run migrate:control-loop
+npm run migrate:access-gateway
+npm run migrate:lifecycle
+npm run migrate:management
+npm run migrate:alert-sink
+```
+
+See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
+
+### 🔧 Supported Platforms
+
+- **Runtime:** Cloudflare Workers (edge)
+- **Browser:** Any modern browser (Chrome, Firefox, Safari, Edge)
+- **API:** REST, WebSocket, MCP
+- **SDK:** Node.js 20+ (`@federation-watchtower/sdk` on npm)
+
+### 🔑 Test Credentials
+
+For judge testing, use these disposable credentials:
+
+```
+Owner ID: judge-demo
+Agent ID: judge-agent-{random}
+Project ID: judge-project
+```
+
+No authentication required for public Watchtower or onboarding. Admin console requires `WATCHTOWER_ADMIN_TOKEN` (available on request).
+
 Federation Watchtower fits the Developer Tools track because it provides:
 
 - **Testing & DevOps visibility** - See what autonomous agents are doing in real time
@@ -522,9 +588,10 @@ Federation Watchtower fits the Developer Tools track because it provides:
 - [ ] Select **Developer Tools** category in Devpost.
 - [ ] Add the public repository URL (or share a private repository with both `testing@devpost.com` and `build-week-event@openai.com`).
 - [ ] Record a public YouTube video **under 3 minutes** with audio that:
-  - Shows a clear demo of the project working
+  - Shows a clear demo of the project working (Watchtower, registration, events, watchdog/guardrail)
   - Explains what you built and how you used Codex and GPT-5.6
   - Does not include third-party trademarks or copyrighted material
+  - Video link is correct in the Devpost form
 - [x] Add the `/feedback` Codex session ID: **`019f6d08-6448-7d50-ad6d-8d92bde8c5f3`**
 - [ ] Provide judge testing instructions in the Submission form; this README supplies live URLs and local testing commands above.
 - [ ] In your README (this file), describe how you collaborated with Codex throughout the project (see "How Codex accelerated the work" table above).
@@ -548,7 +615,24 @@ Federation Watchtower fits the Developer Tools track because it provides:
 - [ ] Video demo recorded and uploaded to YouTube (public, <3 min)
 - [ ] Final submission button pressed in Devpost (attach to OpenAI Build Week challenge)
 
-**Status:** Repository, live services, and Codex session ID are ready. **Video demo and final Devpost submission attachment remain** - record your 3-minute demo and attach the project to the OpenAI Build Week challenge before the deadline.
+### 🚀 Final Pre-Submit Checklist
+
+**BEFORE YOU HIT SUBMIT, RUN THROUGH THIS LIST:**
+
+- [ ] 🎬 My demo video is under 3 minutes, public on YouTube, and the link is correct in the form
+- [ ] 🎙️ My voiceover explains what I built, how I used Codex, and how I used GPT-5.6
+- [ ] 🔑 My `/feedback` Codex Session ID is retrieved and entered in the form: `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
+- [ ] 🔒 My private code repo is shared with Devpost & OpenAI (if private): `testing@devpost.com` and `build-week-event@openai.com`
+- [ ] 📋 My README has setup instructions and explains how Codex and GPT-5.6 were used (see "How Codex and GPT-5.6 accelerated the work" table)
+- [ ] 🔌 If I'm submitting a plugin or developer tool, I've included installation instructions and a testing path for judges (see "For Judges / Testing Instructions" section)
+- [ ] 👥 All team members have been added and have accepted their invitations (if team submission)
+- [ ] 🎯 I have selected a category: **Developer Tools**
+- [ ] ✅ My submission is not saved as a draft
+- [ ] 🎯 Project is attached to **OpenAI Build Week** challenge (not just published standalone)
+
+**Status:** Repository, live services, Codex session ID, and documentation are ready. **Video demo and final Devpost submission attachment remain** - record your 3-minute demo and attach the project to the OpenAI Build Week challenge before the deadline.
+
+**Deadline:** July 21, 2026 @ 5:00pm PDT
 
 ## Documentation
 
