@@ -173,6 +173,11 @@ export default {
     // webhook, MCP request, API mutation, or credential-bearing browser form.
     if (isWatchHost) {
       const allowed = path === "/" || path === "/index.html" || path === "/join.html" || path === "/integrate.html" || path === "/organization.html" || path === "/agent-skill.md" || path === "/tv-widget.js" || path.startsWith("/brand/");
+      // Redirect admin/Federation pages to federation domain
+      const adminPaths = ["/manage", "/manage.html", "/operator", "/operator.html", "/onboarding", "/onboarding.html", "/federation", "/federation.html"];
+      if (adminPaths.includes(path)) {
+        return Response.redirect(new URL("https://federation.drdeeks.xyz" + path, request.url), 302);
+      }
       if ((method !== "GET" && method !== "HEAD") || !allowed) return error("not found", 404);
       const assetPath = path === "/" ? "/index.html" : path;
       return env.ASSETS.fetch(new Request(new URL(assetPath, request.url), request));

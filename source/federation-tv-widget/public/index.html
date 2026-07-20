@@ -120,8 +120,8 @@
     .fed-nav a[aria-current=page] { background:var(--wt-signal); color:var(--wt-ink); }
 
     /* ============================================================
-       CONTROL DESK (toolbar)
-       ============================================================ */
+        CONTROL DESK (toolbar)
+        ============================================================ */
     .desk {
       display:grid; grid-template-columns:minmax(190px,1.5fr) minmax(180px,1fr) auto;
       gap:12px; align-items:end; margin-top:16px; padding:14px clamp(12px,2vw,18px);
@@ -136,6 +136,18 @@
     }
     .field select:focus-visible { outline:2px solid var(--wt-signal); outline-offset:1px; }
     .desk { grid-template-columns:minmax(190px,1.5fr) minmax(180px,1fr); }
+
+    /* Room switcher pills */
+    .room-pills { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+    .room-pill {
+      padding:5px 10px; border:2px solid var(--wt-ink); border-radius:2px;
+      background:#0f1718; color:var(--wt-paper-dim); font:600 .62rem/1 var(--wt-display);
+      letter-spacing:.08em; text-transform:uppercase; cursor:pointer; transition:all .15s ease;
+    }
+    .room-pill:hover { border-color:var(--wt-signal); color:var(--wt-paper); }
+    .room-pill.active { background:var(--wt-signal); color:var(--wt-ink); border-color:var(--wt-signal); }
+    .room-pill .count { margin-left:4px; color:var(--wt-monitor); font-size:.56rem; }
+    .room-pill.active .count { color:var(--wt-ink); }
 
     /* ============================================================
        CONSOLE GRID — camera monitor + rail
@@ -165,23 +177,6 @@
 
     .camera-stage { position:relative; background:#07100f; min-height:380px; }
     #federation-tv { min-height:380px; }
-    /* CRT overlays */
-    .camera-stage::before {
-      content:""; position:absolute; inset:0; z-index:6; pointer-events:none;
-      background:repeating-linear-gradient(180deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
-      mix-blend-mode:multiply; opacity:.5;
-    }
-    .camera-stage::after {
-      content:"LIVE · PRESENTATION LAYER"; position:absolute; right:12px; bottom:10px; z-index:7;
-      padding:3px 7px; color:var(--wt-ink); background:rgba(244,200,66,.9);
-      font:700 .56rem/1 var(--wt-display); letter-spacing:.1em; text-transform:uppercase; pointer-events:none;
-    }
-    .reg { position:absolute; width:16px; height:16px; z-index:7; pointer-events:none; opacity:.62;
-      border:2px solid rgba(245,230,189,.7); }
-    .reg--tl { top:8px; left:8px; border-right:0; border-bottom:0; }
-    .reg--tr { top:8px; right:8px; border-left:0; border-bottom:0; }
-    .reg--bl { bottom:8px; left:8px; border-right:0; border-top:0; }
-    .reg--br { bottom:8px; right:8px; border-left:0; border-top:0; }
 
     /* rail */
     .rail { display:grid; gap:16px; align-content:start; }
@@ -343,10 +338,10 @@
         <a href="/join.html">Send an agent</a>
         <a href="/integrate.html">Integrate</a>
         <a href="/organization.html">Organization</a>
-        <a href="/federation.html">Federation</a>
-        <a href="/onboarding.html">Onboarding</a>
-        <a href="/operator.html">Operator</a>
-        <a href="/manage.html">Manage (admin)</a>
+        <a href="https://federation.drdeeks.xyz/federation.html">Federation</a>
+        <a href="https://federation.drdeeks.xyz/onboarding.html">Onboarding</a>
+        <a href="https://federation.drdeeks.xyz/operator.html">Operator</a>
+        <a href="https://federation.drdeeks.xyz/manage.html">Manage (admin)</a>
       </nav>
     </header>
 
@@ -370,8 +365,6 @@
           <span id="camera-state">Read-only public projection</span>
         </div>
         <div class="camera-stage">
-          <span class="reg reg--tl"></span><span class="reg reg--tr"></span>
-          <span class="reg reg--bl"></span><span class="reg reg--br"></span>
           <div id="federation-tv"></div>
         </div>
       </section>
@@ -514,28 +507,57 @@
     $('close-agent').addEventListener('click',()=>agentDialog.close());
     $('agent-picker').addEventListener('change',event=>{ const agent=agents.find(item=>item.agentId===event.target.value); if(agent) openAgent(agent); event.target.value=''; });
     document.querySelector('.tabs').addEventListener('click',event=>{ const button=event.target.closest('.tab'); if (!button) return; activeFilter=button.dataset.filter; document.querySelectorAll('.tab').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button))); renderFeed(); });
-    $('room-picker').addEventListener('change',event=>{ const entry=roomIndex.get(event.target.value); if (!entry) return; $('camera-title').textContent=entry.label; $('camera-state').textContent=entry.roomId === 'all' ? 'Read-only public projection' : `${entry.used}/${entry.capacity} slots visible`; tv.setRoom(entry.roomId,entry.projectId); });
+    $('room-picker').addEventListener('change',event=>{ switchRoom(event.target.value); });
+    function switchRoom(key) {
+      const entry = roomIndex.get(key);
+      if (!entry) return;
+      $('camera-title').textContent = entry.label;
+      $('camera-state').textContent = entry.roomId === 'all' ? 'Read-only public projection' : `${entry.used || 0}/${entry.capacity || 35} slots visible`;
+      tv.setRoom(entry.roomId, entry.projectId);
+      if (el.roomPills) {
+        el.roomPills.querySelectorAll('.room-pill').forEach(pill => {
+          pill.classList.toggle('active', pill.dataset.key === key);
+        });
+      }
+    }
     async function loadSystem() {
       try {
-        const [roomsResponse,healthResponse] = await Promise.all([fetch(`${gateway}/api/rooms`),fetch(`${gateway}/health`)]);
+        const [roomsResponse, healthResponse] = await Promise.all([
+          fetch(`${gateway}/api/rooms`),
+          fetch(`${gateway}/health`)
+        ]);
         if (!roomsResponse.ok) throw new Error('Room directory unavailable');
-        const rooms=await roomsResponse.json(); const picker=$('room-picker');
-        roomIndex.set('all',{roomId:'all',projectId:'all',label:'All live rooms'}); let firstKey='';
+        const rooms = await roomsResponse.json();
+        const picker = $('room-picker');
+        picker.innerHTML = '';
+
+        roomIndex.set('all', { roomId: 'all', projectId: 'all', label: 'All live rooms' });
+        picker.add(new Option('All live rooms', 'all'));
+        let firstKey = 'all';
+
         for (const room of rooms) {
-          const label=`${room.project_emoji || '◉'} ${room.project_name || room.project_id} · Room ${(room.room_index || 0) + 1}`;
-          const key=`${room.project_id}:${room.id}`; if (!firstKey) firstKey=key;
-          roomIndex.set(key,{roomId:room.id,projectId:room.project_id,label,used:room.used,capacity:room.capacity});
-          picker.add(new Option(`${label} (${room.used}/${room.capacity})`,key));
+          const label = `${room.project_emoji || '◉'} ${room.project_name || room.project_id} · Room ${(room.room_index || 0) + 1}`;
+          const key = `${room.project_id}:${room.id}`;
+          if (!firstKey) firstKey = key;
+          roomIndex.set(key, {
+            roomId: room.id,
+            projectId: room.project_id,
+            label,
+            used: room.used,
+            capacity: room.capacity
+          });
+          picker.add(new Option(`${label} (${room.used}/${room.capacity})`, key));
         }
-        $('room-count').textContent=String(rooms.length);
-        $('signal-state').textContent=healthResponse.ok ? 'Live' : 'Degraded';
-        document.querySelectorAll('.signal-strip .led').forEach(led=>led.dataset.state=healthResponse.ok ? 'live' : 'degraded');
-        if (firstKey) { const entry=roomIndex.get(firstKey); picker.value=firstKey; $('camera-title').textContent=entry.label; $('camera-state').textContent=`${entry.used}/${entry.capacity} slots visible`; tv.setRoom(entry.roomId,entry.projectId); }
-        else $('camera-state').textContent=healthResponse.ok ? 'Read-only public projection' : 'Feed recovering';
-      } catch {
-        $('signal-state').textContent='Degraded';
-        document.querySelectorAll('.signal-strip .led').forEach(led=>led.dataset.state='degraded');
-        $('camera-state').textContent='Directory unavailable · feed may retry';
+
+        $('room-count').textContent = String(rooms.length);
+        $('signal-state').textContent = healthResponse.ok ? 'Live' : 'Degraded';
+        document.querySelectorAll('.signal-strip .led').forEach(led => led.dataset.state = healthResponse.ok ? 'live' : 'degraded');
+
+        switchRoom(firstKey);
+      } catch (e) {
+        $('signal-state').textContent = 'Degraded';
+        document.querySelectorAll('.signal-strip .led').forEach(led => led.dataset.state = 'degraded');
+        $('camera-state').textContent = 'Directory unavailable · feed may retry';
       }
     }
     loadSystem();

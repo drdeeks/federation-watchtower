@@ -877,7 +877,16 @@
     updateDiorama() {
       if (!this.dioramaEl) return;
 
-      const agentArray = Array.from(this.agents.values());
+      const agentArray = Array.from(this.agents.values()).filter(a => {
+        // Filter out offline agents (legacy status field from public API)
+        if (a.status === 'offline') return false;
+        // Filter out agents with stale heartbeats (>3 minutes old)
+        if (a.lastHeartbeat) {
+          const since = Date.now() - a.lastHeartbeat;
+          if (since > 180000) return false; // 3 minutes
+        }
+        return true;
+      });
 
       // Keep existing agents, update or add new ones
       const existingIds = new Set(Array.from(this.dioramaEl.querySelectorAll('[data-agent-id]')).map(el => el.dataset.agentId));

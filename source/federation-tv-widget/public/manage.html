@@ -7,37 +7,359 @@
   <title>Federation Watchtower — Admin Console</title>
   <link rel="stylesheet" href="/brand/tokens.css">
   <style>
-    :root { color-scheme: dark; font-family: var(--fed-mono, ui-monospace, SFMono-Regular, Menlo, monospace); background:#111718; color:#eef5ee; }
-    * { box-sizing:border-box; } body { margin:0; min-width:320px; background:linear-gradient(140deg,#101819,#152325 48%,#131718); }
-    header { display:flex; gap:16px; align-items:center; padding:18px clamp(16px,4vw,48px); border-bottom:2px solid #90cbbc; background:#172324; }
-    header img { width:44px; height:44px; } h1 { margin:0; font:800 clamp(1.2rem,4vw,1.9rem)/1 var(--fed-display,system-ui); letter-spacing:.04em; text-transform:uppercase; } .sub { color:#a4c8c3; font-size:.74rem; margin-top:5px; }
-    main { width:min(1400px,100%); margin:auto; padding:18px clamp(14px,3vw,40px) 56px; }
-    nav.fed-nav { margin-bottom:16px; display:flex; gap:8px; flex-wrap:wrap; }
-    nav.fed-nav a { color:#dff5ee; text-decoration:none; padding:6px 12px; border:1px solid #547f78; background:#192727; font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; }
-    nav.fed-nav a:hover { background:#22403a; } nav.fed-nav a[aria-current] { background:#9bd4c7; color:#11201d; border-color:#9bd4c7; }
-    .connect { display:grid; grid-template-columns:minmax(200px,1fr) minmax(200px,1fr) auto; gap:10px; padding:12px; margin-bottom:20px; border:1px solid #547f78; background:#192727; box-shadow:5px 5px 0 #050909; }
-    label { display:grid; gap:5px; color:#b9d4cf; font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; }
-    input, select, button { min-height:38px; border:1px solid #84b8ad; border-radius:0; font:inherit; }
-    input, select { width:100%; color:#eff8f4; background:#0e1717; padding:7px 9px; } input[type=password] { letter-spacing:.08em; }
-    button { cursor:pointer; color:#11201d; background:#f4c842; padding:7px 12px; font-weight:800; } button:hover { background:#ffe179; }
-    button.secondary { background:#9bd4c7; } button.ghost { background:#22403a; color:#dff5ee; border-color:#5f9186; } button.danger { background:#e57967; } button:disabled { opacity:.5; cursor:not-allowed; }
-    .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:20px; }
-    .metric { min-height:96px; padding:15px; border:1px solid #3f7168; background:#1a2928; } .metric span { display:block; color:#9fc5bd; font-size:.66rem; text-transform:uppercase; letter-spacing:.08em; } .metric strong { display:block; margin-top:8px; font:800 clamp(1.3rem,4vw,2.1rem)/1 var(--fed-display,system-ui); color:#f4c842; }
-    .card { border:1px solid #547f78; background:#192727; box-shadow:5px 5px 0 #050909; overflow:hidden; margin-bottom:20px; }
-    .card h2 { margin:0; padding:11px 14px; border-bottom:1px solid #527f76; font-size:.82rem; text-transform:uppercase; letter-spacing:.08em; background:#213433; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .card h2 .grow { flex:1; } .card h2 input, .card h2 select { max-width:150px; min-height:30px; }
-    .tablewrap { max-height:560px; overflow:auto; }
-    table { width:100%; border-collapse:collapse; font-size:.76rem; }
-    th, td { text-align:left; padding:8px 10px; border-bottom:1px solid #2d4a44; vertical-align:middle; }
-    th { position:sticky; top:0; background:#182726; color:#9fc5bd; font-size:.64rem; text-transform:uppercase; letter-spacing:.06em; z-index:1; }
-    td.name b { display:block; } td.name small { color:#9cb9b3; }
-    .pill { display:inline-block; padding:2px 7px; border:1px solid currentColor; border-radius:10px; font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; }
-    .pill.live { color:#91dcaf; } .pill.paused { color:#f5ce62; } .pill.revoked { color:#c9a29b; } .pill.idle { color:#8fb1aa; }
-    td.act { white-space:nowrap; } td.act button { min-height:28px; font-size:.66rem; padding:4px 8px; margin-right:5px; }
-    #status { color:#b8d8d4; font-size:.76rem; } .barrow { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
-    .empty { color:#9ab6b0; padding:18px 10px; font-size:.8rem; }
-    dialog { max-width:min(460px,calc(100% - 30px)); border:2px solid #e57967; color:#ecf5ef; background:#172626; box-shadow:8px 8px 0 #000; } dialog::backdrop { background:#000b; } dialog form { display:grid; gap:12px; } dialog h2 { margin:0; color:#e57967; } dialog menu { display:flex; justify-content:end; gap:8px; margin:0; padding:0; }
-    @media (max-width:900px){ .metrics{ grid-template-columns:repeat(2,1fr); } .connect{ grid-template-columns:1fr; } }
+    /* ── Reset & base ───────────────────────────────────── */
+    :root {
+      color-scheme: dark;
+      font-family: var(--fed-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+      background: #111718;
+      color: #eef5ee;
+      font-size: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: linear-gradient(140deg, #101819, #152325 48%, #131718);
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      padding: 16px clamp(16px, 4vw, 48px);
+      border-bottom: 1px solid #2d4a44;
+      background: #142020;
+    }
+    header img { width: 40px; height: 40px; flex-shrink: 0; }
+    header h1 {
+      margin: 0;
+      font: 800 clamp(1.1rem, 3vw, 1.4rem) / 1.2 var(--fed-display, system-ui);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .sub { color: #7a9e97; font-size: .72rem; margin-top: 4px; }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    main {
+      width: min(1400px, 100%);
+      margin: auto;
+      padding: 24px clamp(16px, 3vw, 40px) 56px;
+    }
+
+    /* ── Navigation ─────────────────────────────────────── */
+    nav.fed-nav {
+      margin-bottom: 24px;
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      padding: 4px;
+      background: #141e1e;
+      border: 1px solid #2d4a44;
+      border-radius: 8px;
+      width: fit-content;
+    }
+    nav.fed-nav a {
+      color: #a4c8c3;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      transition: background .15s, color .15s;
+    }
+    nav.fed-nav a:hover { background: #1e3330; color: #dff5ee; }
+    nav.fed-nav a[aria-current] { background: #9bd4c7; color: #11201d; font-weight: 700; }
+
+    /* ── Connection bar ─────────────────────────────────── */
+    .connect {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 16px;
+      align-items: end;
+      padding: 16px;
+      margin-bottom: 24px;
+      border: 1px solid #2d4a44;
+      background: #141e1e;
+      border-radius: 8px;
+    }
+
+    /* ── Forms ──────────────────────────────────────────── */
+    label {
+      display: grid;
+      gap: 6px;
+      color: #7a9e97;
+      font-size: .68rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    input, select, textarea {
+      min-height: 36px;
+      border: 1px solid #2d4a44;
+      border-radius: 6px;
+      font: inherit;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #9bd4c7;
+    }
+    input, select, textarea {
+      width: 100%;
+      color: #eff8f4;
+      background: #0e1717;
+      padding: 8px 10px;
+    }
+    input[type=password] { letter-spacing: .08em; }
+    textarea { min-height: 64px; resize: vertical; }
+
+    /* ── Buttons ────────────────────────────────────────── */
+    button {
+      cursor: pointer;
+      color: #11201d;
+      background: #f4c842;
+      padding: 8px 16px;
+      font-weight: 700;
+      font-size: .74rem;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      transition: background .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    button:hover { background: #ffe179; }
+    button.secondary { background: #9bd4c7; }
+    button.secondary:hover { background: #b0e0d6; }
+    button.ghost { background: #1e3330; color: #dff5ee; border-color: #2d4a44; }
+    button.ghost:hover { background: #254038; }
+    button.danger { background: #c45a4a; color: #f0e6e4; }
+    button.danger:hover { background: #e57967; }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Metrics ────────────────────────────────────────── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .metric {
+      padding: 20px 16px;
+      border: 1px solid #2d4a44;
+      background: #141e1e;
+      border-radius: 8px;
+      transition: background-color .3s ease, border-color .15s;
+    }
+    .metric:hover { border-color: #3f7168; }
+    .metric span {
+      display: block;
+      color: #7a9e97;
+      font-size: .66rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    .metric strong {
+      display: block;
+      margin-top: 8px;
+      font: 800 clamp(1.5rem, 3vw, 2rem) / 1 var(--fed-display, system-ui);
+      color: #f4c842;
+      transition: color .3s ease;
+    }
+    .metric.flash { background: #1a2a28; border-color: #3f7168; }
+
+    /* ── Cards ──────────────────────────────────────────── */
+    .card {
+      border: 1px solid #2d4a44;
+      background: #141e1e;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .card h2 {
+      margin: 0;
+      padding: 12px 16px;
+      border-bottom: 1px solid #2d4a44;
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      background: #182525;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .card h2 .grow { flex: 1; }
+    .card h2 input, .card h2 select {
+      max-width: 160px;
+      min-height: 32px;
+    }
+
+    /* ── Tables ─────────────────────────────────────────── */
+    .tablewrap { max-height: 560px; overflow: auto; width: 100%; }
+    table { width: 100%; border-collapse: collapse; font-size: .76rem; table-layout: fixed; }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid #1e2e2c;
+      vertical-align: middle;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hb-cell { white-space: nowrap; width: 120px; }
+    th {
+      position: sticky;
+      top: 0;
+      background: #162222;
+      color: #7a9e97;
+      font-size: .64rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      z-index: 1;
+      border-bottom: 1px solid #2d4a44;
+    }
+    td.name b { display: block; word-break: break-word; }
+    td.name small { color: #7a9e97; display: block; word-break: break-word; }
+
+    /* ── Pills ──────────────────────────────────────────── */
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border: 1px solid currentColor;
+      border-radius: 10px;
+      font-size: .62rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .pill.live { color: #91dcaf; background: #0f291f; }
+    .pill.paused { color: #f5ce62; background: #2a2512; }
+    .pill.revoked { color: #e57967; background: #2a1412; }
+    .pill.offline { color: #8fb1aa; background: #141f1d; }
+
+    /* ── Add-agent link-as-button ───────────────────────── */
+    .add-agent-link {
+      display: inline-block;
+      text-decoration: none;
+      color: #11201d;
+      background: #9bd4c7;
+      padding: 6px 12px;
+      font-weight: 700;
+      font-size: .72rem;
+      border-radius: 6px;
+      transition: background .15s;
+    }
+    .add-agent-link:hover { background: #b0e0d6; }
+
+    /* ── Action cells ───────────────────────────────────── */
+    td.act { white-space: nowrap; overflow: visible; }
+    td.act button {
+      min-height: 28px;
+      font-size: .66rem;
+      padding: 4px 10px;
+      margin-right: 4px;
+    }
+    tbody tr { transition: opacity .2s ease, background-color .2s ease; }
+    tbody tr:hover { background: #182525; }
+    tbody tr.new-row { animation: fadeIn .3s ease; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Status bar ─────────────────────────────────────── */
+    #status { color: #7a9e97; font-size: .74rem; }
+    .barrow { display: flex; gap: 12px; align-items: center; margin-bottom: 0; padding: 12px 16px; border-bottom: 1px solid #1e2e2c; }
+
+    /* ── Empty state ────────────────────────────────────── */
+    .empty { color: #7a9e97; padding: 24px 16px; font-size: .78rem; text-align: center; }
+
+    /* ── Section description ────────────────────────────── */
+    .section-desc {
+      color: #7a9e97;
+      font-size: .72rem;
+      margin: 0;
+      padding: 12px 16px 0;
+    }
+
+    /* ── Viz container ──────────────────────────────────── */
+    .viz-container {
+      border: 1px solid #1e2e2c;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #07100f;
+      min-height: 300px;
+      margin: 16px;
+      margin-bottom: 8px;
+    }
+
+    /* ── Capabilities grid ──────────────────────────────── */
+    .capabilities-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      padding: 16px;
+    }
+    .capability-item {
+      padding: 12px;
+      background: #182525;
+      border: 1px solid #2d4a44;
+      border-radius: 6px;
+      font-size: .74rem;
+      line-height: 1.5;
+    }
+    .capability-item strong {
+      display: block;
+      color: #9bd4c7;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+    }
+    .capability-item p { margin: 0; color: #a4c8c3; }
+
+    /* ── Org details scroll ─────────────────────────────── */
+    .org-details-scroll {
+      max-height: 400px;
+      overflow: auto;
+      margin-bottom: 12px;
+    }
+
+    /* ── Dialogs ────────────────────────────────────────── */
+    dialog {
+      max-width: min(460px, calc(100% - 30px));
+      border: 1px solid #2d4a44;
+      border-radius: 8px;
+      color: #ecf5ef;
+      background: #172626;
+      box-shadow: 0 8px 32px #000a;
+      padding: 24px;
+    }
+    dialog::backdrop { background: #000b; }
+    dialog form { display: grid; gap: 16px; }
+    dialog h2 { margin: 0; color: #9bd4c7; }
+    dialog menu { display: flex; justify-content: flex-end; gap: 8px; margin: 0; padding: 0; }
+
+    /* ── Responsive ─────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .connect { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      table { table-layout: auto; min-width: 600px; }
+      .card h2 { flex-wrap: wrap; gap: 8px; }
+      .card h2 input, .card h2 select { max-width: 100%; flex: 1 1 100%; }
+      .metrics { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .metric { padding: 16px 12px; }
+      .metric strong { font-size: 1.5rem; }
+      nav.fed-nav { gap: 2px; width: 100%; }
+      nav.fed-nav a { padding: 6px 10px; font-size: .66rem; }
+      header { padding: 12px 16px; }
+      header h1 { font-size: 1.1rem; }
+      main { padding: 16px 12px 40px; }
+      td, th { padding: 8px 10px; font-size: .7rem; }
+      td.act button { padding: 3px 8px; font-size: .6rem; margin-right: 2px; }
+      .capabilities-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -48,9 +370,13 @@
   <main>
     <nav class="fed-nav" aria-label="Primary">
       <a href="/">Watch</a>
-      <a href="/onboarding.html">Onboarding</a>
-      <a href="/operator.html">Operator</a>
-      <a href="/manage.html" aria-current="page">Admin</a>
+      <a href="/join.html">Send an agent</a>
+      <a href="/integrate.html">Integrate</a>
+      <a href="/organization.html">Organization</a>
+      <a href="https://federation.drdeeks.xyz/federation.html">Federation</a>
+      <a href="https://federation.drdeeks.xyz/onboarding.html">Onboarding</a>
+      <a href="https://federation.drdeeks.xyz/operator.html">Operator</a>
+      <a href="https://federation.drdeeks.xyz/manage.html" aria-current="page">Admin</a>
     </nav>
 
     <section class="connect" aria-label="Connection settings">
@@ -60,34 +386,74 @@
     </section>
 
     <section class="metrics" aria-live="polite">
-      <div class="metric"><span>Total agents</span><strong id="m-total">—</strong></div>
+      <div class="metric"><span>Total</span><strong id="m-total">—</strong></div>
       <div class="metric"><span>Live</span><strong id="m-live">—</strong></div>
       <div class="metric"><span>Paused</span><strong id="m-paused">—</strong></div>
-      <div class="metric"><span>Revoked</span><strong id="m-revoked">—</strong></div>
+      <div class="metric"><span>Offline</span><strong id="m-offline">—</strong></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="grow">Management Capabilities</span></h2>
+      <div class="capabilities-grid">
+        <div class="capability-item"><strong>Agents</strong><p>Search by name, ID, owner, or room. Filter by room or status (live/paused/offline/revoked). Actions: Pause (hide from Watchtower), Resume (restore), Revoke (permanently disable, preserves event history).</p></div>
+        <div class="capability-item"><strong>Rooms</strong><p>Create rooms for organizations. Delete empty rooms only (0 agents). View capacity and usage.</p></div>
+        <div class="capability-item"><strong>Organizations</strong><p>Review applications (5 technical Q&A + social proofs). Actions: Approve (adds to verified_federations), Reject, Suspend.</p></div>
+        <div class="capability-item"><strong>Alert Webhook</strong><p>View all guardrail alert deliveries with HMAC signature verification from WATCHTOWER_ALERT_WEBHOOK_URL.</p></div>
+        <div class="capability-item"><strong>Live Floor</strong><p>Real-time visualization via FederationTV. Agents automatically disappear after heartbeat timeout (agent.heartbeat_seconds &times; 1.5, default 180s).</p></div>
+      </div>
     </section>
 
     <section class="card">
       <h2><span class="grow">Agents</span>
-        <input id="search" placeholder="search name / id / owner" autocomplete="off">
-        <select id="filter"><option value="">all states</option><option value="connected">live</option><option value="paused">paused</option><option value="offline">offline</option><option value="registered">registered</option><option value="revoked">revoked</option></select>
-        <a href="/onboarding.html" class="button" style="text-decoration:none;background:#9bd4c7;color:#11201d;padding:7px 10px;font-weight:800;">+ Add agent</a>
+        <input id="search" placeholder="search name, id, owner, or room" autocomplete="off">
+        <select id="filterRoom"><option value="">all rooms</option></select>
+        <select id="filterStatus"><option value="">all states</option><option value="live">live</option><option value="paused">paused</option><option value="offline">offline</option><option value="revoked">revoked</option></select>
+        <a href="https://federation.drdeeks.xyz/onboarding.html" class="add-agent-link">+ Add agent</a>
       </h2>
-      <div class="barrow" style="padding:8px 12px 0;"><span id="status" role="status">Disconnected — enter the admin token and connect.</span></div>
+      <div class="barrow">
+        <span id="status" role="status">Disconnected — enter the admin token and connect.</span>
+      </div>
       <div class="tablewrap">
         <table>
-          <thead><tr><th>Agent</th><th>Project</th><th>Room</th><th>Status</th><th>Last heartbeat</th><th>Actions</th></tr></thead>
+          <colgroup>
+            <col style="width:26%">
+            <col style="width:14%">
+            <col style="width:12%">
+            <col style="width:10%">
+            <col style="width:130px">
+            <col style="width:auto">
+          </colgroup>
+          <thead><tr><th>Agent</th><th>Project</th><th>Room</th><th>Status</th><th>Heartbeat</th><th>Manage</th></tr></thead>
           <tbody id="rows"><tr><td colspan="6" class="empty">Connect to load agents.</td></tr></tbody>
         </table>
       </div>
     </section>
 
     <section class="card">
+      <h2><span class="grow">Live floor view</span>
+        <select id="tvRoom" style="max-width:200px;"><option value="all">All rooms</option></select>
+      </h2>
+      <p class="section-desc">Real-time visualization of active agents. Agents past heartbeat timeout disappear automatically.</p>
+      <div class="viz-container" id="viz"></div>
+    </section>
+
+    <section class="card">
       <h2><span class="grow">Room management</span>
+        <input id="roomSearch" placeholder="search room or project" autocomplete="off">
+        <select id="roomFilterStatus"><option value="">all rooms</option><option value="active">active</option><option value="empty">empty</option><option value="full">full</option></select>
         <button id="addRoom" class="secondary" disabled>+ Add room</button>
       </h2>
-      <p class="sub" style="padding:9px 12px 0;">Create rooms for organizations, delete empty demo/test rooms. Rooms must be empty before deletion.</p>
+      <p class="section-desc">Create rooms for organizations, delete empty demo/test rooms. Rooms must be empty before deletion.</p>
       <div class="tablewrap" style="max-height:340px;">
         <table>
+          <colgroup>
+            <col style="width:25%">
+            <col style="width:15%">
+            <col style="width:12%">
+            <col style="width:10%">
+            <col style="width:18%">
+            <col style="width:20%">
+          </colgroup>
           <thead><tr><th>Room ID</th><th>Project</th><th>Index</th><th>Capacity</th><th>Used</th><th>Actions</th></tr></thead>
           <tbody id="roomRows"><tr><td colspan="6" class="empty">Connect to load rooms.</td></tr></tbody>
         </table>
@@ -96,9 +462,9 @@
 
     <section class="card">
       <h2><span class="grow">Organization applications</span>
-        <select id="orgFilter" style="max-width:140px;min-height:30px;"><option value="">all states</option><option value="submitted">submitted</option><option value="active">active</option><option value="rejected">rejected</option><option value="suspended">suspended</option></select>
+        <select id="orgFilter"><option value="">all states</option><option value="submitted">submitted</option><option value="active">active</option><option value="rejected">rejected</option><option value="suspended">suspended</option></select>
       </h2>
-      <p class="sub" style="padding:9px 12px 0;">Review organization applications. Approve adds to verified federations with elevated privileges.</p>
+      <p class="section-desc">Review organization applications. Approve adds to verified federations with elevated privileges.</p>
       <div class="tablewrap" style="max-height:420px;">
         <table>
           <thead><tr><th>Organization</th><th>Contact</th><th>Official URL</th><th>Status</th><th>Applied</th><th>Actions</th></tr></thead>
@@ -109,7 +475,7 @@
 
     <section class="card">
       <h2><span class="grow">Alert webhook</span><span id="alertStatus" class="sub"></span></h2>
-      <p class="sub" style="padding:9px 12px 0;">Guardrail alerts the Worker signed and delivered to <code>WATCHTOWER_ALERT_WEBHOOK_URL</code>.</p>
+      <p class="section-desc">Guardrail alerts the Worker signed and delivered to <code>WATCHTOWER_ALERT_WEBHOOK_URL</code>.</p>
       <div class="tablewrap" style="max-height:340px;">
         <table>
           <thead><tr><th>Received</th><th>Project</th><th>Severity</th><th>Action</th><th>Statement</th></tr></thead>
@@ -119,152 +485,686 @@
     </section>
   </main>
 
-  <dialog id="roomDialog"><form method="dialog"><h2>Create room</h2><label>Room ID <input id="newRoomId" required pattern="[A-Za-z0-9][A-Za-z0-9._:-]{0,63}"></label><label>Project ID <input id="newRoomProject" required></label><label>Capacity <input id="newRoomCapacity" type="number" min="1" max="100" value="35"></label><menu><button value="cancel" class="secondary">Cancel</button><button value="create" class="danger">Create</button></menu></form></dialog>
-  <dialog id="orgDialog"><form method="dialog"><h2 id="orgDialogTitle">Review organization</h2><div id="orgDetails" style="max-height:400px;overflow:auto;margin-bottom:12px;"></div><label>Review notes <textarea id="orgNotes" maxlength="500" placeholder="Optional notes for this decision"></textarea></label><menu><button value="cancel" class="secondary">Cancel</button><button id="orgApprove" value="approve" class="secondary">Approve</button><button id="orgReject" value="reject" class="danger">Reject</button><button id="orgSuspend" value="suspend">Suspend</button></menu></form></dialog>
-  <dialog id="confirm"><form method="dialog"><h2 id="confirmTitle">Confirm</h2><p class="sub" id="confirmBody"></p><menu><button value="cancel" class="secondary">Cancel</button><button id="confirmGo" value="go" class="danger">Confirm</button></menu></form></dialog>
+  <dialog id="roomDialog">
+    <form method="dialog">
+      <h2>Create room</h2>
+      <label>Room ID <input id="newRoomId" required pattern="[A-Za-z0-9][A-Za-z0-9._:-]{0,63}"></label>
+      <label>Project ID <input id="newRoomProject" required></label>
+      <label>Capacity <input id="newRoomCapacity" type="number" min="1" max="100" value="35"></label>
+      <menu>
+        <button value="cancel" class="secondary">Cancel</button>
+        <button value="create" class="danger">Create</button>
+      </menu>
+    </form>
+  </dialog>
+  <dialog id="orgDialog">
+    <form method="dialog">
+      <h2 id="orgDialogTitle">Review organization</h2>
+      <div id="orgDetails" class="org-details-scroll"></div>
+      <label>Review notes <textarea id="orgNotes" maxlength="500" placeholder="Optional notes for this decision"></textarea></label>
+      <menu>
+        <button value="cancel" class="secondary">Cancel</button>
+        <button id="orgApprove" value="approve" class="secondary">Approve</button>
+        <button id="orgReject" value="reject" class="danger">Reject</button>
+        <button id="orgSuspend" value="suspend">Suspend</button>
+      </menu>
+    </form>
+  </dialog>
+  <dialog id="confirm">
+    <form method="dialog">
+      <h2 id="confirmTitle">Confirm</h2>
+      <p class="sub" id="confirmBody"></p>
+      <menu>
+        <button value="cancel" class="secondary">Cancel</button>
+        <button id="confirmGo" value="go" class="danger">Confirm</button>
+      </menu>
+    </form>
+  </dialog>
 
   <script src="/tv-widget.js"></script>
   <script>
-    "use strict";
-    const $ = id => document.getElementById(id);
-    const api = $('api'), token = $('token'), status = $('status');
-    api.value = new URLSearchParams(location.search).get('api') || (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'http://localhost:8787' : 'https://fapi.drdeeks.xyz');
-    const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
-    const date = v => v ? new Date(v).toLocaleString() : '—';
-    const state = { agents: [], viz: null, timer: null };
+    (function () {
+      'use strict';
 
-    function setStatus(msg, err = false) { status.textContent = msg; status.style.color = err ? '#ff9582' : '#b8d8d4'; }
+      // ── State ──────────────────────────────────────────────────────────
+      var state = {
+        apiUrl: '',
+        token: '',
+        agents: [],
+        rooms: [],
+        organizations: [],
+        alerts: [],
+        tv: null,
+        refreshTimer: null
+      };
+      window.__fedAdminState = state;
 
-    async function request(path, options = {}) {
-      const headers = { ...(options.headers || {}) };
-      if (token.value.trim()) headers.Authorization = `Bearer ${token.value.trim()}`;
-      if (options.body) headers['Content-Type'] = 'application/json';
-      const res = await fetch(`${api.value.replace(/\/$/,'')}${path}`, { ...options, headers });
-      const ct = res.headers.get('content-type') || '';
-      const body = ct.includes('application/json') ? await res.json() : await res.text();
-      if (!res.ok) throw new Error(typeof body === 'object' ? (body.error || `HTTP ${res.status}`) : (body || `HTTP ${res.status}`));
-      return body;
-    }
+      // ── DOM refs ───────────────────────────────────────────────────────
+      var el = {
+        api: document.getElementById('api'),
+        token: document.getElementById('token'),
+        connect: document.getElementById('connect'),
+        status: document.getElementById('status'),
+        rows: document.getElementById('rows'),
+        search: document.getElementById('search'),
+        filterRoom: document.getElementById('filterRoom'),
+        filterStatus: document.getElementById('filterStatus'),
+        mTotal: document.getElementById('m-total'),
+        mLive: document.getElementById('m-live'),
+        mPaused: document.getElementById('m-paused'),
+        mOffline: document.getElementById('m-offline'),
+        roomRows: document.getElementById('roomRows'),
+        roomSearch: document.getElementById('roomSearch'),
+        roomFilterStatus: document.getElementById('roomFilterStatus'),
+        addRoom: document.getElementById('addRoom'),
+        roomDialog: document.getElementById('roomDialog'),
+        orgRows: document.getElementById('orgRows'),
+        orgFilter: document.getElementById('orgFilter'),
+        orgDialog: document.getElementById('orgDialog'),
+        orgDetails: document.getElementById('orgDetails'),
+        orgNotes: document.getElementById('orgNotes'),
+        orgApprove: document.getElementById('orgApprove'),
+        orgReject: document.getElementById('orgReject'),
+        orgSuspend: document.getElementById('orgSuspend'),
+        alertRows: document.getElementById('alertRows'),
+        alertStatus: document.getElementById('alertStatus'),
+        confirm: document.getElementById('confirm'),
+        confirmTitle: document.getElementById('confirmTitle'),
+        confirmBody: document.getElementById('confirmBody'),
+        confirmGo: document.getElementById('confirmGo'),
+        viz: document.getElementById('viz'),
+        tvRoom: document.getElementById('tvRoom')
+      };
 
-    function agentStatus(a) {
-      if (a.paused) return 'paused';
-      if (a.lifecycleState === 'revoked') return 'revoked';
-      if (a.lifecycleState === 'connected') return 'live';
-      return 'idle';
-    }
+      // ── Helpers ────────────────────────────────────────────────────────
+      function esc(t) {
+        if (!t) return '';
+        var d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+      }
 
-    function render() {
-      const q = $('search').value.toLowerCase();
-      const f = $('filter').value;
-      const rows = state.agents.filter(a => (!q || (a.name||'').toLowerCase().includes(q) || (a.agent_id||'').toLowerCase().includes(q) || (a.owner_id||'').toLowerCase().includes(q)) && (!f || agentStatus(a) === f));
-      $('rows').innerHTML = rows.length ? rows.map(a => `<tr><td class="name"><b>${esc(a.name||a.agent_id)}</b><small>${esc(a.owner_id||'')}</small></td><td>${esc(a.project_id||'')}</td><td>${esc(a.room_id||'')}</td><td><span class="pill ${agentStatus(a)}">${agentStatus(a)}</span></td><td>${date(a.last_heartbeat_at)}</td><td class="act"><button data-op="pause" data-pid="${esc(a.project_id)}" data-aid="${esc(a.agent_id)}" ${a.paused?'disabled':''}>Pause</button><button data-op="resume" data-pid="${esc(a.project_id)}" data-aid="${esc(a.agent_id)}" ${!a.paused?'disabled':''}>Resume</button><button data-op="revoke" data-pid="${esc(a.project_id)}" data-aid="${esc(a.agent_id)}" class="danger">Revoke</button></td></tr>`).join('') : `<tr><td colspan="6" class="empty">${state.agents.length ? 'No agents match your search.' : 'Connect to load agents.'}</td></tr>`;
-      const totals = state.agents.reduce((acc, a) => { acc.total++; if (a.lifecycleState === 'connected' && !a.paused) acc.live++; if (a.paused) acc.paused++; if (a.lifecycleState === 'revoked') acc.revoked++; return acc; }, { total: 0, live: 0, paused: 0, revoked: 0 });
-      $('m-total').textContent = totals.total; $('m-live').textContent = totals.live; $('m-paused').textContent = totals.paused; $('m-revoked').textContent = totals.revoked;
-    }
+      function timeAgo(ts) {
+        if (!ts) return '—';
+        var diff = Math.max(0, Date.now() - ts);
+        var s = Math.floor(diff / 1000);
+        if (s < 60) return s + 's ago';
+        var m = Math.floor(s / 60);
+        if (m < 60) return m + 'm ago';
+        return Math.floor(m / 60) + 'h ago';
+      }
 
-    async function load() {
-      const agents = await request('/api/v1/admin/agents');
-      state.agents = agents.agents || [];
-      render();
-      setStatus(`Connected · ${state.agents.length} agents loaded`);
-      if (state.viz) state.viz.setAgents(state.agents);
-    }
+      function formatDate(ts) {
+        if (!ts) return '—';
+        return new Date(ts).toLocaleString();
+      }
 
-    async function connect() {
-      $('connect').disabled = true; setStatus('Connecting…');
-      try {
-        await load();
-        $('addRoom').disabled = false;
-        $('orgFilter').disabled = false;
-        mountViz();
-        if (state.timer) clearInterval(state.timer);
-        state.timer = setInterval(load, 15000);
-        await loadRooms();
-        await loadOrgs();
-        await loadAlerts();
-      } catch (e) { setStatus(e.message, true); }
-      finally { $('connect').disabled = false; }
-    }
+      function agentStatusPill(a) {
+        if (a.paused) return 'paused';
+        if (a.lifecycleState === 'revoked') return 'revoked';
+        if (a.lifecycleState === 'connected') return 'live';
+        return 'offline';
+      }
 
-    async function act(op, projectId, agentId) {
-      try { await request(`/api/v1/admin/agents/${encodeURIComponent(projectId)}/${encodeURIComponent(agentId)}/${op}`, { method:'POST' }); await load(); }
-      catch (e) { setStatus(e.message, true); }
-    }
+      function agentStatusLabel(a) {
+        if (a.paused) return 'Paused';
+        return (a.lifecycleState || 'offline').charAt(0).toUpperCase() + (a.lifecycleState || 'offline').slice(1);
+      }
 
-    $('connect').addEventListener('click', connect);
-    $('search').addEventListener('input', render);
-    $('filter').addEventListener('change', load);
-    $('rows').addEventListener('click', e => {
-      const b = e.target.closest('button[data-op]'); if (!b) return;
-      act(b.dataset.op, b.dataset.pid, b.dataset.aid);
-    });
+      function api(path) {
+        return state.apiUrl.replace(/\/+$/, '') + path;
+      }
 
-    // Room management
-    async function loadRooms() {
-      try {
-        const rooms = await request('/api/v1/admin/rooms');
-        $('roomRows').innerHTML = (rooms.rooms || []).length ? (rooms.rooms || []).map(r => `<tr><td>${esc(r.id)}</td><td>${esc(r.project_id)}</td><td>${r.room_index}</td><td>${r.capacity}</td><td>${r.used || 0}</td><td class="act"><button data-op="delete" data-rid="${esc(r.id)}" class="danger" ${(r.used||0)>0?'disabled':''}>Delete</button></td></tr>`).join('') : `<tr><td colspan="6" class="empty">No rooms found.</td></tr>`;
-      } catch (e) { setStatus(e.message, true); }
-    }
+      function headers() {
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + state.token
+        };
+      }
 
-    $('addRoom').addEventListener('click', () => { $('roomDialog').showModal(); });
-    $('roomDialog').addEventListener('close', async () => {
-      if ($('roomDialog').returnValue !== 'create') return;
-      try {
-        await request('/api/v1/admin/rooms', { method:'POST', body: JSON.stringify({ roomId: $('newRoomId').value, projectId: $('newRoomProject').value, capacity: parseInt($('newRoomCapacity').value) || 35 }) });
-        await loadRooms();
-      } catch (e) { setStatus(e.message, true); }
-    });
+      async function fetchJson(path) {
+        var res = await fetch(api(path), { headers: headers() });
+        if (!res.ok) {
+          if (res.status === 401) throw new Error('Unauthorized — check your admin token.');
+          var body = await res.json().catch(function () { return {}; });
+          throw new Error((body.error || 'HTTP ' + res.status));
+        }
+        return res.json();
+      }
 
-    $('roomRows').addEventListener('click', e => {
-      const b = e.target.closest('button[data-op]'); if (!b || b.dataset.op !== 'delete') return;
-      $('confirmTitle').textContent = 'Delete room?'; $('confirmBody').textContent = `Room ${b.dataset.rid} will be permanently deleted.`;
-      $('confirmGo').onclick = async () => { try { await request(`/api/v1/admin/rooms/${encodeURIComponent(b.dataset.rid)}`, { method:'DELETE' }); await loadRooms(); } catch (e) { setStatus(e.message, true); } };
-      $('confirm').showModal();
-    });
+      async function fetchJsonPost(path, body) {
+        var res = await fetch(api(path), {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(body || {})
+        });
+        if (!res.ok) {
+          var b = await res.json().catch(function () { return {}; });
+          throw new Error((b.error || 'HTTP ' + res.status));
+        }
+        return res.json();
+      }
 
-    // Organization management
-    async function loadOrgs() {
-      try {
-        const orgs = await request('/api/v1/admin/organizations' + ($('orgFilter').value ? `?status=${$('orgFilter').value}` : ''));
-        $('orgRows').innerHTML = (orgs.organizations || []).length ? (orgs.organizations || []).map(o => `<tr><td>${esc(o.id)}</td><td>${esc(o.contact_name||'')}</td><td><a href="${esc(o.official_url||'#')}" target="_blank" rel="noopener">${esc(o.official_url||'')}</a></td><td>${esc(o.status)}</td><td>${date(o.created_at)}</td><td class="act"><button data-op="review" data-oid="${esc(o.id)}">Review</button></td></tr>`).join('') : `<tr><td colspan="6" class="empty">No organizations found.</td></tr>`;
-      } catch (e) { setStatus(e.message, true); }
-    }
+      async function fetchJsonDelete(path) {
+        var res = await fetch(api(path), {
+          method: 'DELETE',
+          headers: headers()
+        });
+        if (!res.ok) {
+          var b = await res.json().catch(function () { return {}; });
+          throw new Error((b.error || 'HTTP ' + res.status));
+        }
+        return res.json();
+      }
 
-    $('orgFilter').addEventListener('change', loadOrgs);
-    $('orgRows').addEventListener('click', async e => {
-      const b = e.target.closest('button[data-op]'); if (!b || b.dataset.op !== 'review') return;
-      try {
-        const org = await request(`/api/v1/admin/organizations/${encodeURIComponent(b.dataset.oid)}`);
-        $('orgDialogTitle').textContent = `Review: ${org.id}`;
-        $('orgDetails').innerHTML = `<p><strong>Contact:</strong> ${esc(org.contact_name||'')} (${esc(org.contact_email||'')})</p><p><strong>Official URL:</strong> <a href="${esc(org.official_url||'#')}" target="_blank" rel="noopener">${esc(org.official_url||'')}</a></p><p><strong>Social proofs:</strong> ${org.social_proofs ? org.social_proofs.map(s => `<a href="${esc(s.url||'#')}" target="_blank" rel="noopener">${esc(s.platform||'')}</a>`).join(', ') : 'None'}</p><h3>Technical Q&A</h3>${org.questions && org.questions.length ? org.questions.map((q, i) => `<p><strong>Q${i+1}:</strong> ${esc(q.question||'')}</p><p><strong>A:</strong> ${esc(q.answer||'')}</p>`).join('') : '<p>No questions submitted.</p>'}`;
-        $('orgApprove').onclick = async () => { try { await request(`/api/v1/admin/organizations/${encodeURIComponent(org.id)}/approve`, { method:'POST', body: JSON.stringify({ notes: $('orgNotes').value }) }); await loadOrgs(); } catch (e) { setStatus(e.message, true); } };
-        $('orgReject').onclick = async () => { try { await request(`/api/v1/admin/organizations/${encodeURIComponent(org.id)}/reject`, { method:'POST', body: JSON.stringify({ notes: $('orgNotes').value }) }); await loadOrgs(); } catch (e) { setStatus(e.message, true); } };
-        $('orgSuspend').onclick = async () => { try { await request(`/api/v1/admin/organizations/${encodeURIComponent(org.id)}/suspend`, { method:'POST', body: JSON.stringify({ notes: $('orgNotes').value }) }); await loadOrgs(); } catch (e) { setStatus(e.message, true); } };
-        $('orgDialog').showModal();
-      } catch (e) { setStatus(e.message, true); }
-    });
+      function setStatus(msg, ok) {
+        if (el.status) {
+          el.status.textContent = msg;
+          el.status.style.color = ok === false ? '#e57967' : ok === true ? '#91dcaf' : '#7a9e97';
+        }
+      }
 
-    // Alert webhook
-    async function loadAlerts() {
-      try {
-        const alerts = await request('/api/v1/admin/alerts');
-        $('alertRows').innerHTML = (alerts.alerts || []).length ? (alerts.alerts || []).map(a => `<tr><td>${date(a.received_at)}</td><td>${esc(a.project_id||'')}</td><td>${esc(a.severity||'')}</td><td>${esc(a.action||'')}</td><td>${esc(a.statement||'')}</td></tr>`).join('') : `<tr><td colspan="5" class="empty">No alerts delivered yet.</td></tr>`;
-        $('alertStatus').textContent = alerts.summary ? `· ${alerts.summary.total_delivered} delivered` : '';
-      } catch (e) { setStatus(e.message, true); }
-    }
+      function flashMetric(elRef) {
+        if (!elRef) return;
+        elRef.classList.add('flash');
+        setTimeout(function () { elRef.classList.remove('flash'); }, 600);
+      }
 
-    // Floor viz
-    function mountViz() {
-      if (state.viz) return;
-      state.viz = new FederationTV({ projectId:'all', roomId:'all', container:'#viz', gatewayUrl:api.value, refreshInterval:12000, randomSpeech:false, presentationMode:'camera', onAgentSelect: () => {} });
-    }
+      // ── Data loading ───────────────────────────────────────────────────
+      async function loadAgents() {
+        var data = await fetchJson('/api/v1/admin/agents');
+        state.agents = data.agents || [];
+        renderAgents();
+        updateMetrics(data.summary || {});
+        populateRoomFilter();
+        updateTV();
+      }
 
-    // Initialize
-    api.value = localStorage.getItem('admin_api') || api.value;
-    token.value = localStorage.getItem('admin_token') || '';
-    api.addEventListener('change', () => { localStorage.setItem('admin_api', api.value); });
-    token.addEventListener('change', () => { if (token.value) localStorage.setItem('admin_token', token.value); });
+      async function loadRooms() {
+        var data = await fetchJson('/api/v1/admin/rooms');
+        state.rooms = data.rooms || [];
+        renderRooms(state.rooms);
+        populateTVRoomPicker();
+      }
+
+      function populateTVRoomPicker() {
+        if (!el.tvRoom) return;
+        var current = el.tvRoom.value;
+        el.tvRoom.innerHTML = '<option value="all">All rooms</option>';
+        for (var i = 0; i < state.rooms.length; i++) {
+          var r = state.rooms[i];
+          var opt = document.createElement('option');
+          opt.value = r.roomId;
+          opt.textContent = r.roomId + ' (' + r.projectId + ')';
+          el.tvRoom.appendChild(opt);
+        }
+        if (current && Array.from(el.tvRoom.options).some(function (o) { return o.value === current; })) {
+          el.tvRoom.value = current;
+        }
+      }
+
+      async function loadOrganizations() {
+        var statusFilter = el.orgFilter ? el.orgFilter.value : '';
+        var path = '/api/v1/admin/organizations';
+        if (statusFilter) path += '?status=' + encodeURIComponent(statusFilter);
+        var data = await fetchJson(path);
+        state.organizations = data.organizations || [];
+        renderOrganizations();
+      }
+
+      async function loadAlerts() {
+        var data = await fetchJson('/api/v1/admin/alerts');
+        state.alerts = data.alerts || [];
+        renderAlerts();
+      }
+
+      async function loadAll() {
+        try {
+          setStatus('Loading...', null);
+          await Promise.all([loadAgents(), loadRooms(), loadOrganizations(), loadAlerts()]);
+          setStatus('Connected — ' + state.agents.length + ' agents, auto-refresh 15s.', true);
+        } catch (e) {
+          setStatus('Error: ' + e.message, false);
+        }
+      }
+
+      // ── Metrics ────────────────────────────────────────────────────────
+      function updateMetrics(summary) {
+        if (el.mTotal) { el.mTotal.textContent = summary.total || 0; flashMetric(el.mTotal); }
+        if (el.mLive) { el.mLive.textContent = summary.live || 0; flashMetric(el.mLive); }
+        if (el.mPaused) { el.mPaused.textContent = summary.paused || 0; flashMetric(el.mPaused); }
+        if (el.mOffline) {
+          var offline = (summary.idle || 0) + (summary.revoked || 0);
+          el.mOffline.textContent = offline;
+          flashMetric(el.mOffline);
+        }
+      }
+
+      // ── Room filter population ─────────────────────────────────────────
+      function populateRoomFilter() {
+        if (!el.filterRoom) return;
+        var rooms = {};
+        for (var i = 0; i < state.agents.length; i++) {
+          var r = state.agents[i].roomId;
+          if (r) rooms[r] = (rooms[r] || 0) + 1;
+        }
+        var current = el.filterRoom.value;
+        el.filterRoom.innerHTML = '<option value="">all rooms</option>';
+        var keys = Object.keys(rooms).sort();
+        for (var j = 0; j < keys.length; j++) {
+          var opt = document.createElement('option');
+          opt.value = keys[j];
+          opt.textContent = keys[j] + ' (' + rooms[keys[j]] + ')';
+          el.filterRoom.appendChild(opt);
+        }
+        el.filterRoom.value = current;
+      }
+
+      // ── Agent rendering ────────────────────────────────────────────────
+      function renderAgents() {
+        if (!el.rows) return;
+        var query = (el.search ? el.search.value : '').toLowerCase().trim();
+        var roomFilter = el.filterRoom ? el.filterRoom.value : '';
+        var statusFilter = el.filterStatus ? el.filterStatus.value : '';
+
+        var filtered = state.agents.filter(function (a) {
+          if (roomFilter && a.roomId !== roomFilter) return false;
+          if (statusFilter) {
+            var pill = agentStatusPill(a);
+            if (pill !== statusFilter) return false;
+          }
+          if (query) {
+            var haystack = [a.displayName, a.agentId, a.ownerId, a.roomId, a.projectId].join(' ').toLowerCase();
+            if (haystack.indexOf(query) === -1) return false;
+          }
+          return true;
+        });
+
+        if (!filtered.length) {
+          el.rows.innerHTML = '<tr><td colspan="6" class="empty">' +
+            (state.agents.length ? 'No agents match the current filters.' : 'Connect to load agents.') +
+            '</td></tr>';
+          return;
+        }
+
+        el.rows.innerHTML = filtered.map(function (a) {
+          var pill = agentStatusPill(a);
+          var hb = a.lastHeartbeatAt ? timeAgo(a.lastHeartbeatAt) : '—';
+          var actions = '';
+          if (a.paused) {
+            actions += '<button class="secondary resume-agent" data-project="' + esc(a.projectId) + '" data-agent="' + esc(a.agentId) + '">Resume</button>';
+            actions += '<button class="danger revoke-agent" data-project="' + esc(a.projectId) + '" data-agent="' + esc(a.agentId) + '">Revoke</button>';
+          } else if (a.lifecycleState === 'revoked') {
+            actions += '<span style="color:#7a9e97;font-size:.62rem;">Revoked</span>';
+          } else {
+            actions += '<button class="ghost pause-agent" data-project="' + esc(a.projectId) + '" data-agent="' + esc(a.agentId) + '">Pause</button>';
+            actions += '<button class="danger revoke-agent" data-project="' + esc(a.projectId) + '" data-agent="' + esc(a.agentId) + '">Revoke</button>';
+          }
+          return '<tr>' +
+            '<td class="name"><b>' + esc(a.displayName) + '</b><small>' + esc(a.agentId) + '</small></td>' +
+            '<td>' + esc(a.projectId) + '</td>' +
+            '<td>' + esc(a.roomId || '—') + '</td>' +
+            '<td><span class="pill ' + pill + '">' + agentStatusLabel(a) + '</span></td>' +
+            '<td class="hb-cell">' + hb + '</td>' +
+            '<td class="act">' + actions + '</td>' +
+            '</tr>';
+        }).join('');
+      }
+
+      // ── Agent actions ──────────────────────────────────────────────────
+      async function agentAction(op, projectId, agentId) {
+        try {
+          await fetchJsonPost('/api/v1/admin/agents/' + encodeURIComponent(projectId) + '/' + encodeURIComponent(agentId) + '/' + op);
+          await loadAgents();
+          setStatus(op.charAt(0).toUpperCase() + op.slice(1) + ' — ' + agentId, true);
+        } catch (e) {
+          setStatus('Action failed: ' + e.message, false);
+        }
+      }
+
+      // ── FederationTV (Live Floor) ──────────────────────────────────────
+      function updateTV() {
+        if (!el.viz || !window.FederationTV) return;
+        if (state.tv) {
+          state.tv.stop();
+          el.viz.innerHTML = '';
+        }
+        try {
+          var selectedRoom = el.tvRoom ? el.tvRoom.value : 'all';
+          state.tv = new window.FederationTV({
+            container: el.viz,
+            projectId: selectedRoom === 'all' ? 'all' : '',
+            roomId: selectedRoom === 'all' ? 'all' : selectedRoom,
+            gatewayUrl: state.apiUrl,
+            presentationMode: 'embed',
+            refreshInterval: 30000,
+            maxBubbles: 3
+          });
+        } catch (e) {
+          console.warn('[Admin] TV init failed:', e);
+        }
+      }
+
+      function switchTVRoom() {
+        if (!el.tvRoom || !state.tv) return;
+        var selectedRoom = el.tvRoom.value;
+        if (selectedRoom === 'all') {
+          state.tv.setRoom('all', 'all');
+        } else {
+          var room = state.rooms.find(function (r) { return r.roomId === selectedRoom; });
+          if (room) {
+            state.tv.setRoom(room.roomId, room.projectId);
+          }
+        }
+      }
+
+      // ── Room rendering ─────────────────────────────────────────────────
+      function getRoomStatus(room) {
+        if (!room) return 'unknown';
+        var used = (typeof room.usedCount === 'number') ? room.usedCount :
+          (typeof room.used === 'number') ? room.used : 0;
+        var cap = (typeof room.capacity === 'number') ? room.capacity : 35;
+        if (used === 0) return 'empty';
+        if (used >= cap) return 'full';
+        return 'active';
+      }
+
+      function renderRooms(rooms) {
+        if (!el.roomRows) return;
+        if (!rooms || !rooms.length) {
+          el.roomRows.innerHTML = '<tr><td colspan="6" class="empty">Connect to load rooms.</td></tr>';
+          return;
+        }
+        el.roomRows.innerHTML = rooms.map(function (r) {
+          var st = getRoomStatus(r);
+          var used = r.usedCount != null ? r.usedCount : (r.used != null ? r.used : '—');
+          var canDel = (typeof used === 'number' && used === 0);
+          return '<tr data-room-id="' + esc(r.roomId) + '">' +
+            '<td class="name"><b>' + esc(r.roomId) + '</b></td>' +
+            '<td>' + esc(r.projectId) + '</td>' +
+            '<td>' + (r.roomIndex != null ? r.roomIndex : '—') + '</td>' +
+            '<td>' + (r.capacity != null ? r.capacity : '—') + '</td>' +
+            '<td><span class="pill ' + st + '">' + used + '</span></td>' +
+            '<td class="act">' +
+            (canDel ? '<button class="danger delete-room" data-room-id="' + esc(r.roomId) + '">Delete</button>' : '') +
+            '</td></tr>';
+        }).join('');
+      }
+
+      function filterAndRenderRooms() {
+        var q = (el.roomSearch ? el.roomSearch.value : '').toLowerCase().trim();
+        var sf = el.roomFilterStatus ? el.roomFilterStatus.value : '';
+        var filtered = state.rooms.filter(function (r) {
+          var rid = (r.roomId || '').toLowerCase();
+          var proj = (r.projectId || '').toLowerCase();
+          var st = getRoomStatus(r);
+          if (q && rid.indexOf(q) === -1 && proj.indexOf(q) === -1) return false;
+          if (sf && st !== sf) return false;
+          return true;
+        });
+        renderRooms(filtered);
+      }
+
+      // ── Room CRUD ──────────────────────────────────────────────────────
+      async function createRoom() {
+        var roomId = document.getElementById('newRoomId').value.trim();
+        var projectId = document.getElementById('newRoomProject').value.trim();
+        var capacity = parseInt(document.getElementById('newRoomCapacity').value, 10) || 35;
+        if (!roomId || !projectId) { setStatus('Room ID and Project ID are required.', false); return; }
+        try {
+          await fetchJsonPost('/api/v1/admin/rooms', { roomId: roomId, projectId: projectId, capacity: capacity });
+          el.roomDialog.close();
+          await loadRooms();
+          setStatus('Room created: ' + roomId, true);
+        } catch (e) {
+          setStatus('Room creation failed: ' + e.message, false);
+        }
+      }
+
+      async function deleteRoom(roomId) {
+        if (!confirm('Delete room "' + roomId + '"? This cannot be undone.')) return;
+        try {
+          await fetchJsonDelete('/api/v1/admin/rooms/' + encodeURIComponent(roomId));
+          await loadRooms();
+          setStatus('Room deleted: ' + roomId, true);
+        } catch (e) {
+          setStatus('Delete failed: ' + e.message, false);
+        }
+      }
+
+      // ── Organization rendering ─────────────────────────────────────────
+      function renderOrganizations() {
+        if (!el.orgRows) return;
+        if (!state.organizations.length) {
+          el.orgRows.innerHTML = '<tr><td colspan="6" class="empty">No organization applications.</td></tr>';
+          return;
+        }
+        el.orgRows.innerHTML = state.organizations.map(function (o) {
+          var pillClass = o.status === 'active' ? 'live' : o.status === 'rejected' ? 'revoked' :
+            o.status === 'suspended' ? 'paused' : 'offline';
+          return '<tr>' +
+            '<td class="name"><b>' + esc(o.name) + '</b><small>' + esc(o.organizationId) + '</small></td>' +
+            '<td>' + esc(o.contactEmail) + '</td>' +
+            '<td>' + esc(o.officialUrl) + '</td>' +
+            '<td><span class="pill ' + pillClass + '">' + esc(o.status) + '</span></td>' +
+            '<td>' + formatDate(o.createdAt) + '</td>' +
+            '<td class="act"><button class="ghost review-org" data-id="' + esc(o.id) + '">Review</button></td>' +
+            '</tr>';
+        }).join('');
+      }
+
+      // ── Organization review ────────────────────────────────────────────
+      async function openOrgReview(orgId) {
+        try {
+          var data = await fetchJson('/api/v1/admin/organizations/' + encodeURIComponent(orgId));
+          var o = data.organization;
+          if (!o) throw new Error('Organization not found');
+
+          var html = '<div style="margin-bottom:8px;">';
+          html += '<strong style="color:#9bd4c7;">' + esc(o.name) + '</strong> <span style="color:#7a9e97;">(' + esc(o.organizationId) + ')</span><br>';
+          html += '<span style="color:#7a9e97;">Contact:</span> ' + esc(o.contactEmail) + '<br>';
+          html += '<span style="color:#7a9e97;">Official URL:</span> ' + esc(o.officialUrl) + '<br>';
+          html += '<span style="color:#7a9e97;">Status:</span> <strong>' + esc(o.status) + '</strong><br>';
+          html += '<span style="color:#7a9e97;">Owner:</span> ' + esc(o.ownerId) + '</div>';
+
+          if (o.socialProofs && o.socialProofs.length) {
+            html += '<div style="margin-top:8px;"><strong style="color:#9bd4c7;font-size:.68rem;">SOCIAL PROOFS</strong>';
+            o.socialProofs.forEach(function (p) {
+              html += '<div style="margin:4px 0 0 8px;color:#a4c8c3;">' + esc(p.platform) + ': ' + esc(p.url) + '</div>';
+            });
+            html += '</div>';
+          }
+
+          if (o.technicalQuestions && o.technicalQuestions.length) {
+            html += '<div style="margin-top:8px;"><strong style="color:#9bd4c7;font-size:.68rem;">TECHNICAL Q&amp;A</strong>';
+            o.technicalQuestions.forEach(function (q, idx) {
+              html += '<div style="margin:6px 0 0 8px;"><span style="color:#7a9e97;">Q' + (idx + 1) + ':</span> ' + esc(q.question) + '<br><span style="color:#a4c8c3;margin-left:8px;">A:</span> ' + esc(q.answer) + '</div>';
+            });
+            html += '</div>';
+          }
+
+          if (el.orgDetails) el.orgDetails.innerHTML = html;
+          if (el.orgNotes) el.orgNotes.value = '';
+          if (el.orgDialog) {
+            el._currentOrgId = orgId;
+            el.orgDialog.showModal();
+          }
+        } catch (e) {
+          setStatus('Failed to load org details: ' + e.message, false);
+        }
+      }
+
+      async function orgAction(action) {
+        var orgId = el._currentOrgId;
+        if (!orgId) return;
+        var notes = (el.orgNotes ? el.orgNotes.value : '').trim();
+        try {
+          await fetchJsonPost('/api/v1/admin/organizations/' + encodeURIComponent(orgId) + '/' + action, { notes: notes || 'Processed via admin console' });
+          if (el.orgDialog) el.orgDialog.close();
+          await loadOrganizations();
+          setStatus('Organization ' + action + ': ' + orgId, true);
+        } catch (e) {
+          setStatus('Action failed: ' + e.message, false);
+        }
+      }
+
+      // ── Alert rendering ────────────────────────────────────────────────
+      function renderAlerts() {
+        if (!el.alertRows) return;
+        if (!state.alerts.length) {
+          el.alertRows.innerHTML = '<tr><td colspan="5" class="empty">No alert deliveries recorded.</td></tr>';
+          return;
+        }
+        el.alertRows.innerHTML = state.alerts.map(function (a) {
+          return '<tr>' +
+            '<td>' + formatDate(a.receivedAt) + '</td>' +
+            '<td>' + esc(a.projectId) + '</td>' +
+            '<td><span class="pill ' + (a.severity === 'critical' ? 'revoked' : a.severity === 'high' ? 'paused' : 'offline') + '">' + esc(a.severity || '—') + '</span></td>' +
+            '<td>' + esc(a.action) + '</td>' +
+            '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(a.statement) + '">' + esc(a.statement) + '</td>' +
+            '</tr>';
+        }).join('');
+        if (el.alertStatus) el.alertStatus.textContent = ' (' + state.alerts.length + ' receipts)';
+      }
+
+      // ── Auto-refresh ───────────────────────────────────────────────────
+      function startRefresh() {
+        stopRefresh();
+        state.refreshTimer = setInterval(function () {
+          loadAll();
+        }, 15000);
+      }
+
+      function stopRefresh() {
+        if (state.refreshTimer) {
+          clearInterval(state.refreshTimer);
+          state.refreshTimer = null;
+        }
+      }
+
+      // ── Confirm dialog ─────────────────────────────────────────────────
+      function showConfirm(title, body, callback) {
+        if (!el.confirm) return;
+        el.confirmTitle.textContent = title;
+        el.confirmBody.textContent = body;
+        el.confirm.showModal();
+        el._confirmCallback = callback;
+      }
+
+      // ── Event wiring ───────────────────────────────────────────────────
+      function init() {
+        // Default API URL
+        if (el.api) {
+          el.api.value = state.apiUrl || 'https://fapi.drdeeks.xyz';
+        }
+
+        // Connect
+        if (el.connect) {
+          el.connect.addEventListener('click', function () {
+            state.apiUrl = (el.api ? el.api.value.trim() : '') || 'https://fapi.drdeeks.xyz';
+            state.token = (el.token ? el.token.value : '');
+            if (!state.token) {
+              setStatus('Admin token is required.', false);
+              return;
+            }
+            loadAll();
+            startRefresh();
+          });
+        }
+
+        // Agent search/filter
+        if (el.search) el.search.addEventListener('input', renderAgents);
+        if (el.filterRoom) el.filterRoom.addEventListener('change', renderAgents);
+        if (el.filterStatus) el.filterStatus.addEventListener('change', renderAgents);
+
+        // Agent actions (delegated)
+        if (el.rows) {
+          el.rows.addEventListener('click', function (e) {
+            var btn = e.target.closest('.pause-agent, .resume-agent, .revoke-agent');
+            if (!btn) return;
+            var op = btn.classList.contains('pause-agent') ? 'pause' :
+              btn.classList.contains('resume-agent') ? 'resume' : 'revoke';
+            var projectId = btn.dataset.project;
+            var agentId = btn.dataset.agent;
+            var actionLabel = op.charAt(0).toUpperCase() + op.slice(1);
+            showConfirm(
+              actionLabel + ' agent',
+              actionLabel + ' "' + agentId + '" in project "' + projectId + '"?',
+              function () { agentAction(op, projectId, agentId); }
+            );
+          });
+        }
+
+        // Room search/filter
+        if (el.roomSearch) el.roomSearch.addEventListener('input', filterAndRenderRooms);
+        if (el.roomFilterStatus) el.roomFilterStatus.addEventListener('change', filterAndRenderRooms);
+
+        // Room delete (delegated)
+        if (el.roomRows) {
+          el.roomRows.addEventListener('click', function (e) {
+            var btn = e.target.closest('.delete-room');
+            if (!btn) return;
+            deleteRoom(btn.dataset.roomId);
+          });
+        }
+
+        // Room create dialog
+        if (el.addRoom) {
+          el.addRoom.addEventListener('click', function () {
+            if (el.roomDialog) el.roomDialog.showModal();
+          });
+        }
+        if (el.roomDialog) {
+          el.roomDialog.addEventListener('close', function () {
+            var form = el.roomDialog.querySelector('form');
+            if (form) {
+              var result = form.returnValue;
+              if (result === 'create') createRoom();
+            }
+          });
+        }
+
+        // TV room picker
+        if (el.tvRoom) {
+          el.tvRoom.addEventListener('change', switchTVRoom);
+        }
+
+        // Organization filter
+        if (el.orgFilter) {
+          el.orgFilter.addEventListener('change', loadOrganizations);
+        }
+
+        // Organization review (delegated)
+        if (el.orgRows) {
+          el.orgRows.addEventListener('click', function (e) {
+            var btn = e.target.closest('.review-org');
+            if (!btn) return;
+            openOrgReview(btn.dataset.id);
+          });
+        }
+
+        // Org dialog actions
+        if (el.orgApprove) el.orgApprove.addEventListener('click', function (e) { e.preventDefault(); orgAction('approve'); });
+        if (el.orgReject) el.orgReject.addEventListener('click', function (e) { e.preventDefault(); orgAction('reject'); });
+        if (el.orgSuspend) el.orgSuspend.addEventListener('click', function (e) { e.preventDefault(); orgAction('suspend'); });
+
+        // Confirm dialog
+        if (el.confirmGo) {
+          el.confirmGo.addEventListener('click', function () {
+            var cb = el._confirmCallback;
+            el.confirm.close();
+            if (cb) cb();
+          });
+        }
+        if (el.confirm) {
+          el.confirm.addEventListener('close', function () {
+            el._confirmCallback = null;
+          });
+        }
+      }
+
+      init();
+    })();
   </script>
 </body>
 </html>
