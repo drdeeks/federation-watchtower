@@ -236,6 +236,30 @@ export default {
         return json(await scene.snapshot());
       }
 
+      // The outbound alert webhook is provable end-to-end: the queue consumer
+      // signs and POSTs each guardrail alert to WATCHTOWER_ALERT_WEBHOOK_URL.
+      // Pointing that URL at this self-hosted sink verifies the HMAC signature
+      // and appends an immutable receipt, so operators can see alerts actually
+      // arriving instead of trusting that the plumbing exists. Authentication is
+      // the shared alert-webhook secret, exactly as an external receiver would do.
+      if (path === "/api/v1/alert-sink" && method === "POST") {
+        const secret = env.WATCHTOWER_ALERT_WEBHOOK_SECRET;
+        if (!secret) return error("alert sink requires WATCHTOWER_ALERT_WEBHOOK_SECRET", 503);
+        const { raw, value } = await readBoundedJson(request);
+        const timestamp = request.headers.get("X-Watchtower-Timestamp") || "";
+        const provided = request.headers.get("X-Watchtower-Signature") || "";
+        const expected = `sha256=${await hmacSha256Hex(secret, `${timestamp}.${raw}`)}`;
+        if (!constantTimeEqual(provided, expected)) return error("invalid alert signature", 401);
+        const alert = value as AlertDispatch;
+        if (!alert || typeof alert.deliveryId !== "string" || typeof alert.projectId !== "string") return error("malformed alert payload", 400);
+        const deliveryId = request.headers.get("X-Watchtower-Delivery") || alert.deliveryId;
+        await env.DB.prepare(
+          "INSERT OR IGNORE INTO alert_webhook_receipts (delivery_id, project_id, incident_id, event_id, agent_id, severity, action, statement, reason, signature_valid, received_at, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)"
+        ).bind(deliveryId, alert.projectId, alert.incidentId ?? null, alert.eventId ?? null, alert.agentId ?? null, alert.severity ?? null, alert.action ?? null, alert.statement ?? null, alert.reason ?? null, Date.now(), raw).run();
+        console.log({ event: "watchtower.alert.received", deliveryId, projectId: alert.projectId });
+        return json({ received: true, deliveryId }, 202);
+      }
+
       // ==================== REMOTE MCP GATEWAY ====================
       if (path === "/mcp") {
         const authentication = await authenticateMcpPrincipal(request, coordinator);

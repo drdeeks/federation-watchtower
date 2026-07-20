@@ -83,6 +83,17 @@
         <p class="sub" style="padding:10px 12px;">Read-only public projection of what everyone sees. Pause/revoke here removes an agent from this floor.</p>
       </div>
     </section>
+
+    <section class="card" style="margin-top:20px;">
+      <h2><span class="grow">Alert webhook</span><span id="alertStatus" class="sub"></span></h2>
+      <p class="sub" style="padding:9px 12px 0;">Guardrail alerts the Worker signed and delivered to <code>WATCHTOWER_ALERT_WEBHOOK_URL</code> and the receiver verified. Empty means none have fired yet — or the webhook URL is unset, in which case deliveries are recorded <em>suppressed</em> and nothing is sent.</p>
+      <div class="tablewrap" style="max-height:340px;">
+        <table>
+          <thead><tr><th>Received</th><th>Project</th><th>Agent</th><th>Severity</th><th>Action</th><th>Statement</th><th>Sig</th></tr></thead>
+          <tbody id="alertRows"><tr><td colspan="7" class="empty">Connect to load alert deliveries.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <dialog id="confirm"><form method="dialog"><h2 id="confirmTitle">Confirm</h2><p class="sub" id="confirmBody"></p><menu><button value="cancel" class="secondary">Cancel</button><button id="confirmGo" value="go" class="danger">Confirm</button></menu></form></dialog>
@@ -152,6 +163,24 @@
         render();
         setStatus(`Live · ${state.agents.length} agents · ${new Date().toLocaleTimeString()}`);
       } catch (e) { setStatus(e.message, true); }
+      loadAlerts();
+    }
+
+    async function loadAlerts() {
+      try {
+        const data = await request('/api/v1/admin/alerts');
+        const alerts = data.alerts || [];
+        $('alertStatus').textContent = `${alerts.length} delivered`;
+        $('alertRows').innerHTML = alerts.length ? alerts.map(a => `<tr>
+          <td>${date(a.receivedAt)}</td>
+          <td>${esc(a.projectId)}</td>
+          <td>${esc(a.agentId || '—')}</td>
+          <td><span class="pill ${a.severity === 'critical' || a.severity === 'error' ? 'revoked' : 'paused'}">${esc(a.severity || '—')}</span></td>
+          <td>${esc(a.action || '—')}</td>
+          <td>${esc(a.statement || a.reason || '—')}</td>
+          <td>${a.signatureValid ? '✓' : '✗'}</td></tr>`).join('')
+          : '<tr><td colspan="7" class="empty">No alert deliveries yet.</td></tr>';
+      } catch (e) { $('alertStatus').textContent = e.message; }
     }
 
     function mountViz() {

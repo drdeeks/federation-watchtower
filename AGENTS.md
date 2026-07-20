@@ -94,6 +94,16 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   credential and drops the agent from the public scene but preserves its event
   evidence. Backed by `/api/v1/admin/agents*` (`src/management.ts`). Room
   lifecycle management is the next increment.
+- Provable outbound alert webhook. When a guardrail rule fires, the Worker
+  signs the alert and POSTs it to the configured `WATCHTOWER_ALERT_WEBHOOK_URL`
+  (opt-in; unset means deliveries are recorded `suppressed`). A self-hosted
+  receiver `POST /api/v1/alert-sink` verifies the HMAC signature and appends an
+  immutable receipt (`alert_webhook_receipts`, migration 0006); the operator
+  console reads them via admin `GET /api/v1/admin/alerts` so alert delivery is
+  visible rather than assumed. Point `WATCHTOWER_ALERT_WEBHOOK_URL` at
+  `https://fapi.drdeeks.xyz/api/v1/alert-sink` (with a shared
+  `WATCHTOWER_ALERT_WEBHOOK_SECRET`) for a self-contained working webhook.
+  Per-owner webhook destinations remain a separate, unbuilt increment.
 
 ### Important work that is not done
 

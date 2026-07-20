@@ -81,6 +81,17 @@ export async function handleManagementRequest(input: {
     return json({ agent: { agentId, projectId, lifecycleState: "revoked" }, requestId: crypto.randomUUID() });
   }
 
+  // Operator-visible proof the alert webhook is live: receipts the self-hosted
+  // sink verified by signature. Read-only; the receipts table is append-only.
+  if (path === "/api/v1/admin/alerts" && method === "GET") {
+    const rows = await env.DB.prepare(
+      `SELECT delivery_id, project_id, incident_id, event_id, agent_id, severity, action, statement, reason, signature_valid, received_at
+       FROM alert_webhook_receipts ORDER BY received_at DESC LIMIT 200`
+    ).all<AlertReceiptRow>();
+    const alerts = (rows.results || []).map(presentAlertReceipt);
+    return json({ alerts, count: alerts.length, requestId: crypto.randomUUID() });
+  }
+
   return null;
 }
 
@@ -97,6 +108,21 @@ export function agentStateFilter(state: string): { clause: string; bind?: string
   if (state === "paused") return { clause: "a.paused_at IS NOT NULL" };
   if (["registered", "connected", "offline", "revoked"].includes(state)) return { clause: "a.lifecycle_state = ? AND a.paused_at IS NULL", bind: state };
   throw new ValidationError("state filter is not recognised");
+}
+
+interface AlertReceiptRow {
+  delivery_id: string; project_id: string; incident_id: string | null; event_id: string | null;
+  agent_id: string | null; severity: string | null; action: string | null; statement: string | null;
+  reason: string | null; signature_valid: number; received_at: number;
+}
+
+export function presentAlertReceipt(r: AlertReceiptRow) {
+  return {
+    deliveryId: r.delivery_id, projectId: r.project_id, incidentId: r.incident_id || undefined,
+    eventId: r.event_id || undefined, agentId: r.agent_id || undefined, severity: r.severity || undefined,
+    action: r.action || undefined, statement: r.statement || undefined, reason: r.reason || undefined,
+    signatureValid: r.signature_valid === 1, receivedAt: r.received_at,
+  };
 }
 
 export function present(a: AgentRow) {
