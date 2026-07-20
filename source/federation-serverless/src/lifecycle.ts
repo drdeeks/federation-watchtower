@@ -25,6 +25,7 @@ interface Manifest {
   agentId: string; displayName: string; ownerId: string; projectId: string; role: string; capabilities: string[];
   identity: { avatarSeed: string; paletteKey: string; characterType: string };
   publicProjection: boolean; heartbeatSeconds: number; organizationId?: string;
+  lease?: { ttlSeconds: number; scopes: string[] };
 }
 
 export async function handleLifecycleRequest(input: {
@@ -109,7 +110,34 @@ export async function handleLifecycleRequest(input: {
     const registrationEventId = `register-${crypto.randomUUID()}`;
     await appendLifecycle(env, canonicalId, "agent.registered", registrationEventId, { publicProjection: manifest.publicProjection, roomId: legacy?.roomId }, now);
     if (legacy?.roomId) await projectPublicScene(env, legacy, "registered", "agent.registered", registrationEventId, now);
-    return json({ agent: presentAgent({ id: canonicalId, project_id: manifest.projectId, agent_id: manifest.agentId, owner_id: owner.id, organization_id: manifest.organizationId || null, display_name: manifest.displayName, role: manifest.role, capabilities: JSON.stringify(manifest.capabilities), avatar_seed: manifest.identity.avatarSeed, palette_key: manifest.identity.paletteKey, character_type: manifest.identity.characterType, public_projection: manifest.publicProjection ? 1 : 0, heartbeat_seconds: manifest.heartbeatSeconds, lifecycle_state: "registered" }, legacy?.roomId), credential: { token, scopes: ["agent:connect", "agent:heartbeat", "agent:emit", "agent:disconnect"], issuedAt: now }, next: { connect: `/api/v1/agents/${encodeURIComponent(manifest.agentId)}/connect`, heartbeat: `/api/v1/agents/${encodeURIComponent(manifest.agentId)}/heartbeat`, event: `/api/v1/agents/${encodeURIComponent(manifest.agentId)}/events` }, requestId: crypto.randomUUID() }, 201);
+    
+    // Auto-create lease if requested at registration
+    let leaseInfo = null;
+    if (manifest.lease && manifest.lease.ttlSeconds) {
+      const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(manifest.projectId)) as DurableObjectStub<ProjectGuardrail>;
+      const lease = await guardrail.requestLease({
+        projectId: manifest.projectId,
+        agentId: manifest.agentId,
+        runId: `registration-${crypto.randomUUID()}`,
+        ttlSeconds: manifest.lease.ttlSeconds,
+        scopes: manifest.lease.scopes || manifest.capabilities
+      }, `owner:${owner.id}`);
+      leaseInfo = lease;
+      await appendLifecycle(env, canonicalId, "lease.created", `lease-${crypto.randomUUID()}`, { leaseId: lease.leaseId, status: lease.status, ttlSeconds: manifest.lease.ttlSeconds }, now);
+    }
+    
+    return json({ 
+      agent: presentAgent({ id: canonicalId, project_id: manifest.projectId, agent_id: manifest.agentId, owner_id: owner.id, organization_id: manifest.organizationId || null, display_name: manifest.displayName, role: manifest.role, capabilities: JSON.stringify(manifest.capabilities), avatar_seed: manifest.identity.avatarSeed, palette_key: manifest.identity.paletteKey, character_type: manifest.identity.characterType, public_projection: manifest.publicProjection ? 1 : 0, heartbeat_seconds: manifest.heartbeatSeconds, lifecycle_state: "registered" }, legacy?.roomId), 
+      credential: { token, scopes: ["agent:connect", "agent:heartbeat", "agent:emit", "agent:disconnect"], issuedAt: now }, 
+      lease: leaseInfo,
+      next: { 
+        connect: `/api/v1/agents/${encodeURIComponent(manifest.agentId)}/connect`, 
+        heartbeat: `/api/v1/agents/${encodeURIComponent(manifest.agentId)}/heartbeat`, 
+        event: `/api/v1/agents/${encodeURIComponent(manifest.agentId)}/events`,
+        ...(leaseInfo ? { leaseValidate: `/api/v1/projects/${encodeURIComponent(manifest.projectId)}/leases/${encodeURIComponent(leaseInfo.leaseId)}/validate` } : { leaseRequest: `/api/v1/projects/${encodeURIComponent(manifest.projectId)}/leases` })
+      }, 
+      requestId: crypto.randomUUID() 
+    }, 201);
   }
 
   const agentMatch = path.match(/^\/api\/v1\/agents\/([^/]+)\/(connect|heartbeat|events|disconnect)$/);
@@ -161,7 +189,7 @@ async function authenticateOwner(request: Request, env: WatchtowerEnv): Promise<
   return env.DB.prepare("SELECT id, display_name, owner_type, status FROM federation_owners WHERE credential_hash = ? AND status = 'active'").bind(await sha256Hex(token)).first<Owner>();
 }
 
-async function authenticateAgent(request: Request, env: WatchtowerEnv, projectId: string, agentId: string): Promise<CanonicalAgent | null> {
+export async function authenticateAgent(request: Request, env: WatchtowerEnv, projectId: string, agentId: string): Promise<CanonicalAgent | null> {
   const token = bearer(request, AGENT_PREFIX); if (!token) return null;
   return env.DB.prepare(`SELECT a.* FROM federation_agents a JOIN federation_agent_credentials c ON c.agent_id = a.id WHERE a.project_id = ? AND a.agent_id = ? AND a.lifecycle_state != 'revoked' AND a.paused_at IS NULL AND c.credential_hash = ? AND c.revoked_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > ?)`)
     .bind(projectId, agentId, await sha256Hex(token), Date.now()).first<CanonicalAgent>();
@@ -175,8 +203,16 @@ export function validateLifecycleManifest(value: unknown): Manifest {
   const characterType = text(identity.characterType, "identity.characterType", 32).toLowerCase(); if (!SAFE_CHARACTERS.has(characterType)) fail("identity.characterType is not supported");
   if (typeof body.publicProjection !== "boolean") fail("publicProjection must be a boolean");
   const heartbeatSeconds = integer(heartbeat.intervalSeconds, "heartbeat.intervalSeconds", 30, 3600);
+  let lease: { ttlSeconds: number; scopes: string[] } | undefined;
+  if (body.lease !== undefined) {
+    const leaseBody = record(body.lease, "lease");
+    lease = {
+      ttlSeconds: integer(leaseBody.ttlSeconds, "lease.ttlSeconds", 30, 3600),
+      scopes: array(leaseBody.scopes, "lease.scopes", 1, 16).map(item => validateAgentId(item))
+    };
+  }
   rejectSensitive(body.metadata);
-  return { agentId: validateAgentId(body.agentId), displayName: text(body.displayName, "displayName", 80), ownerId: validateAgentId(body.ownerId), projectId: validateProjectId(body.projectId), role: text(body.role, "role", 80), capabilities, identity: { avatarSeed: validateAgentId(identity.avatarSeed), paletteKey, characterType }, publicProjection: body.publicProjection, heartbeatSeconds, organizationId: body.organizationId === undefined ? undefined : validateAgentId(body.organizationId) };
+  return { agentId: validateAgentId(body.agentId), displayName: text(body.displayName, "displayName", 80), ownerId: validateAgentId(body.ownerId), projectId: validateProjectId(body.projectId), role: text(body.role, "role", 80), capabilities, identity: { avatarSeed: validateAgentId(identity.avatarSeed), paletteKey, characterType }, publicProjection: body.publicProjection, heartbeatSeconds, organizationId: body.organizationId === undefined ? undefined : validateAgentId(body.organizationId), lease };
 }
 
 export async function appendLifecycle(env: WatchtowerEnv, agentId: string, eventType: string, idempotencyKey: string | undefined, detail: Record<string, unknown>, occurredAt: number): Promise<void> {

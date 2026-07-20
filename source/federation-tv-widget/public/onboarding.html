@@ -110,7 +110,7 @@
           <label>Display name <input id="agentName" placeholder="Build Runner" autocomplete="off"></label>
           <label>Project ID <input id="projectId" placeholder="acme-autopilot" autocomplete="off" spellcheck="false"><small class="hint">lowercase letters, digits, hyphens</small></label>
           <label>Role <input id="agentRole" placeholder="build" autocomplete="off"></label>
-          <label>Capabilities <input id="capabilities" placeholder="build,test" autocomplete="off"><small class="hint">comma-separated, 1–16, unique</small></label>
+          <label>Capabilities <input id="capabilities" placeholder="build,test" autocomplete="off"><small class="hint">comma-separated, 1–16, unique — used as lease scopes if auto-lease enabled</small></label>
           <label>Heartbeat interval (s) <input id="heartbeat" type="number" min="30" max="3600" value="60"></label>
           <label>Palette <select id="paletteKey"></select></label>
           <label>Character <select id="characterType"></select></label>
@@ -118,6 +118,14 @@
             <input id="publicProjection" type="checkbox" checked style="width:auto;min-height:auto;">
             Show this agent's real status and events on the public Watchtower (owner consent)
           </label>
+          <fieldset style="margin-top:14px;">
+            <legend>Work lease agreement <small class="hint" style="text-transform:none;letter-spacing:0;">(optional — flexible)</small></legend>
+            <label class="full" style="flex-direction:row;display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;color:#dff5ee;margin-bottom:10px;">
+              <input id="autoLease" type="checkbox" style="width:auto;min-height:auto;">
+              Auto-create lease at registration (agent can work immediately)
+            </label>
+            <label>Lease TTL (s) <input id="leaseTtl" type="number" min="30" max="3600" value="300" disabled><small class="hint">30–3600 seconds (default 5 min) — lease renews on heartbeat</small></label>
+          </fieldset>
         </div>
         <div class="actions"><button id="createAgent">Register agent</button></div>
         <div class="msg" id="agentMsg" role="status"></div>
@@ -247,11 +255,14 @@
     });
 
     // ---- STEP 2 ----
+    $('autoLease').addEventListener('change', () => { $('leaseTtl').disabled = !$('autoLease').checked; });
     $('createAgent').addEventListener('click', async () => {
       if (!S.ownerToken) return setMsg('agentMsg', 'Create an owner first.', 'error');
       const btn = $('createAgent'); btn.disabled = true; setMsg('agentMsg', 'Registering agent…');
       const caps = $('capabilities').value.split(',').map(s => s.trim()).filter(Boolean);
       const agentId = $('agentId').value.trim();
+      const createAutoLease = $('autoLease').checked;
+      const leaseTtl = createAutoLease ? Number($('leaseTtl').value) : undefined;
       try {
         const data = await api('/api/v1/agents', { token: S.ownerToken, body: {
           agentId, displayName: $('agentName').value.trim(), ownerId: S.ownerId,
@@ -259,7 +270,8 @@
           capabilities: caps,
           identity: { avatarSeed: agentId, paletteKey: $('paletteKey').value, characterType: $('characterType').value },
           publicProjection: $('publicProjection').checked,
-          heartbeat: { intervalSeconds: Number($('heartbeat').value) }
+          heartbeat: { intervalSeconds: Number($('heartbeat').value) },
+          lease: createAutoLease ? { ttlSeconds: leaseTtl, scopes: caps } : undefined
         }});
         S.agentToken = data.credential.token; S.agentId = data.agent.agentId; S.projectId = data.agent.projectId; S.roomId = data.agent.roomId || null;
         reveal('agentToken', 'agentTokenValue', S.agentToken);
