@@ -1,3 +1,8 @@
+<img width="755" height="265" alt="image" src="https://github.com/user-attachments/assets/96a5e62d-c6a9-4611-bb1f-a14c433c127a" />
+
+
+
+
 # Federation Watchtower
 
 [![OpenAI Build Week](https://img.shields.io/badge/OpenAI-Build%20Week-412991?logo=openai&logoColor=white)](https://openai.devpost.com/)
