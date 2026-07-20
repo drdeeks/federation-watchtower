@@ -471,3 +471,35 @@ Phase       : PHASE-6 governance/observability, partial (single global webhook)
 Rollback Ref: drop the 0006 table, remove the alert-sink route + /api/v1/admin/alerts
               handler + presentAlertReceipt, revert the manage.html panel
 ```
+
+## CL-0020 — Destination-Aware Alert Webhook (Slack/Discord)
+
+```
+Date        : 2026-07-19
+Contributor : Claude
+Modules     : [MOD-007, MOD-015]
+Section Tags: [[WATCHDOG-v1], [INTEGRATION-v1], [QUALITY-v1]]
+Files Changed: [source/federation-serverless/src/alert-webhook.ts,
+                source/federation-serverless/src/alert-webhook.test.ts,
+                source/federation-serverless/src/index.ts,
+                source/federation-serverless/src/agent-registry.ts, AGENTS.md]
+Description : Made the outbound alert webhook deliver to real external chat
+              destinations, not only a self-hosted receiver. Added
+              WATCHTOWER_ALERT_WEBHOOK_FORMAT (slack | discord | json, default
+              json): slack posts {text}, discord posts {content} as a readable
+              one-line alert to a free incoming-webhook URL (URL is the secret,
+              no signature); json keeps the generic HMAC-signed envelope that
+              /api/v1/alert-sink verifies. Extracted the payload builder into
+              src/alert-webhook.ts so the queue consumer just selects a format,
+              keeping the set small and extensible for future destinations
+              (PagerDuty, Teams, email). Transport (retries, DLQ, delivery audit)
+              is unchanged.
+Tests Passing: node --experimental-strip-types --test src/*.test.ts 24/24
+               (adds alert-webhook.test.ts: format normalisation, message
+               shape, slack/discord/json body + signature rules); npm run types
+               PASS
+Phase       : PHASE-6 governance/observability; per-owner destinations still unbuilt
+Rollback Ref: remove src/alert-webhook.ts(+test), restore the inline
+              stableJson/HMAC delivery block in the index.ts queue consumer, drop
+              the WATCHTOWER_ALERT_WEBHOOK_FORMAT env field
+```

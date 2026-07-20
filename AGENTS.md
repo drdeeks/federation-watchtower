@@ -100,10 +100,14 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   receiver `POST /api/v1/alert-sink` verifies the HMAC signature and appends an
   immutable receipt (`alert_webhook_receipts`, migration 0006); the operator
   console reads them via admin `GET /api/v1/admin/alerts` so alert delivery is
-  visible rather than assumed. Point `WATCHTOWER_ALERT_WEBHOOK_URL` at
-  `https://fapi.drdeeks.xyz/api/v1/alert-sink` (with a shared
-  `WATCHTOWER_ALERT_WEBHOOK_SECRET`) for a self-contained working webhook.
-  Per-owner webhook destinations remain a separate, unbuilt increment.
+  visible rather than assumed. The delivery payload is destination-aware via
+  `WATCHTOWER_ALERT_WEBHOOK_FORMAT`: `slack` and `discord` post a readable
+  channel message to a free incoming-webhook URL (the URL is the secret; no
+  signature), while `json` (default) posts the generic HMAC-signed envelope that
+  a custom receiver such as `POST /api/v1/alert-sink` verifies. The format set is
+  intentionally small so more destinations (PagerDuty, Teams, email relay) can be
+  added later behind the same switch. Per-owner webhook destinations remain a
+  separate, unbuilt increment.
 
 ### Important work that is not done
 
