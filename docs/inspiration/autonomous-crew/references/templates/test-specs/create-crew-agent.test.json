@@ -1,0 +1,23 @@
+{
+  "description": "Functional tests for create-crew-agent.sh",
+  "tests": [
+    {
+      "description": "Shows help with --help flag",
+      "args": ["--help"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["Create Crew Agent", "agent-type", "CREW_ID", "CREW_WORKSPACE"],
+        "stderr_empty": true
+      }
+    },
+    {
+      "description": "Shows usage on missing agent-type (returns 0, shows help)",
+      "args": [],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["Create Crew Agent", "agent-type", "Usage:"],
+        "stderr_empty": true
+      }
+    }
+  ]
+}

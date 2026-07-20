@@ -1,0 +1,39 @@
+name: "crew-phase-gate"
+version: "1.0.0"
+type: "internalized_habit"
+description: "Enforces crew phase transition gates. Integrates with loop-enforcer for phase validation."
+
+triggers:
+  - event: "crew_phase_transition"
+    priority: 150
+  - event: "completion_claimed"
+    priority: 100
+  - event: "checkpoint_created"
+    priority: 75
+
+behavior:
+  steps:
+    - "Verify all assigned tasks in current phase marked complete"
+    - "Run reflective-loop habit for self-assessment"
+    - "Confirm identity constitution hash unchanged"
+    - "Report readiness to crew orchestrator via enforcer RPC"
+    - "Wait for peer readiness signal (all agents in phase)"
+    - "On all ready: allow phase transition, create checkpoint"
+    - "On any not ready: block, log, wait for readiness"
+  timeout_seconds: 30
+
+enforcement:
+  level: "blocking"
+  on_violation:
+    - "Block phase transition"
+    - "Log to crew audit trail (.agent/logs/crew-audit.jsonl)"
+    - "Require manual override with justification from crew lead"
+
+auto_fix: {}
+
+metrics:
+  - "phase_transitions_blocked"
+  - "phase_transitions_passed"
+  - "peer_readiness_wait_time_seconds"
+  - "reflection_completion_rate"
+  - "checkpoints_created"

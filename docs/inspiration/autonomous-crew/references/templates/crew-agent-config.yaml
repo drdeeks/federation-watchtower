@@ -1,0 +1,37 @@
+# Crew Agent Config Template
+# Enforcer daemon configuration for crew agents
+
+agent_id: "REPLACE_WITH_AGENT_ID"
+agent_name: "REPLACE_WITH_AGENT_NAME"
+agent_type: "REPLACE_WITH_AGENT_TYPE"
+crew_id: "REPLACE_WITH_CREW_ID"
+workspace: "${WORKSPACE_ROOT}/${AGENT_ID}"
+identity_layer: "v1"
+
+constitution_hash: ""  # populated at runtime
+
+enforcer:
+  socket: "${WORKSPACE}/.agent/enforcer.sock"
+  log: "${WORKSPACE}/.agent/logs/audit.log"
+  validation_interval_seconds: 30
+  heartbeat_interval_seconds: 300
+  stale_heartbeat_threshold_seconds: 600
+
+memory:
+  daily_dir: "${WORKSPACE}/memory/daily"
+  weekly_dir: "${WORKSPACE}/memory/weekly"
+  long_term_file: "${WORKSPACE}/memory/long-term/MEMORY.md"
+  knowledge_index: "${WORKSPACE}/memory/knowledge-index.json"
+
+builder_code:
+  enabled: true
+  attestation_fields:
+    - "constitution_hash"
+    - "habits"
+    - "enforcer_identity"
+
+crew_integration:
+  phase_gates: ["planning", "confirmation", "acting", "validation", "completed"]
+  checkpoint_on_phase_transition: true
+  rollback_capability: true
+  peer_readiness_required: true

@@ -1,0 +1,12 @@
+{
+  "pre_checks": [],
+  "loop_command": [
+    "python3",
+    "-c",
+    "print(\"guardrail gate initialized\")"
+  ],
+  "post_checks": [],
+  "hmac_secret_path": "~/.config/gate/hmac.key",
+  "log_path": ".loop-log.jsonl",
+  "git_integration": true
+}

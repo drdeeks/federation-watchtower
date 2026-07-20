@@ -1,0 +1,32 @@
+{
+  "description": "Functional tests for init-crew.py",
+  "tests": [
+    {
+      "description": "Shows help with --help flag",
+      "args": ["--help"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["Initialize Crew", "crew-id", "WORKSPACE_ROOT", "AGENT_TYPES"],
+        "stderr_empty": true
+      }
+    },
+    {
+      "description": "Shows help when missing crew-id (argparse shows help, returns 0)",
+      "args": [],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["Initialize Crew", "crew-id", "Usage:"],
+        "stderr_empty": true
+      }
+    },
+    {
+      "description": "Creates crew structure with default template",
+      "args": ["test-crew-creation-functest"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["test-crew-creation-functest", "Ready", "crew.json", "agents.json"],
+        "stderr_empty": false
+      }
+    }
+  ]
+}

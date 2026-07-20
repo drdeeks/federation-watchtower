@@ -1,0 +1,32 @@
+{
+  "description": "Functional tests for duplicate-crew.py",
+  "tests": [
+    {
+      "description": "Shows help with --help flag",
+      "args": ["--help"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["duplicate-crew", "source", "target", "--include", "--dry-run"],
+        "stderr_empty": true
+      }
+    },
+    {
+      "description": "Shows usage on missing arguments (returns 0, shows help)",
+      "args": [],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["duplicate-crew", "source", "target", "Usage:"],
+        "stderr_empty": true
+      }
+    },
+    {
+      "description": "Dry-run mode shows error for missing source",
+      "args": ["--source", "test", "--target", "test2", "--dry-run"],
+      "expect": {
+        "returncode": 1,
+        "stdout_contains": ["ERROR", "Source crew not found"],
+        "stderr_empty": true
+      }
+    }
+  ]
+}

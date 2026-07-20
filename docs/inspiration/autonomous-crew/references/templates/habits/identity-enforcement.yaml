@@ -1,0 +1,40 @@
+name: "identity-enforcement"
+version: "1.0.0"
+type: "internalized_habit"
+description: "Enforces agent identity constitution at t=0 and before every action. The first and highest priority habit."
+
+triggers:
+  - event: "before_any_action"
+    priority: 200
+  - event: "agent_initialization"
+    priority: 1
+  - event: "completion_claimed"
+    priority: 100
+  - event: "heartbeat_received"
+    priority: 50
+
+behavior:
+  steps:
+    - "Verify .agent/constitution.yaml exists and is readable"
+    - "Compute identity hash: SHA256(constitution + genesis.md)[:16]"
+    - "Compare with enforcer's stored hash via RPC"
+    - "Check constitution hard_constraints not violated"
+    - "Verify habits directory contains all 4 required habits"
+    - "On mismatch: block action, log violation, require re-verification"
+  timeout_seconds: 5
+
+enforcement:
+  level: "blocking"
+  on_violation:
+    - "Block tool execution immediately"
+    - "Log to .agent/logs/habit-violations.jsonl"
+    - "Require explicit identity re-verification"
+    - "Alert crew lead if repeated"
+
+auto_fix: {}
+
+metrics:
+  - "identity_checks_passed"
+  - "identity_checks_failed"
+  - "drift_detections"
+  - "hash_mismatches"

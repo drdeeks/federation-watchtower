@@ -1,0 +1,66 @@
+# Crew Builder Code (ERC-8021) Integration Reference
+# Builder code registration with identity attestation for crew agents
+
+builder_code:
+  enabled: true
+  standard: "ERC-8021"
+  description: "Onchain attribution for crew agent contributions"
+  
+  registration:
+    manager: "builder_code_manager"
+    method: "register_agent"
+    hardwired: true
+    enforced: true
+  
+  agent_metadata:
+    required:
+      - "agent_id"
+      - "agent_name"
+      - "agent_type"
+      - "parent_agent"
+    identity_attestation:
+      - "constitution_hash"
+      - "habits"
+      - "enforcer_identity"
+      - "memory_pipeline_version"
+      - "crew_id"
+  
+  framework_detection:
+    priority_order:
+      - "privy"         # @privy-io/react-auth in package.json/imports
+      - "wagmi"         # wagmi in package.json (without Privy)
+      - "viem"          # viem in package.json, no React framework
+      - "standard_rpc"  # ethers, window.ethereum, or no Web3 library
+  
+  integration_patterns:
+    privy:
+      method: "dataSuffix plugin"
+      config: "privyConfig.dataSuffix = builderCode.toDataSuffix()"
+    
+    wagmi:
+      method: "client config dataSuffix"
+      config: "createConfig({ dataSuffix: builderCode.toDataSuffix() })"
+    
+    viem:
+      method: "wallet client dataSuffix"
+      config: "createWalletClient({ dataSuffix: builderCode.toDataSuffix() })"
+    
+    standard_rpc:
+      method: "append to calldata"
+      config: "calldata += builderCode.toDataSuffix()"
+  
+  verification:
+    base_analytics: "Check Onchain → Total Transactions for attribution"
+    block_explorer: "Last 16 bytes = 0x8021 repeating pattern"
+    tool: "https://builder-code-checker.vercel.app/"
+  
+  crew_integration:
+    registry_file: "crew.json"
+    attestation_fields_in_crew_config: true
+    shared_builder_code: false  # each agent gets unique code
+    parent_crew_tracking: true
+  
+  references:
+    - "adding-builder-codes skill"
+    - "ERC-8021 specification"
+    - "Base builder codes dashboard"

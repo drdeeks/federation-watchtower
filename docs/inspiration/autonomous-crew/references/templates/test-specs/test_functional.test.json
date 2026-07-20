@@ -1,0 +1,14 @@
+{
+  "description": "Functional tests for test_functional.py (test runner itself)",
+  "tests": [
+    {
+      "description": "Shows help with --help flag",
+      "args": ["--help"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["Functional test runner", "scripts_dir", "test-specs"],
+        "stderr_empty": true
+      }
+    }
+  ]
+}

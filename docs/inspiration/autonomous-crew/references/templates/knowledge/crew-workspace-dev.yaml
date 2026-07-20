@@ -1,0 +1,61 @@
+# Development Crew Workspace Template
+# Used by init-dev-crew.sh
+
+crew_id: "REPLACE_WITH_CREW_ID"
+crew_type: "development"
+created_utc: "REPLACE_WITH_ISO_TIMESTAMP"
+workspace: "REPLACE_WITH_WORKSPACE_PATH"
+shared_dir: "REPLACE_WITH_SHARED_DIR"
+agents_dir: "REPLACE_WITH_AGENTS_DIR"
+agent_types: []
+semantic_enabled: false
+secrets_mode: "placeholders"
+persistence: "ephemeral"
+
+# Shared directory structure
+shared:
+  knowledge:
+    architecture: []
+    api: []
+    ui: []
+    infra: []
+    process: []
+    debugging: []
+    research: []
+  communications:
+    messages: []
+    threads: []
+    broadcasts: []
+  documents:
+    decisions: []
+    learnings: []
+    specs: []
+    communications: []
+  index:
+    by-category: {}
+    by-agent: {}
+    by-tag: {}
+    semantic: {}
+
+# Communication protocol
+communication:
+  protocol_version: "1.0"
+  message_types:
+    - "sync"
+    - "question"
+    - "proposal"
+    - "decision"
+    - "broadcast"
+    - "alert"
+  priorities:
+    - "low"
+    - "normal"
+    - "high"
+    - "urgent"
+  storage:
+    messages_dir: "messages"
+    threads_dir: "threads"
+    broadcasts_dir: "broadcasts"
+  threading:
+    enabled: true
+    max_depth: 10

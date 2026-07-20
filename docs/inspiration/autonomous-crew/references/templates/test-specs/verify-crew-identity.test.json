@@ -1,0 +1,22 @@
+{
+  "description": "Functional tests for verify-crew-identity.sh",
+  "tests": [
+    {
+      "description": "Shows help with --help flag",
+      "args": ["--help"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["verify-crew-identity", "crew-id", "WORKSPACE_ROOT"],
+        "stderr_empty": true
+      }
+    },
+    {
+      "description": "Shows help when missing crew-id",
+      "args": [],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["verify-crew-identity", "Usage:", "crew-id"]
+      }
+    }
+  ]
+}

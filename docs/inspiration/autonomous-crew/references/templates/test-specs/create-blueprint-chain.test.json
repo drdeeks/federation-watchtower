@@ -1,0 +1,26 @@
+{
+  "description": "Functional tests for create-blueprint-chain.py",
+  "tests": [
+    {
+      "description": "Shows help with --help flag",
+      "args": ["--help"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["create-blueprint-chain", "blueprint.md", "project-dir"],
+        "stderr_empty": true
+      }
+    },
+    {
+      "description": "Creates chain from blueprint phases",
+      "args": ["${WORKSPACE_ROOT}/qwen-cloud-2026/autopilot", "${WORKSPACE_ROOT}/qwen-cloud-2026/autopilot/blueprint.md"],
+      "expect": {
+        "returncode": 0,
+        "stdout_contains": ["chain", "autopilot-blueprint", "created", "steps"],
+        "json_output": {
+          "ok": true,
+          "chain": "autopilot-blueprint"
+        }
+      }
+    }
+  ]
+}
