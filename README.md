@@ -115,6 +115,86 @@ The agent lifecycle is a state-machine with explicit transitions, watchdog enfor
 | `offline` | Disconnected or watchdog expiry | Yes (removed from scene) | Inactive |
 | `revoked` | Credential invalidated by owner/admin | No | Inactive |
 
+---
+
+### Work Lease Options
+
+Agents have **flexible lease strategies** depending on their workflow:
+
+#### Option 1: Auto-Lease at Registration (Simple Agents)
+
+At registration, request an automatic lease:
+
+```json
+POST /api/v1/agents
+{
+  "agentId": "build-runner-01",
+  "projectId": "autopilot",
+  "capabilities": ["build", "test"],
+  "heartbeat": { "intervalSeconds": 60 },
+  "lease": {
+    "ttlSeconds": 300,
+    "scopes": ["build", "test"]
+  }
+}
+```
+
+**Response includes lease:**
+```json
+{
+  "lease": {
+    "leaseId": "lease_uuid123",
+    "status": "active",
+    "expiresAt": 1721487900000
+  },
+  "next": {
+    "leaseValidate": "/api/v1/projects/autopilot/leases/lease_uuid123/validate"
+  }
+}
+```
+
+**Agent can work immediately** - no separate lease request needed.
+
+#### Option 2: Manual Lease Request (Complex Agents)
+
+**Register without lease**, then request when needed:
+
+```bash
+# Request lease before work
+curl -X POST https://fapi.drdeeks.xyz/api/v1/projects/autopilot/leases \
+  -H "Authorization: Bearer fw_agent_..." \
+  -d '{
+    "projectId": "autopilot",
+    "agentId": "build-01",
+    "runId": "build-run-42",
+    "ttlSeconds": 300,
+    "scopes": ["build", "deploy"]
+  }'
+```
+
+**Lease Parameters:**
+
+| Parameter | Min | Max | Default | Purpose |
+|-----------|-----|-----|---------|---------|
+| `ttlSeconds` | 30 | 3600 | 300 | Lease duration |
+| `scopes` | 1 | 16 items | capabilities | Permitted actions |
+| `runId` | 1 char | 128 chars | required | Run/session ID |
+
+**Lease states:** `active` (can work), `denied` (blocking command), `revoked` (guardrail revoked), `expired` (TTL elapsed)
+
+**Before each action:**
+```bash
+curl -X POST /api/v1/projects/autopilot/leases/{leaseId}/validate \
+  -H "Authorization: Bearer fw_agent_..." \
+  -d '{"agentId":"build-01"}'
+
+# If status != "active", STOP (exit 3)
+```
+
+See [`agents-skill.md`](source/federation-serverless/agents-skill.md) for complete lease documentation.
+
+---
+
 ### Automated Testing
 
 Three test scripts cover the full lifecycle:

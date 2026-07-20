@@ -71,6 +71,166 @@ EOF
 
 ---
 
+## Work Lease Options (Agent Autonomy)
+
+Agents have **flexible lease strategies** depending on their workflow. Choose at registration or request dynamically:
+
+### Option 1: Auto-Lease at Registration (Recommended for Simple Agents)
+
+**At registration** (via onboarding or SDK), request an automatic lease:
+
+```json
+POST /api/v1/agents
+Authorization: Bearer fw_owner_...
+{
+  "agentId": "build-runner-01",
+  "projectId": "autopilot",
+  "capabilities": ["build", "test"],
+  "heartbeat": { "intervalSeconds": 60 },
+  "lease": {
+    "ttlSeconds": 300,
+    "scopes": ["build", "test"]
+  }
+}
+```
+
+**Response includes lease:**
+```json
+{
+  "agent": { ... },
+  "credential": { "token": "fw_agent_..." },
+  "lease": {
+    "leaseId": "lease_uuid123",
+    "status": "active",
+    "expiresAt": 1721487900000,
+    "reason": null
+  },
+  "next": {
+    "leaseValidate": "/api/v1/projects/autopilot/leases/lease_uuid123/validate"
+  }
+}
+```
+
+**Agent can work immediately** - no separate lease request needed.
+
+---
+
+### Option 2: Manual Lease Request (Recommended for Complex Agents)
+
+**Register without lease**, then request when needed:
+
+```bash
+# 1. Register (no lease)
+curl -X POST https://fapi.drdeeks.xyz/api/v1/agents \
+  -H "Authorization: Bearer fw_owner_..." \
+  -d '{"agentId":"build-01","projectId":"autopilot","capabilities":["build"],"heartbeat":{"intervalSeconds":60}}'
+
+# 2. Request lease before work
+curl -X POST https://fapi.drdeeks.xyz/api/v1/projects/autopilot/leases \
+  -H "Authorization: Bearer fw_agent_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "projectId": "autopilot",
+    "agentId": "build-01",
+    "runId": "build-run-42",
+    "ttlSeconds": 300,
+    "scopes": ["build", "deploy"]
+  }'
+
+# Response: { "leaseId": "lease_...", "status": "active", "expiresAt": ..., "reason": null }
+```
+
+---
+
+### Lease Parameters (Your Options)
+
+| Parameter | Min | Max | Default | Purpose |
+|-----------|-----|-----|---------|---------|
+| `ttlSeconds` | 30 | 3600 | 300 | How long lease lasts before expiry |
+| `scopes` | 1 | 16 items | capabilities | What actions lease permits |
+| `runId` | 1 char | 128 chars | required | Which run/session this lease covers |
+
+**Lease Scopes** (what you can request):
+- `*` - All actions (use sparingly)
+- `build` - Build operations
+- `test` - Test execution
+- `deploy` - Deployment actions
+- `tool:{name}` - Specific tool access (e.g., `tool:deploy`)
+- `action:{name}` - Specific action (e.g., `action:execute`)
+
+---
+
+### Lease Lifecycle
+
+```
+┌─────────────┐
+│ REQUESTED   │ ← POST /api/v1/projects/{id}/leases
+└─────────────┘
+       │
+       ├─► ACTIVE ──────┐   (can work)
+       │                │
+       │                ▼
+       │         ┌──────────────┐
+       │         │ VALIDATE     │ ← POST /leases/{id}/validate (before each action)
+       │         └──────────────┘
+       │                │
+       │                ├─► ACTIVE (continue)
+       │                └─► DENIED/REVOKED (STOP - exit 3)
+       │
+       ├─► DENIED ─────── (guardrail blocking command present)
+       ├─► REVOKED ────── (validation failed, runaway detected)
+       └─► EXPIRED ────── (ttlSeconds elapsed without heartbeat)
+```
+
+**Lease states:**
+- `active` - Can work, validate before each action
+- `denied` - Guardrail has blocking command (cannot start)
+- `revoked` - Guardrail revoked mid-run (must stop)
+- `expired` - TTL elapsed (must renew)
+
+---
+
+### SDK Usage (Node.js)
+
+```javascript
+import { FederationAgentClient } from "@federation-watchtower/sdk";
+
+const agent = new FederationAgentClient({
+  projectId: "autopilot",
+  agentId: "build-01",
+  agentToken: process.env.FEDERATION_AGENT_TOKEN,
+});
+
+await agent.connect();
+
+// Request lease
+const lease = await agent.requestLease({
+  runId: "build-42",
+  ttlSeconds: 300,
+  scopes: ["build", "test"],
+});
+
+if (lease.status !== "active") {
+  console.error("Lease denied:", lease.reason);
+  process.exit(3);  // Loop Enforcer exit code
+}
+
+// Before each action, validate
+const validation = await agent.validateLease({
+  leaseId: lease.leaseId,
+});
+
+if (validation.status !== "active") {
+  console.error("Lease revoked:", validation.reason);
+  process.exit(3);
+}
+
+// Do your work...
+await doBuild();
+```
+
+---
+
 ## Federation verification and statements
 
 Basic agent events do not require organization verification. A verified
