@@ -8,8 +8,9 @@ import { createMcpHandler } from "agents/mcp";
 import { createWatchtowerMcpServer, isIpAllowed, parseMcpCredential, toMcpPrincipal, verifyMcpApiKey } from "./mcp";
 import { handleLifecycleRequest } from "./lifecycle";
 import { handleManagementRequest } from "./management";
+import { alertWebhookFormat, buildAlertDelivery } from "./alert-webhook";
 import {
-  constantTimeEqual, hmacSha256Hex, sha256Hex, stableJson, validateAgentId,
+  constantTimeEqual, hmacSha256Hex, sha256Hex, validateAgentId,
   validateCommandAcknowledgement, validateControlledToolAuthorizationRequest, validateLeaseRequest, validateLeaseValidationRequest,
   validateOperationalEvent, validateProjectId, validateValidationGateRequest, ValidationError,
 } from "./watchtower";
@@ -612,16 +613,8 @@ export default {
 
       try {
         const webhookUrl = alertWebhookUrl(configuredUrl);
-        const body = stableJson(alert);
-        const timestamp = Math.floor(Date.now() / 1_000).toString();
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          "X-Watchtower-Delivery": alert.deliveryId,
-          "X-Watchtower-Timestamp": timestamp,
-        };
-        if (env.WATCHTOWER_ALERT_WEBHOOK_SECRET) {
-          headers["X-Watchtower-Signature"] = `sha256=${await hmacSha256Hex(env.WATCHTOWER_ALERT_WEBHOOK_SECRET, `${timestamp}.${body}`)}`;
-        }
+        const format = alertWebhookFormat(env.WATCHTOWER_ALERT_WEBHOOK_FORMAT);
+        const { body, headers } = await buildAlertDelivery(alert, format, env.WATCHTOWER_ALERT_WEBHOOK_SECRET);
         const response = await fetch(webhookUrl, { method: "POST", headers, body });
         if (!response.ok) throw new Error(`webhook returned HTTP ${response.status}`);
         await guardrail.updateNotification(alert.deliveryId, "delivered");
