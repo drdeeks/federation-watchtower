@@ -16,6 +16,15 @@ It also includes two canonical lifecycle clients:
   webhook-style heartbeats/events, disconnect, and return later without holding
   a WebSocket open or carrying the shared ingestion secret.
 
+## Built with Codex and GPT-5.6
+
+This SDK was developed during OpenAI Build Week 2026 using Codex and GPT-5.6:
+
+- **Codex** consolidated the SDK structure, wired the signature logic, implemented the lifecycle clients, and produced the documentation and test suite.
+- **GPT-5.6** assisted with TypeScript type definitions, edge case testing for HMAC signing, and refining the API ergonomics for the lease and validation gate methods.
+
+**Codex `/feedback` Session ID:** `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
+
 ## Install
 
 ```bash
@@ -136,18 +145,28 @@ await agent.emit({
 });
 ```
 
-## Release verification
+## Release checklist
+
+Before publishing a new version:
+
+- [ ] All tests pass: `npm test` (8/8 tests)
+- [ ] Pack check passes: `npm run pack:check`
+- [ ] No secrets in package: verify no `.env`, `.dev.vars`, tokens, or credentials
+- [ ] Version bumped in `package.json` (semver: major.minor.patch)
+- [ ] README.md updated with any API changes
+- [ ] TypeScript types (`index.d.ts`) match `index.js` exports
+- [ ] npm 2FA enabled for publisher account
+- [ ] Published from clean git commit
 
 ```bash
 cd packages/watchtower-sdk
 npm test
 npm run pack:check
-npm view @federation-watchtower/sdk version
+npm publish  # requires npm 2FA
 ```
 
 The current repository release is `0.2.0`. The package contains no secret,
-token, `.env`, test fixture, or Worker deployment configuration. Future releases
-should be tested and packed from a clean, reviewed commit with npm 2FA enabled.
+token, `.env`, test fixture, or Worker deployment configuration.
 
 ## License
 
