@@ -248,23 +248,4 @@
 
 ---
 
-## 📋 Checklist
-
-- [ ] Recording tool installed and tested
-- [ ] Three browser tabs open (Watchtower, Onboarding, GitHub)
-- [ ] Microphone tested and working
-- [ ] Followed the 8-step recording script
-- [ ] Video is under 3 minutes
-- [ ] Uploaded to YouTube (public or unlisted)
-- [ ] Got /feedback session ID from Codex
-- [ ] Added YouTube URL to Devpost
-- [ ] Added session ID to Devpost
-- [ ] Answered all required Devpost fields
-- [ ] Attached project to OpenAI Build Week challenge
-- [ ] Pressed Submit button
-
-**Deadline: July 21, 2026 @ 5:00pm PDT**
-
----
-
-**Good luck! You've built something amazing - now show it off! 🚀**
+**Good luck! You've built something amazing - now show it off!**
