@@ -208,6 +208,30 @@
       return;
     }
 
+    function useVanilla() {
+      loadVanilla().then(function (Vanilla) {
+        if (self._stopped) return;
+        self._vanilla = new Vanilla(Object.assign({}, opts, { container: container }));
+        self.agents = self._vanilla.agents;
+        self.speechLines = self._vanilla.speechLines;
+        self.activeBubbles = self._vanilla.activeBubbles;
+      }).catch(function (e) {
+        console.error('[FederationTV] vanilla engine failed:', e && e.message);
+        container.innerHTML =
+          '<p style="padding:16px;font:13px system-ui;color:#d6b984;text-align:center">' +
+          'Watchtower presentation is temporarily unavailable.</p>';
+      });
+    }
+
+    // engine:'vanilla' — the host page wants the real-data legacy engine as the
+    // PRIMARY presentation (e.g. the public Watchtower, which must render the
+    // real registered roster and authoritative room scene, never the React
+    // stage's fictional cast). Skip React entirely.
+    if (opts.engine === 'vanilla') {
+      useVanilla();
+      return;
+    }
+
     // React presentation mounts into a dedicated root so the fallback engine can
     // cleanly take over the container if needed.
     var rootEl = container.querySelector('#office-stage-root');
@@ -226,18 +250,7 @@
       }
       // Fall back to the vanilla legacy widget for BOTH visual and data.
       console.warn('[FederationTV] React monitor unavailable — using vanilla fallback');
-      loadVanilla().then(function (Vanilla) {
-        if (self._stopped) return;
-        self._vanilla = new Vanilla(Object.assign({}, opts, { container: container }));
-        self.agents = self._vanilla.agents;
-        self.speechLines = self._vanilla.speechLines;
-        self.activeBubbles = self._vanilla.activeBubbles;
-      }).catch(function (e) {
-        console.error('[FederationTV] fallback failed:', e && e.message);
-        rootEl.innerHTML =
-          '<p style="padding:16px;font:13px system-ui;color:#d6b984;text-align:center">' +
-          'Watchtower presentation is temporarily unavailable.</p>';
-      });
+      useVanilla();
     });
   }
 

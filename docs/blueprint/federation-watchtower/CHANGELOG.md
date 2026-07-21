@@ -912,3 +912,67 @@ Rollback Ref: wrangler rollback to the previous deployment version (or
               redeploy the prior commit's working tree); the D1 unique index
               from CL-0030 is independent and stays
 ```
+
+## CL-0032 — Real-Data React Stage, Pool-Driven Bubbles, Feed Integrity
+
+```
+Date        : 2026-07-21
+Contributor : Claude
+Modules     : [MOD-006, MOD-008, MOD-009, MOD-010, MOD-015]
+Section Tags: [[CAMERA-PROJECTION-v1], [CHOREOGRAPHY-v1], [DATA-ARCH-v1],
+               [QUALITY-v1]]
+Files Changed: [source/federation-serverless/src/project-guardrail.ts,
+                source/federation-serverless/src/lifecycle.ts,
+                source/federation-serverless/src/index.ts,
+                source/federation-tv-widget/src/react/OfficeStage.tsx,
+                source/federation-tv-widget/public/react-dist/assets/office-stage.js,
+                source/federation-tv-widget/public/tv-widget.js,
+                source/federation-tv-widget/src/tv-widget.js,
+                source/federation-tv-widget/public/tv-widget-vanilla.js,
+                source/federation-tv-widget/public/index.html,
+                README.md,
+                docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : Serverless: canonical lifecycle events displayed twice on the
+              public feed because guardrail ingest and the registry both
+              wrote a feed_events row; ingest now accepts publicFeed:false
+              and the lifecycle path owns the single consent-gated feed
+              write (also stops non-consenting agents' statements reaching
+              the public feed via ingest). The alert queue consumer now
+              skips any delivery ID already marked delivered, so re-queued
+              retries can no longer duplicate Slack/Discord notifications.
+              React OfficeStage rework per owner direction and
+              SUPER_STATEMENT_PACKET_SPEC: the cast is reconciled from the
+              REAL agent registry (single project or all, deterministic
+              palette per agent id, spawn/retire on roster change, cap 35,
+              truthful NO AGENTS ON SHIFT empty state); the fabricated
+              ambient event simulator was removed; feed events dedupe by row
+              id with silent first-load hydration; an event animates only
+              its own agent. Chat bubbles now draw from the dynamic
+              federation speech pool bucketed by tone (negative/positive/
+              neutral keyword heuristic) and matched to the event kind —
+              the caption strip and operations terminal carry the event's
+              real text; bubbles are personality. visibility.publicBubble
+              === false is honored (caption-only) and pool lines are
+              deduplicated per the spec. Registry status changes (kept out
+              of the feed by design) surface as a bubble only. Watch page:
+              operations terminal is room-scoped to the selected camera
+              (global only when explicitly selected); loader gained an
+              engine:'vanilla' option; vanilla monitor's top-left cabinet
+              artifact removed and scene coordinates clamped to the visible
+              floor so authoritative zones can no longer draw agents inside
+              the wall band. README judge instructions fixed (cd back to
+              repo root before running the test scripts). Deployed as
+              Worker version 62eb0647-52ef-439d-a55d-b95045a34acf.
+Tests Passing: pre-deploy: npm run types PASS, serverless tests 29/29,
+               node --check on all widget JS, loader copies identical, git
+               diff --check clean; post-deploy: /health healthy, live
+               bundle contains speech-pool + publicBubble markers with the
+               fictional cast absent (new etag cb85e932...), live
+               index.html carries room-scoping, live loader carries the
+               engine option; live speech pool returns seeded repertoire.
+               Browser-level visual pass still recommended before
+               recording.
+Phase       : PHASE-6 — public projection is real-data end to end
+Rollback Ref: wrangler rollback to version 5260289f; revert this commit to
+              restore the prior widget/page behavior
+```

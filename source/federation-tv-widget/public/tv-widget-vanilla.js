@@ -476,7 +476,6 @@
               <div class="desk" style="left:15%; top:82%;"></div>
               <div class="desk" style="left:38%; top:82%;"></div>
               <div class="desk" style="left:61%; top:82%;"></div>
-              <div class="cabinet" style="left:5%; top:37%;"></div>
               <div class="rug" style="left:83%; top:70%;"></div>
               <div class="couch" style="left:83%; top:60%;"></div>
               <div class="lowtable" style="left:83%; top:75%;"></div>
@@ -594,11 +593,6 @@
               background:#eef3ee; border:3px solid #101820; box-shadow:0 2px 0 rgba(0,0,0,.3); }
             .wall-clock::before { content:""; position:absolute; left:50%; top:50%; width:2px; height:8px; background:#101820; border-radius:1px; transform-origin:bottom center; transform:translate(-50%,-100%) rotate(38deg); }
             .wall-clock::after { content:""; position:absolute; left:50%; top:50%; width:2px; height:6px; background:#101820; border-radius:1px; transform-origin:bottom center; transform:translate(-50%,-100%) rotate(-72deg); }
-            .cabinet { position:absolute; width:30px; height:44px; transform:translate(-50%,-50%); z-index:2;
-              background:linear-gradient(180deg,#5a6b74,#3f4d55); border:2px solid #101820; border-radius:3px; box-shadow:0 4px 0 rgba(0,0,0,.28); }
-            .cabinet::before { content:""; position:absolute; left:5px; right:5px; top:6px; height:11px; background:rgba(255,255,255,.07);
-              border:1px solid rgba(0,0,0,.4); border-radius:2px; box-shadow:0 15px 0 rgba(255,255,255,.07), 0 15px 0 1px rgba(0,0,0,.4); }
-            .cabinet::after { content:""; position:absolute; left:50%; top:10px; width:8px; height:2px; background:#cdd8d0; transform:translateX(-50%); box-shadow:0 15px 0 #cdd8d0; }
             .rug { position:absolute; width:150px; height:64px; transform:translate(-50%,-50%); z-index:1; border-radius:16px;
               background:rgba(60,80,88,.5); box-shadow:inset 0 0 0 3px rgba(242,193,78,.22), inset 0 0 0 9px rgba(47,182,168,.12); }
             .couch { position:absolute; width:70px; height:26px; transform:translate(-50%,-50%); z-index:2; }
@@ -1051,7 +1045,9 @@
     applyScenePosition(el, sceneAgent, hash, waypointIdx) {
       if (sceneAgent) {
         if (el._wanderTimer) { clearTimeout(el._wanderTimer); el._wanderTimer = null; }
-        const destination = sceneAgent.destination || sceneAgent.position;
+        // Tolerate a scene agent that arrives without coordinates — placeAgent
+        // falls back to a mid-floor position instead of rendering at 0,0.
+        const destination = sceneAgent.destination || sceneAgent.position || {};
         this.placeAgent(el, destination.x, destination.y);
         el.dataset.sceneOrigin = sceneAgent.presentation?.origin || 'lifecycle';
         el.dataset.sceneAnimation = sceneAgent.animation || 'idle';
@@ -1066,6 +1062,16 @@
     }
 
     placeAgent(el, x, y, { animate = true } = {}) {
+      // The authoritative room-scene zones were laid out for a different room
+      // geometry than this CSS office (whose walkable floor spans roughly
+      // 4–96% horizontally and 34–94% vertically; above that is the back
+      // wall). Clamp projected coordinates so a real agent is never drawn
+      // inside the wall band or clipped at the frame edge — the top-left
+      // "phantom overlay" discrepancy. The agent's operational state stays
+      // authoritative; only the drawn position is bounded.
+      x = Number(x); y = Number(y);
+      x = Number.isFinite(x) ? Math.max(4, Math.min(96, x)) : 50;
+      y = Number.isFinite(y) ? Math.max(34, Math.min(94, y)) : 64;
       const prevX = parseFloat(el.style.getPropertyValue('--scene-x'));
       el.style.setProperty('--scene-x', `${x}%`);
       el.style.setProperty('--scene-y', `${y}%`);

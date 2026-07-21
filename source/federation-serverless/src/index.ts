@@ -613,6 +613,17 @@ export default {
         continue;
       }
 
+      // Re-queueing the same delivery ID is legal (event retries deliberately
+      // re-enqueue to close the D1→Queue failure window), but external
+      // destinations like Slack/Discord post a channel message per request and
+      // do not dedupe. Honor "already delivered" here so a delivery ID can
+      // reach the webhook at most once.
+      const existing = await guardrail.getNotification(alert.deliveryId);
+      if (existing?.status === "delivered") {
+        message.ack();
+        continue;
+      }
+
       const configuredUrl = env.WATCHTOWER_ALERT_WEBHOOK_URL;
       if (!configuredUrl) {
         await guardrail.updateNotification(alert.deliveryId, "suppressed", "no alert webhook is configured");

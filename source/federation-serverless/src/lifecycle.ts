@@ -175,7 +175,10 @@ export async function handleLifecycleRequest(input: {
   if (action === "events") {
     const event = validateOperationalEvent({ schemaVersion: "2026-07-17", eventId: body.eventId || `evt-${crypto.randomUUID()}`, idempotencyKey: body.idempotencyKey || `agent-event-${crypto.randomUUID()}`, projectId, agentId, eventType: body.eventType, severity: body.severity, occurredAt: body.occurredAt || new Date(now).toISOString(), statement: body.statement, metadata: body.metadata || {} });
     const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
-    const result = await guardrail.ingest({ event, producerId: `agent:${agent.id}`, payloadDigest: await sha256Hex(raw), receivedAt: now });
+    // publicFeed:false — this path owns the public feed write below (gated on
+    // publicProjection consent and non-duplicate); letting ingest also insert a
+    // feed row displayed every lifecycle event twice on the Watchtower.
+    const result = await guardrail.ingest({ event, producerId: `agent:${agent.id}`, payloadDigest: await sha256Hex(raw), receivedAt: now, publicFeed: false });
     if (result.alerts.length) await env.WATCHTOWER_ALERTS.sendBatch(result.alerts.map(alert => ({ body: alert })));
     if (agent.public_projection && !result.duplicate) {
       await registry.recordPublicEvent({ eventType: event.eventType, agentId, message: event.statement, priority: event.severity === "critical" ? "critical" : event.severity === "error" ? "high" : "normal", metadata: { lifecycle: "canonical", eventId: event.eventId } });

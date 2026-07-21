@@ -7,6 +7,17 @@ export interface IngestedEvent {
   producerId: string;
   payloadDigest: string;
   receivedAt: number;
+  /**
+   * When false, ingest still records the operational event, guardrail
+   * decisions, and audit chain, but skips the public feed_events row. The
+   * canonical lifecycle path sets this: it owns the public-projection decision
+   * (publicProjection consent + duplicate gating) and writes its own single
+   * feed row via the registry, so ingest writing one too displayed every
+   * lifecycle event twice on the public Watchtower — and surfaced statements
+   * from agents that never consented to public projection. Undefined/true
+   * preserves the legacy signed-producer behavior.
+   */
+  publicFeed?: boolean;
 }
 
 export interface IngestResult {
@@ -295,6 +306,10 @@ export class ProjectGuardrail extends DurableObject<WatchtowerEnv> {
       event.chainKey ?? null, event.eventType, event.severity, event.statement, metadataJson,
       Date.parse(event.occurredAt), input.receivedAt, input.payloadDigest, finalizedJson,
     );
+    // statements[1] is the public feed row; the caller may own the public
+    // projection decision (see IngestedEvent.publicFeed). Remove it last so the
+    // index-based re-binds above stay valid.
+    if (input.publicFeed === false) statements.splice(1, 1);
     await this.db.batch(statements);
     return finalized;
   }
@@ -610,6 +625,10 @@ export class ProjectGuardrail extends DurableObject<WatchtowerEnv> {
       FROM incidents WHERE project_id = ? ORDER BY updated_at DESC LIMIT ?
     `).bind(this.ctx.id.name, Math.min(Math.max(limit, 1), 100)).all();
     return rows.results;
+  }
+
+  async getNotification(deliveryId: string): Promise<{ status: string } | null> {
+    return this.db.prepare("SELECT status FROM notification_deliveries WHERE id = ?").bind(deliveryId).first<{ status: string }>();
   }
 
   async updateNotification(deliveryId: string, status: "delivered" | "retrying" | "suppressed" | "failed", detail?: string, now = Date.now()): Promise<void> {
