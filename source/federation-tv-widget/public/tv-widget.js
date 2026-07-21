@@ -69,10 +69,12 @@
   // ------------------------------------------------------------------
   // Loads the self-mounting module bundle into rootEl. Resolves true when the
   // bundle produced DOM (mounted), false on load error / empty render.
-  function mountReactStage(rootEl, gatewayUrl, projectId) {
+  function mountReactStage(rootEl, gatewayUrl, projectId, roomId) {
     return new Promise(function (resolve) {
       rootEl.setAttribute('data-gateway', gatewayUrl);
       rootEl.setAttribute('data-project', projectId);
+      if (roomId && roomId !== 'all') rootEl.setAttribute('data-room', roomId);
+      else rootEl.removeAttribute('data-room');
       window.__federationOfficeStageMounted = false;
 
       var moduleUrl = assetBase() + '/react-dist/assets/office-stage.js';
@@ -192,6 +194,7 @@
     var container = resolveContainer(opts.container);
     var gatewayUrl = opts.gatewayUrl || DEFAULT_GATEWAY;
     var projectId = opts.projectId || 'all';
+    var roomId = opts.roomId || 'all';
 
     // Vanilla internals some host/test pages read; kept defined so they never
     // throw before (or without) the fallback engine attaching.
@@ -241,7 +244,7 @@
       container.appendChild(rootEl);
     }
 
-    mountReactStage(rootEl, gatewayUrl, projectId).then(function (ok) {
+    mountReactStage(rootEl, gatewayUrl, projectId, roomId).then(function (ok) {
       if (self._stopped) return;
       if (ok) {
         // React visual is live; run the lightweight data layer for callbacks.
@@ -282,8 +285,9 @@
     if (!container) return;
     var gatewayUrl = (LOADER_SCRIPT && LOADER_SCRIPT.getAttribute('data-gateway')) || DEFAULT_GATEWAY;
     var projectId = (LOADER_SCRIPT && LOADER_SCRIPT.getAttribute('data-project')) || 'autopilot';
+    var roomId = (LOADER_SCRIPT && LOADER_SCRIPT.getAttribute('data-room')) || 'all';
     var containerSel = (LOADER_SCRIPT && LOADER_SCRIPT.getAttribute('data-container')) || '#federation-tv';
-    new FederationTV({ gatewayUrl: gatewayUrl, projectId: projectId, container: containerSel });
+    new FederationTV({ gatewayUrl: gatewayUrl, projectId: projectId, roomId: roomId, container: containerSel });
   }
 
   // Defer so a following inline script that constructs FederationTV wins first.

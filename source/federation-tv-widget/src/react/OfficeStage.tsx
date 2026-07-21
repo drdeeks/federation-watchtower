@@ -41,6 +41,8 @@ export type StageEvent = {
 export interface OfficeStageProps {
   gatewayUrl?: string;
   projectId?: string;
+  /** Optional room scope — only that room's agents appear on this stage. */
+  roomId?: string;
   agents?: Array<{ agentId: string; name: string; paletteIndex?: number }>;
 }
 
@@ -95,6 +97,43 @@ function classifyLine(line: string): Sentiment {
   if (POSITIVE_HINTS.test(line)) return "positive";
   return "neutral";
 }
+
+// ── WatchDog: the station's resident mascot ─────────────────────────
+// WatchDog is PRESENTATION, permanently on duty in every room. It is not an
+// agent: it never appears in the roster, the feed, or any record, and it is
+// visibly labelled. Its speech list is designated — agents never draw from it
+// and it never draws from the shared pool. It speaks on a 15–45s cadence ONLY
+// when no real agents are on shift, and it announces labelled ambient cameos.
+const WATCHDOG_LINES = [
+  "All quiet on the floor. I checked twice.",
+  "Perimeter sweep complete. Zero rogue processes.",
+  "Holding the fort until the next shift clocks in.",
+  "I sniffed every packet. Smells fine.",
+  "No heartbeats to guard right now. Stretching my paws.",
+  "The servers hum. I hum back.",
+  "Watched the logs scroll by. Beautiful stuff.",
+  "Empty office, full vigilance.",
+  "If anything moves, I bark. Professionally.",
+  "Uptime is my favorite chew toy.",
+  "Patrolling desk to desk. All clear.",
+  "Someone left the cursor blinking. On it.",
+];
+const CAMEOS = [
+  { id: "night-shift", icon: "👻", name: "NIGHT SHIFT GHOST" },
+  { id: "supervisor", icon: "🧑‍💼", name: "SUPERVISOR WALK-BY" },
+] as const;
+const WATCHDOG_CAMEO_LINES: Record<(typeof CAMEOS)[number]["id"], string[]> = {
+  "night-shift": [
+    "Night shift ghost drifting through. Routine visit.",
+    "Ghost on the floor. It never touches the logs.",
+    "Apparition passing by. No event implied.",
+  ],
+  supervisor: [
+    "Supervisor walk-by. Look busy, nobody.",
+    "Management strolling past. Purely ceremonial.",
+    "Supervisor cameo in progress. All decorative.",
+  ],
+};
 
 // Deterministic seed per real agent id — drives palette choice and spawn
 // jitter so an agent keeps the same look every visit (same idea as the
@@ -187,7 +226,7 @@ function pathTo(from: {x:number;y:number}, to: {x:number;y:number}) {
   ];
 }
 
-export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', projectId = 'autopilot', agents: agentConfig }: OfficeStageProps = {}) {
+export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', projectId = 'autopilot', roomId, agents: agentConfig }: OfficeStageProps = {}) {
   const stationsRef = useRef<Station[]>(STATIONS.map((s) => ({ ...s, occupants: [] })));
   // The cast is the REAL registered roster, reconciled from the API below.
   // The stage never invents an agent — an empty office is the truth
@@ -236,16 +275,62 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
     return () => { stopped = true; };
   }, [gatewayUrl]);
 
+  // WatchDog presence: speaks from its designated list every 15–45s, but ONLY
+  // while no real agents are on shift. Labelled presentation, never data.
+  const [watchdogBubble, setWatchdogBubble] = useState<string | null>(null);
+  const [cameo, setCameo] = useState<(typeof CAMEOS)[number] | null>(null);
+
+  useEffect(() => {
+    let speakT: ReturnType<typeof setTimeout>;
+    let clearT: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      speakT = setTimeout(() => {
+        if (agentsRef.current.length === 0) {
+          setWatchdogBubble(pick(WATCHDOG_LINES));
+          clearT = setTimeout(() => setWatchdogBubble(null), 4_600);
+        }
+        schedule();
+      }, 15_000 + Math.random() * 30_000);
+    };
+    schedule();
+    return () => { clearTimeout(speakT); clearTimeout(clearT); };
+  }, []);
+
+  // Sparse labelled cameos visit quiet rooms; WatchDog announces each one
+  // from its cameo-specific lines. Cameos never enter the roster or feed.
+  useEffect(() => {
+    let visitT: ReturnType<typeof setTimeout>;
+    let endT: ReturnType<typeof setTimeout>;
+    let sayT: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      visitT = setTimeout(() => {
+        if (agentsRef.current.length === 0) {
+          const visitor = pick([...CAMEOS]);
+          setCameo(visitor);
+          setWatchdogBubble(pick(WATCHDOG_CAMEO_LINES[visitor.id]));
+          sayT = setTimeout(() => setWatchdogBubble(null), 4_600);
+          endT = setTimeout(() => setCameo(null), 7_200);
+        }
+        schedule();
+      }, 75_000 + Math.random() * 75_000);
+    };
+    schedule();
+    return () => { clearTimeout(visitT); clearTimeout(endT); clearTimeout(sayT); };
+  }, []);
+
   // ── Real roster sync: spawn/retire stage characters from the live agent
   // registry. Movement, activities, and looks are presentation; identity is
   // operational truth. Palette is deterministic per agent id.
   useEffect(() => {
     let stopped = false;
-    const reconcile = (roster: Array<{ agentId: string; name: string; paletteIndex?: number; status?: string }>) => {
+    const reconcile = (roster: Array<{ agentId: string; name: string; paletteIndex?: number; status?: string; roomId?: string }>) => {
       const now = performance.now();
       setAgents((prev) => {
         const stations = stationsRef.current;
-        const visible = roster.filter((r) => (r.status ?? "active") !== "offline").slice(0, 35);
+        const visible = roster
+          .filter((r) => (r.status ?? "active") !== "offline")
+          .filter((r) => !roomId || roomId === "all" || r.roomId === roomId)
+          .slice(0, 35);
         const keep = new Set(visible.map((r) => r.agentId));
         for (const a of prev) {
           if (!keep.has(a.id)) {
@@ -296,7 +381,7 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
       reconcile(agentConfig.map((a) => ({ agentId: a.agentId, name: a.name, paletteIndex: a.paletteIndex })));
       return;
     }
-    const toEntry = (a: { agentId: string; name?: string; status?: string }) => ({ agentId: a.agentId, name: a.name || a.agentId, status: a.status });
+    const toEntry = (a: { agentId: string; name?: string; status?: string; roomId?: string }) => ({ agentId: a.agentId, name: a.name || a.agentId, status: a.status, roomId: a.roomId });
     const fetchRoster = async () => {
       try {
         if (projectId === "all") {
@@ -324,7 +409,27 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
     fetchRoster();
     const timer = setInterval(fetchRoster, 15_000);
     return () => { stopped = true; clearInterval(timer); };
-  }, [gatewayUrl, projectId, agentConfig]);
+  }, [gatewayUrl, projectId, roomId, agentConfig]);
+
+  // ── Organization/project theming: single-project embeds paint the wall
+  // board with the project's registered name, emoji, and accent color, so an
+  // approved organization's branded room carries its identity on camera.
+  const [theme, setTheme] = useState<{ name: string; color?: string; emoji?: string } | null>(null);
+  useEffect(() => {
+    if (projectId === "all") { setTheme(null); return; }
+    let stopped = false;
+    (async () => {
+      try {
+        const res = await fetch(`${gatewayUrl}/api/projects`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const projects = Array.isArray(data) ? data : (data.projects || []);
+        const p = projects.find((x: { projectId: string }) => x.projectId === projectId);
+        if (!stopped && p) setTheme({ name: p.name || projectId, color: p.color, emoji: p.emoji });
+      } catch { /* the generic board is fine */ }
+    })();
+    return () => { stopped = true; };
+  }, [gatewayUrl, projectId]);
 
   // main animation loop
   useEffect(() => {
@@ -510,10 +615,23 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
           {/* whiteboard */}
           <g transform="translate(280,26)">
             <rect width="90" height="52" fill="#fbfaf3" stroke="#3a1f0e" strokeWidth="3" />
-            <line x1="6" y1="12" x2="80" y2="12" stroke="#4b6db3" strokeWidth="1.4" />
-            <line x1="6" y1="22" x2="70" y2="22" stroke="#c94f4f" strokeWidth="1.4" />
-            <line x1="6" y1="32" x2="76" y2="32" stroke="#2f6b46" strokeWidth="1.4" />
-            <line x1="6" y1="42" x2="60" y2="42" stroke="#3a1f0e" strokeWidth="1.4" />
+            {theme ? (
+              <>
+                {/* branded room board: the project's registered identity */}
+                <rect x="3" y="3" width="84" height="8" fill={theme.color || "#4fd1c5"} opacity="0.85" />
+                <text x="45" y="28" textAnchor="middle" fontSize="12">{theme.emoji || "◉"}</text>
+                <text x="45" y="42" textAnchor="middle" fontFamily="'Courier New', monospace" fontSize="7" fontWeight="bold" fill="#3a1f0e">
+                  {theme.name.length > 14 ? `${theme.name.slice(0, 13)}…` : theme.name}
+                </text>
+              </>
+            ) : (
+              <>
+                <line x1="6" y1="12" x2="80" y2="12" stroke="#4b6db3" strokeWidth="1.4" />
+                <line x1="6" y1="22" x2="70" y2="22" stroke="#c94f4f" strokeWidth="1.4" />
+                <line x1="6" y1="32" x2="76" y2="32" stroke="#2f6b46" strokeWidth="1.4" />
+                <line x1="6" y1="42" x2="60" y2="42" stroke="#3a1f0e" strokeWidth="1.4" />
+              </>
+            )}
           </g>
 
           {/* stations on floor */}
@@ -600,12 +718,21 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
           )}
 
           {/* CRT scanlines + vignette */}
+          <WatchdogMascot x={36} y={244} tick={tick} />
+          {watchdogBubble && <SpeechBubble x={36} y={244 - 22} text={watchdogBubble} kind="idle" />}
           <rect x="0" y="0" width="400" height="260" fill="url(#scan)" opacity="0.14" pointerEvents="none" />
           <rect x="0" y="0" width="400" height="260" fill="url(#vignette)" pointerEvents="none" />
         </svg>
 
+        {cameo && (
+          <div className="cameo" role="note" aria-label={`Ambient presentation: ${cameo.name}. No operational event is implied.`}>
+            <i aria-hidden="true">{cameo.icon}</i>
+            <b>{cameo.name}</b>
+            <span>ambient presentation · no event</span>
+          </div>
+        )}
         {agents.length === 0 && (
-          <div className="empty-office">NO AGENTS ON SHIFT · CAMERA LIVE</div>
+          <div className="empty-office">NO AGENTS ON SHIFT · WATCHDOG ON DUTY</div>
         )}
         <div className="chrome-top"><span className="rec-dot" /> LIVE · OFFICE CAM</div>
         <div className="chrome-tr">CH-04 · 4:20 PM</div>
@@ -645,6 +772,16 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
           color:#f4ecd8; font:700 12px 'Courier New', monospace; letter-spacing:.14em;
           text-shadow:0 1px 0 #000; opacity:.85; pointer-events:none;
         }
+        .cameo {
+          position:absolute; bottom:16%; left:-18%;
+          display:flex; flex-direction:column; align-items:center; gap:1px;
+          pointer-events:none; z-index:4;
+          animation:cameo-cross 7s linear both;
+        }
+        .cameo i { font-size:26px; font-style:normal; filter:drop-shadow(0 0 6px rgba(244,200,66,.5)); }
+        .cameo b { font:800 8px 'Courier New', monospace; color:#f4ecd8; letter-spacing:.08em; text-shadow:0 1px 0 #000; }
+        .cameo span { font:700 6px 'Courier New', monospace; color:#c8b992; letter-spacing:.06em; text-transform:uppercase; text-shadow:0 1px 0 #000; }
+        @keyframes cameo-cross { from { left:-18%; opacity:0; } 12% { opacity:1; } 88% { opacity:1; } to { left:104%; opacity:0; } }
         .captions { position:absolute; left:10px; right:10px; bottom:10px; display:flex; flex-direction:column; gap:4px; }
         .caption { background:rgba(20,10,4,0.85); border-left:3px solid #e07a3c; color:#f4ecd8;
           padding:4px 8px; font-size:10px; line-height:1.25; border-radius:2px;
@@ -874,6 +1011,41 @@ function SpeechBubble({
           {l}
         </text>
       ))}
+    </g>
+  );
+}
+
+/**
+ * WatchdogMascot — the station's permanent, labelled presentation mascot.
+ * A small pixel dog on patrol duty by the floor's edge. It is drawn outside
+ * the agents array so it can never enter the roster, feed, or any record.
+ */
+function WatchdogMascot({ x, y, tick }: { x: number; y: number; tick: number }) {
+  const wag = Math.sin(tick * 0.25) * 18;
+  const bob = Math.sin(tick * 0.06) * 0.6;
+  return (
+    <g transform={`translate(${x}, ${y - bob})`} style={{ pointerEvents: "none" }}>
+      <ellipse cx="0" cy="10" rx="10" ry="2.4" fill="#000" opacity="0.25" />
+      {/* tail (wags) */}
+      <line x1="8" y1="2" x2="12" y2="-4" stroke="#8a5a2b" strokeWidth="2.2" strokeLinecap="round" transform={`rotate(${wag} 8 2)`} />
+      {/* body */}
+      <ellipse cx="0" cy="3" rx="9" ry="6" fill="#a8743c" stroke="#3a1f0e" strokeWidth="1.2" />
+      {/* legs */}
+      <rect x="-7" y="6" width="2.6" height="4.5" rx="1" fill="#8a5a2b" />
+      <rect x="4" y="6" width="2.6" height="4.5" rx="1" fill="#8a5a2b" />
+      {/* head */}
+      <circle cx="-8" cy="-4" r="5.4" fill="#a8743c" stroke="#3a1f0e" strokeWidth="1.2" />
+      {/* ears */}
+      <polygon points="-12,-8 -9,-11 -8,-6" fill="#6b3a1e" />
+      <polygon points="-5,-9 -3,-12 -2,-6" fill="#6b3a1e" opacity="0.9" />
+      {/* snout, nose, eye */}
+      <circle cx="-11.5" cy="-3" r="2.2" fill="#c9955c" />
+      <circle cx="-13" cy="-3.4" r="0.9" fill="#1a1a1a" />
+      <circle cx="-7" cy="-5.5" r="0.8" fill="#1a1a1a" />
+      {/* collar */}
+      <rect x="-11" y="-0.5" width="6" height="1.6" rx="0.8" fill="#c94f4f" />
+      <text x="0" y="18" textAnchor="middle" fontFamily="'Courier New', monospace" fontSize="5.4" fill="#f4ecd8" stroke="#3a1f0e" strokeWidth="0.4" paintOrder="stroke">WATCHDOG</text>
+      <text x="0" y="24" textAnchor="middle" fontFamily="'Courier New', monospace" fontSize="3.4" fill="#c8b992">station mascot · presentation</text>
     </g>
   );
 }

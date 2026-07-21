@@ -521,11 +521,13 @@
     </form>
   </dialog>
 
+  <script src="/tv-widget.js"></script>
   <script>
     (function () {
       'use strict';
 
-      // Stub FederationTV for live floor view (optional, not critical for admin)
+      // Fallback stub ONLY if the real loader failed to load — without it the
+      // Live Floor renders an empty black box.
       if (!window.FederationTV) {
         window.FederationTV = function (opts) {
           return {
@@ -1150,11 +1152,9 @@
         }
         if (el.roomDialog) {
           el.roomDialog.addEventListener('close', function () {
-            var form = el.roomDialog.querySelector('form');
-            if (form) {
-              var result = form.returnValue;
-              if (result === 'create') createRoom();
-            }
+            // returnValue lives on the <dialog>, not the form. Reading it off
+            // the form was always undefined, so Create silently did nothing.
+            if (el.roomDialog.returnValue === 'create') createRoom();
           });
         }
 
