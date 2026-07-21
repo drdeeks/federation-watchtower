@@ -779,9 +779,15 @@
 
         var filtered = state.agents.filter(function (a) {
           if (roomFilter && a.roomId !== roomFilter) return false;
+          var pill = agentStatusPill(a);
           if (statusFilter) {
-            var pill = agentStatusPill(a);
             if (pill !== statusFilter) return false;
+          } else if (pill === 'revoked') {
+            // Revoked agents keep their row and event history for audit, but
+            // once revoked they're done, so they shouldn't linger in the
+            // default view forever. They only reappear if you explicitly
+            // filter to "revoked".
+            return false;
           }
           if (query) {
             var haystack = [a.displayName, a.agentId, a.ownerId, a.roomId, a.projectId].join(' ').toLowerCase();

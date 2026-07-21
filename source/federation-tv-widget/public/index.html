@@ -348,7 +348,7 @@
     <!-- ============ CONTROL DESK ============ -->
     <section class="panel desk" aria-label="Watchtower controls">
       <label class="field"><span>Camera / room</span>
-        <select id="room-picker" aria-label="Choose a room"><option value="all">All live rooms</option></select>
+        <select id="room-picker" aria-label="Choose a room"><option value="">Loading rooms…</option></select>
       </label>
       <label class="field"><span>Agent roster</span>
         <select id="agent-picker" aria-label="Inspect an agent"><option value="">Choose an agent</option></select>
@@ -360,7 +360,7 @@
       <section class="monitor" aria-label="Live Watchtower camera">
         <div class="monitor__top">
           <span class="tally">● CAM 01</span>
-          <strong id="camera-title">All live rooms</strong>
+          <strong id="camera-title">Connecting…</strong>
           <span class="rec"><i></i>REC</span>
           <span id="camera-state">Read-only public projection</span>
         </div>
@@ -518,7 +518,9 @@
     // roster (deterministic palettes per agent id) and reacts to real feed
     // events only. The vanilla legacy engine remains the automatic fallback if
     // the React bundle fails to load or render.
-    var tv = window.FederationTV ? new window.FederationTV({ projectId:'all', roomId:'all', container:'#federation-tv', gatewayUrl:gateway, refreshInterval:12000, randomSpeech:false, presentationMode:'camera', onAgentSelect:openAgent, onAgentsUpdate:renderAgents, onFeedUpdate:items => { feed=items; renderFeed(); }}) : null;
+    // No default project/room here: the widget mounts once loadSystem() has
+    // resolved a real room (see switchRoom/loadSystem below), never to 'all'.
+    var tv = window.FederationTV ? new window.FederationTV({ projectId:'autopilot', roomId:undefined, container:'#federation-tv', gatewayUrl:gateway, refreshInterval:12000, randomSpeech:false, presentationMode:'camera', onAgentSelect:openAgent, onAgentsUpdate:renderAgents, onFeedUpdate:items => { feed=items; renderFeed(); }}) : null;
     $('close-agent').addEventListener('click',()=>agentDialog.close());
     $('agent-picker').addEventListener('change',event=>{ const agent=agents.find(item=>item.agentId===event.target.value); if(agent) openAgent(agent); event.target.value=''; });
     document.querySelector('.tabs').addEventListener('click',event=>{ const button=event.target.closest('.tab'); if (!button) return; activeFilter=button.dataset.filter; document.querySelectorAll('.tab').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button))); renderFeed(); });
@@ -529,14 +531,9 @@
       $('camera-title').textContent = entry.label;
       $('camera-state').textContent = entry.roomId === 'all' ? 'Read-only public projection' : `${entry.used || 0}/${entry.capacity || 35} slots visible`;
       currentRoomId = entry.roomId;
-      if (entry.roomId !== 'all') roomAgentIds = new Set(); // repopulated by the next roster update
+      roomAgentIds = new Set(); // repopulated by the next roster update
       renderFeed();
       if (tv) tv.setRoom(entry.roomId, entry.projectId);
-      if (el.roomPills) {
-        el.roomPills.querySelectorAll('.room-pill').forEach(pill => {
-          pill.classList.toggle('active', pill.dataset.key === key);
-        });
-      }
     }
     async function loadSystem() {
       try {
@@ -549,14 +546,19 @@
         const picker = $('room-picker');
         picker.innerHTML = '';
 
-        roomIndex.set('all', { roomId: 'all', projectId: 'all', label: 'All live rooms' });
-        picker.add(new Option('All live rooms', 'all'));
-        let firstKey = 'all';
+        // No "All rooms" choice: it summed agent counts across every project
+        // while the on-screen diorama only ever showed one room, producing
+        // nonsense like "15 agents live" next to a 3-agent room. Every option
+        // here is a single, real room; the picker defaults to one of them
+        // (preferring the `autopilot` project) rather than an aggregate view.
+        let firstKey = null;
+        let preferredKey = null;
 
         for (const room of rooms) {
           const label = `${room.project_emoji || '◉'} ${room.project_name || room.project_id} · Room ${(room.room_index || 0) + 1}`;
           const key = `${room.project_id}:${room.id}`;
           if (!firstKey) firstKey = key;
+          if (!preferredKey && room.project_id === 'autopilot') preferredKey = key;
           roomIndex.set(key, {
             roomId: room.id,
             projectId: room.project_id,
@@ -571,7 +573,7 @@
         $('signal-state').textContent = healthResponse.ok ? 'Live' : 'Degraded';
         document.querySelectorAll('.signal-strip .led').forEach(led => led.dataset.state = healthResponse.ok ? 'live' : 'degraded');
 
-        switchRoom(firstKey);
+        if (preferredKey || firstKey) switchRoom(preferredKey || firstKey);
       } catch (e) {
         $('signal-state').textContent = 'Degraded';
         document.querySelectorAll('.signal-strip .led').forEach(led => led.dataset.state = 'degraded');

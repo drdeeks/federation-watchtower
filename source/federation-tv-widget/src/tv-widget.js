@@ -261,8 +261,14 @@
     if (this._vanilla && typeof this._vanilla.setRoom === 'function') {
       this._vanilla.setRoom(roomId, nextProjectId);
     } else if (this._dataFeed) {
-      // React diorama is ambient; the authoritative roster/feed follow the room.
+      // Roster/count/feed panels follow the room via the lightweight data feed...
       this._dataFeed.setProject(nextProjectId, roomId);
+      // ...and the React diorama itself must be re-rendered with the same
+      // project/room, or it keeps showing whatever cast it originally mounted
+      // with while the panels around it move on.
+      if (typeof window.__federationOfficeStageSetRoom === 'function') {
+        window.__federationOfficeStageSetRoom(nextProjectId, roomId === 'all' ? undefined : roomId);
+      }
     }
   };
 
