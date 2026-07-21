@@ -94,6 +94,14 @@ export class AgentRegistry extends DurableObject<WatchtowerEnv> {
   }
 
   async registerAgent(agentData: Omit<Agent, 'id' | 'registeredAt' | 'updatedAt' | 'roomId' | 'avatarUrl'>): Promise<Agent> {
+    // assignToRoom reads room occupancy then inserts the agent. D1 access does
+    // not hold the DO input gate, so two concurrent registrations could both see
+    // spare capacity in the same room and exceed MAX_AGENTS_PER_ROOM. Serialize
+    // the check-then-act per project registry DO.
+    return this.ctx.blockConcurrencyWhile(() => this.registerAgentLocked(agentData));
+  }
+
+  private async registerAgentLocked(agentData: Omit<Agent, 'id' | 'registeredAt' | 'updatedAt' | 'roomId' | 'avatarUrl'>): Promise<Agent> {
     const agentId = `${this.projectId}:${agentData.agentId}`;
     const now = Date.now();
     const roomId = await this.assignToRoom();
@@ -124,8 +132,7 @@ export class AgentRegistry extends DurableObject<WatchtowerEnv> {
     const updated: Agent = { ...existing, ...updates, id: existing.id, projectId: existing.projectId, agentId: existing.agentId, updatedAt: Date.now() };
     await this.db.prepare(`
       UPDATE agents SET name=?, role=?, capabilities=?, status=?, room_id=?, avatar_url=?, metadata=?, last_heartbeat=?, updated_at=? WHERE id=?
-    `).bind(updated.name, updated.role, JSON.stringify(updated.capabilities), updated.status, updated.roomId, updated.avatarUrl, JSON.stringify(updated.metadata), updated.lastHeartbeat, updated.updatedAt, id).run();
-    await this.emitFeedEvent({ projectId: this.projectId, eventType: 'agentUpdated', agentId, message: `Agent ${agentId} updated`, priority: 'low', metadata: updates });
+    `).bind(updates.name ?? existing.name, updates.role ?? existing.role, JSON.stringify(updates.capabilities ?? existing.capabilities), updates.status ?? existing.status, updates.roomId ?? existing.roomId, updates.avatarUrl ?? existing.avatarUrl, JSON.stringify(updates.metadata ?? existing.metadata), updates.lastHeartbeat ?? existing.lastHeartbeat, updated.updatedAt, existing.id).run();
     return updated;
   }
 

@@ -78,7 +78,14 @@ export async function handleLifecycleRequest(input: {
         .bind(organizationId, owner.id, name, contactEmail, officialUrl, now, now),
     ];
     for (const proof of socialProofs) statements.push(env.DB.prepare("INSERT INTO federation_organization_social_proofs (organization_id, platform, url, created_at) VALUES (?, ?, ?, ?)").bind(organizationId, proof.platform, proof.url, now));
-    questions.forEach((item, index) => statements.push(env.DB.prepare("INSERT INTO federation_organization_questions (id, organization_id, position, question, answer, submitted_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(`orgq-${crypto.randomUUID()}`, organizationId, index + 1, item.question, item.answer, owner.id, now)));
+    questions.forEach((item, index) => {
+      statements.push(env.DB.prepare("INSERT INTO federation_organization_questions (id, organization_id, position, question, answer, submitted_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(`orgq-${crypto.randomUUID()}`, organizationId, index + 1, item.question, item.answer, owner.id, now));
+      // Pipe question and answer into the speech pool (truncated to 120 chars, best-effort unique)
+      const q = item.question.slice(0, 120);
+      const a = item.answer.slice(0, 120);
+      statements.push(env.DB.prepare("INSERT OR IGNORE INTO federation_speech_lines (federation_id, agent_id, project_id, statement, is_unique, submitted_at) VALUES (?, ?, ?, ?, 1, ?)").bind(organizationId, "org-applicant", manifest?.projectId || organizationId, q, now));
+      statements.push(env.DB.prepare("INSERT OR IGNORE INTO federation_speech_lines (federation_id, agent_id, project_id, statement, is_unique, submitted_at) VALUES (?, ?, ?, ?, 1, ?)").bind(organizationId, "org-applicant", manifest?.projectId || organizationId, a, now));
+    });
     await env.DB.batch(statements);
     return json({ application: { organizationId, name, status: "submitted", questionCount: 5, socialProofCount: socialProofs.length }, requestId: crypto.randomUUID() }, 201);
   }

@@ -137,6 +137,17 @@ export class ProjectGuardrail extends DurableObject<WatchtowerEnv> {
   }
 
   async ingest(input: IngestedEvent): Promise<IngestResult> {
+    // The per-project audit hash chain is a read-modify-write: read the latest
+    // hash, compute the next hash from it, then append. D1 access (env.DB) does
+    // NOT hold the Durable Object input gate, so without an explicit critical
+    // section two concurrent events for the same project can both read the same
+    // previous hash and fork the append-only chain. All ingestion for a project
+    // routes to this single DO (idFromName(projectId)), so serializing here with
+    // blockConcurrencyWhile restores the "one chain per project" guarantee.
+    return this.ctx.blockConcurrencyWhile(() => this.ingestLocked(input));
+  }
+
+  private async ingestLocked(input: IngestedEvent): Promise<IngestResult> {
     const { event } = input;
     const existing = await this.db.prepare(
       "SELECT decision AS result FROM operational_events WHERE project_id = ? AND idempotency_key = ?"
@@ -289,6 +300,13 @@ export class ProjectGuardrail extends DurableObject<WatchtowerEnv> {
   }
 
   async requestLease(request: LeaseRequest, producerId: string, now = Date.now()): Promise<LeaseResult> {
+    // Read-active-lease-then-insert must not interleave with another request for
+    // the same agent/run, or two active leases get issued for one run. Same
+    // rationale as ingest: D1 access doesn't hold the input gate, so serialize.
+    return this.ctx.blockConcurrencyWhile(() => this.requestLeaseLocked(request, producerId, now));
+  }
+
+  private async requestLeaseLocked(request: LeaseRequest, producerId: string, now = Date.now()): Promise<LeaseResult> {
     const existing = await this.db.prepare(`
       SELECT id, status, expires_at, reason FROM work_leases
       WHERE project_id = ? AND agent_id = ? AND run_id = ? AND status = 'active' AND expires_at > ?
@@ -389,6 +407,19 @@ export class ProjectGuardrail extends DurableObject<WatchtowerEnv> {
     orgId?: string,
     now = Date.now(),
   ): Promise<ControlledToolAuthorization> {
+    // Read-existing-by-requestId-then-insert: without the gate, two concurrent
+    // calls with the same requestId can both miss the existing row and record
+    // two invocations (and two operational events) for one request. Serialize,
+    // same rationale as ingest/requestLease.
+    return this.ctx.blockConcurrencyWhile(() => this.authorizeControlledToolLocked(request, producerId, orgId, now));
+  }
+
+  private async authorizeControlledToolLocked(
+    request: ControlledToolAuthorizationRequest,
+    producerId: string,
+    orgId?: string,
+    now = Date.now(),
+  ): Promise<ControlledToolAuthorization> {
     const existing = await this.db.prepare(`
       SELECT i.id, i.status, i.lease_id, i.created_at, i.reason, l.expires_at
       FROM controlled_tool_invocations i LEFT JOIN work_leases l ON l.id = i.lease_id
@@ -438,7 +469,9 @@ export class ProjectGuardrail extends DurableObject<WatchtowerEnv> {
       },
     };
     const payload = stableJson(event);
-    await this.ingest({ event, producerId, payloadDigest: await sha256Hex(payload), receivedAt: now });
+    // Already inside this DO's blockConcurrencyWhile critical section — call the
+    // locked body directly instead of re-entering the public gated ingest().
+    await this.ingestLocked({ event, producerId, payloadDigest: await sha256Hex(payload), receivedAt: now });
     await this.db.prepare(`
       INSERT INTO controlled_tool_invocations (
         id, project_id, org_id, producer_id, agent_id, lease_id, tool_name, action,

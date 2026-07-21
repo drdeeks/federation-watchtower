@@ -13,6 +13,7 @@
     "migrate:lifecycle": "wrangler d1 execute federation-db --remote --file=src/migrations/0004_federation_lifecycle.sql",
     "migrate:management": "wrangler d1 execute federation-db --remote --file=src/migrations/0005_management.sql",
     "migrate:alert-sink": "wrangler d1 execute federation-db --remote --file=src/migrations/0006_alert_webhook_receipts.sql",
+    "migrate:audit-chain-integrity": "wrangler d1 execute federation-db --remote --file=src/migrations/0008_audit_chain_integrity.sql",
     "test": "node --experimental-strip-types --test src/*.test.ts",
     "security:socket": "socket scan create --report --no-interactive .",
     "security:socket:dry-run": "socket scan create --dry-run --no-interactive ."

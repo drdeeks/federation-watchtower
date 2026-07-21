@@ -54,7 +54,16 @@ export class AgentWatchdog extends DurableObject<WatchtowerEnv> {
       .bind(now, now, `${heartbeat.projectId}:${heartbeat.agentId}`).run();
     await this.env.DB.prepare("INSERT OR IGNORE INTO federation_lifecycle_events (id, agent_id, event_type, idempotency_key, detail, occurred_at) VALUES (?, ?, 'heartbeat.missed', ?, ?, ?)")
       .bind(`life-${crypto.randomUUID()}`, `${heartbeat.projectId}:${heartbeat.agentId}`, `watchdog-${heartbeat.deadlineAt}`, JSON.stringify({ deadlineAt: heartbeat.deadlineAt }), now).run();
-    if (result.alerts.length > 0) await this.env.WATCHTOWER_ALERTS.sendBatch(result.alerts.map(alert => ({ body: alert })));
+    // Alarms auto-retry on any throw, re-running this whole handler. The D1
+    // writes above are idempotent (INSERT OR IGNORE + idempotency keys) and the
+    // registry/scene updates are idempotent, but the queue send is not. ingest
+    // (via raiseHeartbeatMissed) dedupes on its idempotency key and returns
+    // duplicate=true on a retry, so only enqueue owner alerts on the first,
+    // non-duplicate ingestion of this missed heartbeat — otherwise a failure
+    // after the send would re-deliver the same alerts on every retry.
+    if (!result.duplicate && result.alerts.length > 0) {
+      await this.env.WATCHTOWER_ALERTS.sendBatch(result.alerts.map(alert => ({ body: alert })));
+    }
 
     // Do not delete a newer heartbeat that arrived while the alert path awaited I/O.
     const current = await this.ctx.storage.get<HeartbeatDeadline>("heartbeat");

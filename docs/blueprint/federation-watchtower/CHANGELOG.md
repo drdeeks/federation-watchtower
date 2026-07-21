@@ -739,3 +739,176 @@ Phase       : PHASE-6 governance and safety — admin can now manage any agent,
 Rollback Ref: remove room/organization endpoints from management.ts, remove
               UI sections from manage.html, remove management.test.ts
 ```
+
+## CL-0028 — React TV Monitor Repair with Vanilla Legacy Fallback
+
+```
+Date        : 2026-07-21
+Contributor : Claude
+Modules     : [MOD-008, MOD-015]
+Section Tags: [[CAMERA-PROJECTION-v1], [QUALITY-v1]]
+Files Changed: [source/federation-tv-widget/src/react/main.tsx,
+                source/federation-tv-widget/src/index.html,
+                source/federation-tv-widget/public/tv-widget.js,
+                source/federation-tv-widget/src/tv-widget.js,
+                source/federation-tv-widget/public/tv-widget-vanilla.js,
+                source/federation-tv-widget/public/office-stage.js,
+                source/federation-tv-widget/public/react-dist/assets/office-stage.js,
+                docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : The React OfficeStage monitor never mounted for two independent
+              reasons: main.tsx invoked the function component directly
+              (root.render(OfficeStage({...})) — hooks ran outside React's
+              render phase, throwing "Invalid hook call"), and tv-widget.js
+              injected the built ES-module bundle as a classic script, making
+              its `export` statement a parse error. Fixed the mount via
+              createElement, rebuilt the bundle, and rewrote tv-widget.js as a
+              React-primary loader that detects load/render failure (module
+              onerror, empty root after mount, mount flag) and falls back to
+              the vanilla legacy widget (tv-widget-vanilla.js) for both visual
+              and data. On the React path a lightweight data layer polls the
+              same public agent/feed endpoints the vanilla engine uses and
+              drives onAgentsUpdate/onFeedUpdate/onAgentSelect, so host-page
+              roster and terminal panels work identically in either mode. The
+              vanilla engine is now exposed as FederationTVVanilla, no longer
+              clobbers the loader's FederationTV, and auto-inits only when
+              included directly with data attributes (no double-mount when
+              injected programmatically). office-stage.js was an unreferenced
+              broken duplicate loader (wrong bundle path, conflicting CDN
+              React 18) and is now a thin module embed loader; the src dev
+              entry reference (react-entry.tsx -> react/main.tsx) was fixed.
+              src/tv-widget.js and public/tv-widget.js kept identical.
+Tests Passing: vite build PASS; node --check on both tv-widget.js copies
+               (identical), tv-widget-vanilla.js, and office-stage.js; Node
+               DOM-shim harness verified the React-success path (bundle
+               injected as type=module, data callbacks fire, vanilla not
+               loaded) and the React-failure path (vanilla fallback script
+               injected); headless-browser render was unavailable in the
+               sandbox — an in-browser visual pass is still recommended
+Phase       : PHASE-6 public projection reliability
+Rollback Ref: restore the prior single-path tv-widget.js loader in both
+              copies, revert main.tsx to the direct render call, revert the
+              tv-widget-vanilla.js export/auto-init changes, restore the CDN
+              office-stage.js loader
+```
+
+## CL-0029 — Durable Object Serialization and Audit Chain Integrity
+
+```
+Date        : 2026-07-21
+Contributor : Claude
+Modules     : [MOD-003, MOD-006, MOD-007, MOD-015]
+Section Tags: [[DATA-ARCH-v1], [WATCHDOG-v1], [QUALITY-v1]]
+Files Changed: [source/federation-serverless/src/project-guardrail.ts,
+                source/federation-serverless/src/agent-registry.ts,
+                source/federation-serverless/src/agent-watchdog.ts,
+                source/federation-serverless/src/migrations/0008_audit_chain_integrity.sql,
+                source/federation-serverless/package.json,
+                docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : D1 access from a Durable Object does not hold the DO input
+              gate, so read-modify-write sections against env.DB could
+              interleave across concurrent RPCs to the same DO instance.
+              Serialized four check-then-act critical sections with
+              ctx.blockConcurrencyWhile: ProjectGuardrail.ingest (the
+              per-project audit hash chain reads the latest hash, computes
+              the next, then appends — concurrent events could both read the
+              same previous hash and fork the append-only evidence chain),
+              ProjectGuardrail.requestLease (two active leases could be
+              issued for one agent/run), ProjectGuardrail.
+              authorizeControlledTool (duplicate invocation records and
+              operational events for one requestId; its inner ingest call now
+              targets the locked body directly to avoid nested gating), and
+              AgentRegistry.registerAgent (concurrent registrations could
+              both see spare capacity and exceed the 35-agent room limit).
+              AgentWatchdog.alarm() now enqueues owner alerts only when
+              ingest reports a non-duplicate heartbeat.missed event, so alarm
+              auto-retries cannot re-deliver the same alerts (every other
+              alarm write was already idempotent). Added additive migration
+              0008: a UNIQUE index on audit_events(project_id, previous_hash)
+              as a storage-layer backstop that makes any future chain fork
+              fail loudly instead of corrupting evidence. The migration is
+              NOT yet applied remotely; it documents its precheck query and
+              is wired as npm run migrate:audit-chain-integrity.
+Tests Passing: source/federation-serverless: npm run types PASS; node
+               --experimental-strip-types --test src/*.test.ts 29/29; node
+               --experimental-strip-types --check on all three changed DO
+               modules; git diff --check clean. The DO concurrency paths are
+               not exercised by the node suite (those modules import
+               cloudflare:workers), so the serialization behavior is
+               verified by review, not by an executed concurrency test.
+Phase       : PHASE-6 evidence integrity hardening
+Rollback Ref: remove the blockConcurrencyWhile wrappers and restore the
+              direct method bodies in project-guardrail.ts and
+              agent-registry.ts, restore the unconditional sendBatch in
+              agent-watchdog.ts alarm(), drop idx_audit_events_chain_unique
+              if the migration was applied
+```
+
+## CL-0030 — Migration 0008 Applied to Production D1
+
+```
+Date        : 2026-07-21
+Contributor : Claude
+Modules     : [MOD-006, MOD-015]
+Section Tags: [[DATA-ARCH-v1], [QUALITY-v1]]
+Files Changed: [docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : Release evidence for CL-0029's migration 0008 (audit chain
+              integrity backstop), applied to the remote federation-db with
+              owner approval. Precheck ran first and returned zero forked
+              (project_id, previous_hash) pairs across 102 audit rows read,
+              confirming the existing chain was intact. Applied via npm run
+              migrate:audit-chain-integrity: changed_db true, 52 index rows
+              written, size_after 700416. Post-apply verification queried
+              sqlite_master on the remote database and confirmed
+              idx_audit_events_chain_unique exists as CREATE UNIQUE INDEX ON
+              audit_events (project_id, previous_hash). Any future fork of
+              the append-only audit hash chain now fails the inserting batch
+              loudly instead of corrupting evidence.
+Tests Passing: remote precheck SELECT ... GROUP BY project_id, previous_hash
+               HAVING c > 1 returned 0 rows; remote apply succeeded
+               (changed_db: true); remote sqlite_master verification shows
+               the unique index present with the expected definition
+Phase       : PHASE-6 evidence integrity hardening — production applied
+Rollback Ref: DROP INDEX idx_audit_events_chain_unique; (additive index,
+              touches no table data)
+```
+
+## CL-0031 — Production Deploy: DO Serialization + React TV Monitor
+
+```
+Date        : 2026-07-21
+Contributor : Claude
+Modules     : [MOD-006, MOD-007, MOD-008, MOD-015]
+Section Tags: [[DATA-ARCH-v1], [CAMERA-PROJECTION-v1], [QUALITY-v1]]
+Files Changed: [docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : Release evidence for deploying CL-0028 and CL-0029 to
+              production with owner approval. wrangler deploy shipped Worker
+              version 5260289f-4ea8-4803-9d85-d1179f3f69f3 with all five
+              Durable Object bindings, D1, R2, queue producer/consumers, and
+              cron intact, plus 4 new/modified static assets (tv-widget.js,
+              tv-widget-vanilla.js, office-stage.js, react-dist/assets/
+              office-stage.js) to all three custom domains. Post-deploy
+              validation: fapi /health healthy; watch.drdeeks.xyz/ 200; the
+              live tv-widget.js is the new React-primary loader with vanilla
+              fallback; /api/feed returns real operational events. The React
+              bundle URL briefly served a stale pre-fix edge-cache copy
+              (cf-cache-status HIT, old etag) for roughly a minute after
+              deploy before converging on the new build (etag 02124d02...,
+              createElement mount + mount flag confirmed on repeated
+              requests); during that window the new loader's failure
+              detection would have fallen back to the vanilla widget. The
+              deploy also carried pre-existing uncommitted working-tree
+              changes (agent-registry.ts/lifecycle.ts modifications,
+              manage.html FederationTV stub, demo/index tweaks) that predate
+              this session's work.
+Tests Passing: pre-deploy gates: npm run types PASS, node
+               --experimental-strip-types --test src/*.test.ts 29/29, git
+               diff --check clean; post-deploy: /health healthy, watch/ 200,
+               new loader and bundle content verified live on
+               watch.drdeeks.xyz, tv-widget-vanilla.js 200, /api/feed
+               serving events
+Phase       : PHASE-6 — serialization fixes and React monitor live in
+              production
+Rollback Ref: wrangler rollback to the previous deployment version (or
+              redeploy the prior commit's working tree); the D1 unique index
+              from CL-0030 is independent and stays
+```
