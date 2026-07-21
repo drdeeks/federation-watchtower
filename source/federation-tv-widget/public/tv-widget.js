@@ -504,7 +504,6 @@
               background: #171718;
               box-shadow: inset 0 0 0 18px rgba(8,12,14,.2), inset 0 0 70px rgba(0,0,0,.32);
             }
-            /* Clean office scene - no decorative overlays */
             /* One cohesive, dependency-free CSS office: a back wall with a
                window, a floor with subtle receding grid + depth, CSS desk
                pods with glowing monitors, a water cooler and a plant. No
@@ -512,14 +511,41 @@
             .office { position:absolute; inset:0; z-index:1; overflow:hidden; }
             .office-back {
               position:absolute; inset:0 0 74% 0;
-              background:linear-gradient(180deg,#1a2630 0%,#141e26 72%,#101820 100%);
+              background:linear-gradient(180deg,#24313b 0%,#1c2830 72%,#16202a 100%);
               border-bottom:2px solid rgba(0,0,0,.45);
+            }
+            .office-back::before {
+              content:""; position:absolute; left:7%; right:27%; top:24%; height:44%;
+              background:linear-gradient(180deg,#31505b,#233942);
+              border:2px solid #101820; border-radius:3px;
+              background-image:
+                linear-gradient(90deg,transparent 48.5%, rgba(10,15,18,.65) 48.5% 51.5%, transparent 51.5%),
+                linear-gradient(0deg,transparent 48.5%, rgba(10,15,18,.5) 48.5% 51.5%, transparent 51.5%);
+              box-shadow:inset 0 0 18px rgba(120,190,200,.16);
             }
             .office-floor {
               position:absolute; inset:26% 0 0 0;
-              background:linear-gradient(180deg,#2a3640,#1f2a33 58%,#1a232a);
+              background:
+                linear-gradient(180deg, rgba(0,0,0,.32), rgba(0,0,0,0) 34%),
+                repeating-linear-gradient(180deg, rgba(255,255,255,.045) 0 1px, transparent 1px 28px),
+                repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 1px, transparent 1px 48px),
+                linear-gradient(180deg,#3c4852,#2c363e 58%,#232c33);
             }
-            .desk { position:absolute; width:66px; height:36px; transform:translate(-50%,-50%); z-index:2; background:linear-gradient(180deg,#5a4a3a,#3d3226); border:2px solid #17110c; border-radius:5px; }
+            .office-floor::after {
+              content:""; position:absolute; inset:0;
+              background:radial-gradient(120% 78% at 50% 6%, rgba(110,175,185,.10), transparent 62%);
+            }
+            .desk { position:absolute; width:66px; height:36px; transform:translate(-50%,-50%); z-index:2; }
+            .desk::before {
+              content:""; position:absolute; left:0; right:0; bottom:0; height:16px;
+              background:linear-gradient(180deg,#6d5a45,#4d4032); border:2px solid #17110c; border-radius:5px;
+              box-shadow:0 4px 0 rgba(0,0,0,.28);
+            }
+            .desk::after {
+              content:""; position:absolute; left:50%; bottom:11px; transform:translateX(-50%);
+              width:28px; height:20px; background:#0d1415; border:2px solid #101a1c; border-radius:3px;
+              box-shadow:0 0 10px rgba(47,182,168,.45), inset 0 0 0 2px rgba(47,182,168,.32);
+            }
             .cooler { position:absolute; width:24px; height:46px; transform:translate(-50%,-50%); z-index:2; }
             .cooler::before {
               content:""; position:absolute; top:0; left:50%; transform:translateX(-50%);
@@ -565,19 +591,6 @@
               background:linear-gradient(180deg,#6d5a45,#4d4032); border:2px solid #17110c; border-radius:5px; box-shadow:0 3px 0 rgba(0,0,0,.28); }
             .lowtable::after { content:""; position:absolute; left:50%; top:-6px; width:8px; height:8px; background:rgba(96,196,205,.85);
               border:2px solid #101820; border-radius:2px; transform:translateX(-50%); }
-            .tv-scene::after {
-              content: "FEDERATION FLOOR · WATCHTOWER OFFICE";
-              position: absolute;
-              left: 14px;
-              top: 12px;
-              z-index: 4;
-              padding: 2px 6px;
-              color: #f5e6bd;
-              background: rgba(23,24,24,.55);
-              font: 700 10px ui-monospace, monospace;
-              letter-spacing: .08em;
-              pointer-events: none;
-            }
             .tv-agent {
               position: absolute; left: var(--scene-x, 50%); top: var(--scene-y, 50%);
               width: 72px; transform: translate(-50%, -50%);
@@ -686,12 +699,10 @@
           const projects = Array.isArray(data) ? data : (data.projects || []);
           this.agents.clear();
           for (const proj of projects) {
-            if (proj.agentCount > 0) {
-              const agentsRes = await fetch(`${this.gatewayUrl}/api/projects/${proj.projectId}/agents`);
-              const agentsData = await agentsRes.json();
-              for (const agent of agentsData.agents) {
-                if (this.roomId === 'all' || agent.roomId === this.roomId) this.agents.set(agent.agentId, { ...agent, projectId: proj.projectId });
-              }
+            const agentsRes = await fetch(`${this.gatewayUrl}/api/projects/${proj.projectId}/agents`);
+            const agentsData = await agentsRes.json();
+            for (const agent of agentsData.agents || []) {
+              if (this.roomId === 'all' || agent.roomId === this.roomId) this.agents.set(agent.agentId, { ...agent, projectId: proj.projectId });
             }
           }
         } else {
@@ -841,16 +852,8 @@
     updateDiorama() {
       if (!this.dioramaEl) return;
 
-      const agentArray = Array.from(this.agents.values()).filter(a => {
-        // Filter out offline agents (legacy status field from public API)
-        if (a.status === 'offline') return false;
-        // Filter out agents with stale heartbeats (>3 minutes old)
-        if (a.lastHeartbeat) {
-          const since = Date.now() - a.lastHeartbeat;
-          if (since > 180000) return false; // 3 minutes
-        }
-        return true;
-      });
+      // Respect server-side status - watchdog sets 'offline' when heartbeats miss deadline
+      const agentArray = Array.from(this.agents.values()).filter(a => a.status !== 'offline');
 
       // Keep existing agents, update or add new ones
       const existingIds = new Set(Array.from(this.dioramaEl.querySelectorAll('[data-agent-id]')).map(el => el.dataset.agentId));

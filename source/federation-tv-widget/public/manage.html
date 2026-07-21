@@ -671,20 +671,19 @@
       }
 
       // ── Data loading ───────────────────────────────────────────────────
-      async function loadAgents() {
+      async function loadAgents(silent) {
         var data = await fetchJson('/api/v1/admin/agents');
         state.agents = data.agents || [];
         renderAgents();
-        updateMetrics(data.summary || {});
+        updateMetrics(data.summary || {}, silent);
         populateRoomFilter();
-        updateTV();
       }
 
-      async function loadRooms() {
+      async function loadRooms(silent) {
         var data = await fetchJson('/api/v1/admin/rooms');
         state.rooms = data.rooms || [];
         renderRooms(state.rooms);
-        populateTVRoomPicker();
+        if (!silent) populateTVRoomPicker();
       }
 
       function populateTVRoomPicker() {
@@ -703,7 +702,7 @@
         }
       }
 
-      async function loadOrganizations() {
+      async function loadOrganizations(silent) {
         var statusFilter = el.orgFilter ? el.orgFilter.value : '';
         var path = '/api/v1/admin/organizations';
         if (statusFilter) path += '?status=' + encodeURIComponent(statusFilter);
@@ -712,31 +711,31 @@
         renderOrganizations();
       }
 
-      async function loadAlerts() {
+      async function loadAlerts(silent) {
         var data = await fetchJson('/api/v1/admin/alerts');
         state.alerts = data.alerts || [];
         renderAlerts();
       }
 
-      async function loadAll() {
+      async function loadAll(silent) {
         try {
-          setStatus('Loading...', null);
-          await Promise.all([loadAgents(), loadRooms(), loadOrganizations(), loadAlerts()]);
-          setStatus('Connected — ' + state.agents.length + ' agents, auto-refresh 15s.', true);
+          if (!silent) setStatus('Loading...', null);
+          await Promise.all([loadAgents(silent), loadRooms(silent), loadOrganizations(silent), loadAlerts(silent)]);
+          if (!silent) setStatus('Connected — ' + state.agents.length + ' agents, auto-refresh 15s.', true);
         } catch (e) {
-          setStatus('Error: ' + e.message, false);
+          if (!silent) setStatus('Error: ' + e.message, false);
         }
       }
 
       // ── Metrics ────────────────────────────────────────────────────────
-      function updateMetrics(summary) {
-        if (el.mTotal) { el.mTotal.textContent = summary.total || 0; flashMetric(el.mTotal); }
-        if (el.mLive) { el.mLive.textContent = summary.live || 0; flashMetric(el.mLive); }
-        if (el.mPaused) { el.mPaused.textContent = summary.paused || 0; flashMetric(el.mPaused); }
+      function updateMetrics(summary, silent) {
+        if (el.mTotal) { el.mTotal.textContent = summary.total || 0; if (!silent) flashMetric(el.mTotal); }
+        if (el.mLive) { el.mLive.textContent = summary.live || 0; if (!silent) flashMetric(el.mLive); }
+        if (el.mPaused) { el.mPaused.textContent = summary.paused || 0; if (!silent) flashMetric(el.mPaused); }
         if (el.mOffline) {
           var offline = (summary.idle || 0) + (summary.revoked || 0);
           el.mOffline.textContent = offline;
-          flashMetric(el.mOffline);
+          if (!silent) flashMetric(el.mOffline);
         }
       }
 
@@ -786,6 +785,7 @@
           return;
         }
 
+        var scrollY = window.scrollY;
         el.rows.innerHTML = filtered.map(function (a) {
           var pill = agentStatusPill(a);
           var hb = a.lastHeartbeatAt ? timeAgo(a.lastHeartbeatAt) : '—';
@@ -808,6 +808,7 @@
             '<td class="act">' + actions + '</td>' +
             '</tr>';
         }).join('');
+        window.scrollTo(0, scrollY);
       }
 
       // ── Agent actions ──────────────────────────────────────────────────
@@ -1030,7 +1031,7 @@
       function startRefresh() {
         stopRefresh();
         state.refreshTimer = setInterval(function () {
-          loadAll();
+          loadAll(true);
         }, 15000);
       }
 
