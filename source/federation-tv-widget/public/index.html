@@ -461,8 +461,13 @@
     const safeText = (id, value) => { $(id).textContent = value || 'Not published'; };
     const formatTime = value => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' }); };
     const agentDialog = $('agent-dialog'); let feed = [], agents = [], activeFilter = 'all', roomIndex = new Map();
+    // The terminal follows the selected camera: a specific room shows only that
+    // room's agents' events; the global feed appears only when "All live rooms"
+    // is explicitly selected.
+    let currentRoomId = 'all', roomAgentIds = new Set();
     const classify = item => `${item.eventType || item.event_type || ''} ${item.priority || ''} ${item.message || item.statement || ''}`.toLowerCase();
-    const belongs = item => activeFilter === 'all' || (activeFilter === 'lifecycle' && /(agent|heartbeat|connect|disconnect|run\.)/.test(classify(item))) || (activeFilter === 'safeguard' && /(validation|incident|budget|deny|reject|loop|watchdog|command|tool)/.test(classify(item)));
+    const inCurrentRoom = item => currentRoomId === 'all' || roomAgentIds.has(item.agentId || item.agent_id);
+    const belongs = item => inCurrentRoom(item) && (activeFilter === 'all' || (activeFilter === 'lifecycle' && /(agent|heartbeat|connect|disconnect|run\.)/.test(classify(item))) || (activeFilter === 'safeguard' && /(validation|incident|budget|deny|reject|loop|watchdog|command|tool)/.test(classify(item))));
     function renderFeed() {
       const entries = feed.filter(belongs).slice(0,40); const log = $('event-log'); log.replaceChildren();
       if (!entries.length) { const empty=document.createElement('li'); empty.innerHTML='<time>—</time><b>Feed</b><span>No matching public events yet.</span>'; log.append(empty); $('feed-state').textContent='No matching public events'; return; }
@@ -479,6 +484,8 @@
     function statusClass(agent) { return String(agent.status || agent.action || 'offline').toLowerCase().replace(/[^a-z-]/g,''); }
     function renderAgents(items) {
       agents = items; $('agent-count').textContent = String(items.length);
+      roomAgentIds = new Set(items.map(item => item.agentId));
+      renderFeed(); // keep the terminal scoped to the roster now in view
       const meta=$('roster-meta'); if (meta) meta.textContent = `${items.length} on camera`;
       const list=$('agent-list'), picker=$('agent-picker'); list.replaceChildren(); picker.replaceChildren(new Option('Choose an agent',''));
       for (const agent of items) {
@@ -507,6 +514,10 @@
     }
     // TV widget is loaded via tv-widget.js script tag
     // FederationTV stub is provided by tv-widget.js for backward compatibility
+    // React OfficeStage is the primary monitor: it renders the REAL registered
+    // roster (deterministic palettes per agent id) and reacts to real feed
+    // events only. The vanilla legacy engine remains the automatic fallback if
+    // the React bundle fails to load or render.
     var tv = window.FederationTV ? new window.FederationTV({ projectId:'all', roomId:'all', container:'#federation-tv', gatewayUrl:gateway, refreshInterval:12000, randomSpeech:false, presentationMode:'camera', onAgentSelect:openAgent, onAgentsUpdate:renderAgents, onFeedUpdate:items => { feed=items; renderFeed(); }}) : null;
     $('close-agent').addEventListener('click',()=>agentDialog.close());
     $('agent-picker').addEventListener('change',event=>{ const agent=agents.find(item=>item.agentId===event.target.value); if(agent) openAgent(agent); event.target.value=''; });
@@ -517,6 +528,9 @@
       if (!entry) return;
       $('camera-title').textContent = entry.label;
       $('camera-state').textContent = entry.roomId === 'all' ? 'Read-only public projection' : `${entry.used || 0}/${entry.capacity || 35} slots visible`;
+      currentRoomId = entry.roomId;
+      if (entry.roomId !== 'all') roomAgentIds = new Set(); // repopulated by the next roster update
+      renderFeed();
       if (tv) tv.setRoom(entry.roomId, entry.projectId);
       if (el.roomPills) {
         el.roomPills.querySelectorAll('.room-pill').forEach(pill => {

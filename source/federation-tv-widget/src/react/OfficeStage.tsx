@@ -13,6 +13,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 export type StageEvent = {
   agent?: string;
+  /**
+   * Super-statement-packet visibility: when false the event still captions on
+   * the monitor (it is in the public feed) but must NOT pop a chat bubble or
+   * animate the character (visibility.publicBubble === false).
+   */
+  bubble?: boolean;
   kind:
     | "tool.call"
     | "tool.denied"
@@ -58,7 +64,46 @@ const PALETTES = [
   { skin: "#f0b98a", shirt: "#8e4585", hair: "#4a2e1a", pants: "#2b1608" },
   { skin: "#eabf9f", shirt: "#e07a3c", hair: "#2b1a10", pants: "#1a1a1a" },
 ];
-const NAMES = ["Smitty", "Barb", "Dave", "Marge", "Carl", "Wanda"];
+// ── Speech repertoire ────────────────────────────────────────────────
+// Chat bubbles are personality, not telemetry. Lines come from the dynamic
+// speech pool in the database — the statement every agent submits at
+// registration and the five Q&A an organization submits, growing over time —
+// picked at random to match the tone of the real event that fired. The
+// event's actual type/statement belongs to the caption strip and the
+// operations feed, never the bubble.
+type Sentiment = "negative" | "positive" | "neutral";
+
+const KIND_SENTIMENT: Record<StageEvent["kind"], Sentiment> = {
+  "tool.call": "neutral",
+  "tool.denied": "negative",
+  "tool.authorized": "positive",
+  "test.failed": "negative",
+  "test.passed": "positive",
+  heartbeat: "neutral",
+  deploy: "positive",
+  boiler: "negative",
+  idle: "neutral",
+};
+
+const NEGATIVE_HINTS = /fail|error|broke|fire|crash|denied|invalid|wrong|bug|flaky|blame|stuck|panic|help|oops|sorry|worse|😱|🔥|💀|😬/i;
+const POSITIVE_HINTS = /pass|success|green|ship|deploy|done|complete|win|approv|celebrat|great|good|nailed|faith|proud|🎉|🚀|✅|😎/i;
+
+// The pool has no stored tone; bucket lines with a light keyword heuristic so
+// negative events pull gloomier lines and positive events pull brighter ones.
+function classifyLine(line: string): Sentiment {
+  if (NEGATIVE_HINTS.test(line)) return "negative";
+  if (POSITIVE_HINTS.test(line)) return "positive";
+  return "neutral";
+}
+
+// Deterministic seed per real agent id — drives palette choice and spawn
+// jitter so an agent keeps the same look every visit (same idea as the
+// deterministic SVG avatar generator used across the Watchtower).
+function hashSeed(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) { h = ((h << 5) - h) + id.charCodeAt(i); h |= 0; }
+  return Math.abs(h);
+}
 
 // Stations agents move between. Each has a "stand at" point and activity type.
 type StationKind = "desk" | "cooler" | "coffee" | "whiteboard" | "printer" | "window";
@@ -80,6 +125,7 @@ const STATIONS: Station[] = [
 type Agent = {
   id: string;
   name: string;
+  status?: string; // last known registry status — tracked so a change can bubble
   palette: (typeof PALETTES)[number];
   x: number;
   y: number;
@@ -100,6 +146,9 @@ function pick<T>(arr: T[]): T {
 
 // Map real API event types to stage event kinds
 function mapEventType(eventType: string): StageEvent["kind"] | undefined {
+  // Routine agent-status churn is deliberately kept out of the public feed;
+  // if a legacy record slips through, the stage must not resurface it.
+  if (eventType === "agentUpdated") return undefined;
   const map: Record<string, StageEvent["kind"]> = {
     "run.started": "deploy",
     "run.completed": "test.passed",
@@ -140,30 +189,142 @@ function pathTo(from: {x:number;y:number}, to: {x:number;y:number}) {
 
 export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', projectId = 'autopilot', agents: agentConfig }: OfficeStageProps = {}) {
   const stationsRef = useRef<Station[]>(STATIONS.map((s) => ({ ...s, occupants: [] })));
-  const [agents, setAgents] = useState<Agent[]>(() => {
-    const now = performance.now();
-    return NAMES.map((name, i) => {
-      const st = stationsRef.current[i % stationsRef.current.length];
-      st.occupants.push(`a${i}`);
-      return {
-        id: `a${i}`,
-        name,
-        palette: PALETTES[i % PALETTES.length],
-        x: st.x,
-        y: st.y,
-        targetStation: st.id,
-        path: [],
-        speed: 0.6 + Math.random() * 0.4,
-        facing: (i % 2 === 0 ? 1 : -1) as 1 | -1,
-        activity: activityFor(st.kind),
-        activityUntil: now + 3000 + Math.random() * 4000,
-        animOffset: Math.random() * 10,
-      };
-    });
-  });
+  // The cast is the REAL registered roster, reconciled from the API below.
+  // The stage never invents an agent — an empty office is the truth
+  // (AGENTS.md: presentation must not fabricate agents, events, or results).
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const agentsRef = useRef<Agent[]>([]);
+  const seenEventsRef = useRef<Set<string>>(new Set());
+  const hydratedRef = useRef(false);
   const [captions, setCaptions] = useState<Array<{ id: number; text: string; kind: StageEvent["kind"]; who: string }>>([]);
   const captionId = useRef(0);
   const [tick, setTick] = useState(0);
+
+  useEffect(() => { agentsRef.current = agents; }, [agents]);
+
+  // Dynamic speech pool, bucketed by tone. QUIPS remain the seed/fallback
+  // repertoire until the database pool loads (or if it is empty).
+  const speechRef = useRef<Record<Sentiment, string[]>>({ negative: [], positive: [], neutral: [] });
+  const pickSpeech = (kind: StageEvent["kind"]): string => {
+    const pool = speechRef.current[KIND_SENTIMENT[kind]];
+    const line = pool.length ? pick(pool) : pick(QUIPS[kind]);
+    return line.length > 88 ? `${line.slice(0, 85)}…` : line;
+  };
+
+  useEffect(() => {
+    let stopped = false;
+    (async () => {
+      try {
+        const res = await fetch(`${gatewayUrl}/api/federation/speech?limit=500`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const lines = Array.isArray(data) ? data : (data.speechLines || data.lines || []);
+        if (stopped) return;
+        const buckets: Record<Sentiment, string[]> = { negative: [], positive: [], neutral: [] };
+        const seenLines = new Set<string>(); // spec: duplicate public statements are deduplicated
+        for (const item of lines) {
+          const text = typeof item === "string" ? item : (item?.statement || item?.text || item?.message);
+          if (typeof text !== "string" || !text.trim()) continue;
+          const line = text.trim();
+          if (seenLines.has(line)) continue;
+          seenLines.add(line);
+          buckets[classifyLine(line)].push(line);
+        }
+        speechRef.current = buckets;
+      } catch { /* QUIPS remain the fallback repertoire */ }
+    })();
+    return () => { stopped = true; };
+  }, [gatewayUrl]);
+
+  // ── Real roster sync: spawn/retire stage characters from the live agent
+  // registry. Movement, activities, and looks are presentation; identity is
+  // operational truth. Palette is deterministic per agent id.
+  useEffect(() => {
+    let stopped = false;
+    const reconcile = (roster: Array<{ agentId: string; name: string; paletteIndex?: number; status?: string }>) => {
+      const now = performance.now();
+      setAgents((prev) => {
+        const stations = stationsRef.current;
+        const visible = roster.filter((r) => (r.status ?? "active") !== "offline").slice(0, 35);
+        const keep = new Set(visible.map((r) => r.agentId));
+        for (const a of prev) {
+          if (!keep.has(a.id)) {
+            for (const s of stations) s.occupants = s.occupants.filter((id) => id !== a.id);
+          }
+        }
+        const existing = new Map(prev.map((a) => [a.id, a]));
+        return visible.map((r) => {
+          const found = existing.get(r.agentId);
+          if (found) {
+            // Status churn is deliberately kept OUT of the public feed (it is
+            // internal state, not an action). Surface a change as a chat
+            // bubble only, so the floor stays lively without feed bloat.
+            const statusChanged = found.status !== undefined && r.status !== undefined && found.status !== r.status;
+            if (!statusChanged && found.name === r.name && found.status === r.status) return found;
+            const updated: Agent = { ...found, name: r.name, status: r.status };
+            if (statusChanged && !updated.bubble) {
+              updated.bubble = { text: pickSpeech("idle"), kind: "idle", until: now + 4200 };
+            }
+            return updated;
+          }
+          // Spawn at a free station; overflow takes a deterministic open-floor
+          // spot and joins the normal station rotation from there.
+          const h = hashSeed(r.agentId);
+          const st = stations.find((s) => s.occupants.length < s.capacity);
+          if (st) st.occupants.push(r.agentId);
+          return {
+            id: r.agentId,
+            name: r.name,
+            status: r.status,
+            palette: PALETTES[(r.paletteIndex ?? h) % PALETTES.length],
+            x: st ? st.x : 40 + (h % 320),
+            y: st ? st.y : 140 + ((h >> 5) % 100),
+            targetStation: st ? st.id : "",
+            path: [],
+            speed: 0.6 + Math.random() * 0.4,
+            facing: (h % 2 === 0 ? 1 : -1) as 1 | -1,
+            activity: st ? activityFor(st.kind) : "gazing",
+            activityUntil: now + 3000 + Math.random() * 4000,
+            animOffset: Math.random() * 10,
+          };
+        });
+      });
+    };
+
+    // A host page may hand us its (real) roster directly; otherwise poll.
+    if (agentConfig && agentConfig.length) {
+      reconcile(agentConfig.map((a) => ({ agentId: a.agentId, name: a.name, paletteIndex: a.paletteIndex })));
+      return;
+    }
+    const toEntry = (a: { agentId: string; name?: string; status?: string }) => ({ agentId: a.agentId, name: a.name || a.agentId, status: a.status });
+    const fetchRoster = async () => {
+      try {
+        if (projectId === "all") {
+          const res = await fetch(`${gatewayUrl}/api/projects`);
+          if (!res.ok) return;
+          const data = await res.json();
+          const projects = Array.isArray(data) ? data : (data.projects || []);
+          const groups = await Promise.all(projects.map(async (p: { projectId: string }) => {
+            try {
+              const r = await fetch(`${gatewayUrl}/api/projects/${encodeURIComponent(p.projectId)}/agents`);
+              if (!r.ok) return [];
+              const d = await r.json();
+              return (d.agents || []).map(toEntry);
+            } catch { return []; }
+          }));
+          if (!stopped) reconcile(groups.flat());
+        } else {
+          const res = await fetch(`${gatewayUrl}/api/projects/${encodeURIComponent(projectId)}/agents`);
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!stopped) reconcile((data.agents || []).map(toEntry));
+        }
+      } catch { /* transient fetch error — keep the current cast */ }
+    };
+    fetchRoster();
+    const timer = setInterval(fetchRoster, 15_000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [gatewayUrl, projectId, agentConfig]);
 
   // main animation loop
   useEffect(() => {
@@ -183,12 +344,18 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
   const pushEvent = useMemo(
     () => (ev: StageEvent) => {
       const now = performance.now();
-      setAgents((prev) => {
+      // publicBubble:false — the event captions (it is public feed content)
+      // but the character must not bubble or react.
+      if (ev.bubble !== false) setAgents((prev) => {
+        // Only the agent the event actually belongs to reacts — an event is
+        // never attributed to a random character.
         const target = ev.agent
-          ? prev.find((a) => a.name.toLowerCase() === ev.agent!.toLowerCase() || a.id === ev.agent)
-          : pick(prev);
+          ? prev.find((a) => a.id === ev.agent || a.name.toLowerCase() === ev.agent!.toLowerCase())
+          : undefined;
         if (!target) return prev;
-        const text = ev.text ?? pick(QUIPS[ev.kind]);
+        // The bubble is a tone-matched line from the dynamic speech pool —
+        // the caption strip and operations feed carry the event's real text.
+        const bubbleText = pickSpeech(ev.kind);
         return prev.map((a) => {
           if (a.id !== target.id) {
             // boiler makes EVERYONE panic and scatter
@@ -199,7 +366,7 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
           }
           return {
             ...a,
-            bubble: { text, kind: ev.kind, until: now + 4200 },
+            bubble: { text: bubbleText, kind: ev.kind, until: now + 4200 },
             panicUntil: ev.kind === "boiler" || ev.kind === "test.failed" ? now + 2000 : a.panicUntil,
             activity: ev.kind === "boiler" ? "panic" : a.activity,
             speed: ev.kind === "boiler" ? 1.8 : a.speed,
@@ -208,7 +375,10 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
       });
       const id = ++captionId.current;
       const text = ev.text ?? pick(QUIPS[ev.kind]);
-      setCaptions((c) => [...c.slice(-2), { id, text, kind: ev.kind, who: ev.agent ?? "" }]);
+      const who = ev.agent
+        ? (agentsRef.current.find((a) => a.id === ev.agent)?.name ?? ev.agent)
+        : "";
+      setCaptions((c) => [...c.slice(-2), { id, text, kind: ev.kind, who }]);
       setTimeout(() => setCaptions((c) => c.filter((x) => x.id !== id)), 4800);
     },
     [],
@@ -219,48 +389,53 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
     const handler = (e: Event) => pushEvent((e as CustomEvent<StageEvent>).detail);
     window.addEventListener("office:event", handler as EventListener);
 
-    // Fetch real feed events from API
-    let pollTimer: ReturnType<typeof setInterval>;
+    // Real feed events drive the reactions. A seen-set keyed on the feed row id
+    // means a poll never replays a bubble, and the first fetch hydrates
+    // silently so page load doesn't re-animate history. There is NO ambient
+    // event simulator: fabricated tool/test/incident events would violate the
+    // operational-truth rule — an idle office wandering between stations is
+    // the honest presentation of a quiet system.
+    const seen = seenEventsRef.current;
     const fetchFeed = async () => {
       try {
-        const res = await fetch(`${gatewayUrl}/api/projects/${projectId}/feed?limit=20`);
+        const url = projectId === "all"
+          ? `${gatewayUrl}/api/feed?limit=20`
+          : `${gatewayUrl}/api/projects/${encodeURIComponent(projectId)}/feed?limit=20`;
+        const res = await fetch(url);
         if (!res.ok) return;
         const data = await res.json();
-        const events = data.events || [];
+        const events = data.events || data.feed || [];
+        const fresh: Array<{ eventType: string; agentId?: string; message?: string; visibility?: { publicBubble?: boolean } }> = [];
         for (const evt of events) {
-          const kind = mapEventType(evt.eventType);
-          if (kind) {
-            pushEvent({ kind, agent: evt.agentId, text: evt.message });
-          }
+          const key = String(evt.id ?? `${evt.eventType}:${evt.agentId}:${evt.timestamp}`);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          fresh.push(evt);
         }
-      } catch (e) {
+        if (seen.size > 600) {
+          const keep = Array.from(seen).slice(-300);
+          seen.clear();
+          for (const k of keep) seen.add(k);
+        }
+        if (!hydratedRef.current) { hydratedRef.current = true; return; }
+        for (const evt of fresh.reverse()) {
+          const kind = mapEventType(evt.eventType);
+          // Honor super-statement-packet visibility: publicBubble:false means
+          // caption-only (defensive — today's feed rows omit visibility).
+          if (kind) pushEvent({ kind, agent: evt.agentId, text: evt.message, bubble: evt.visibility?.publicBubble !== false });
+        }
+      } catch {
         // Silently fail on fetch errors
       }
     };
 
     // Initial fetch + periodic polling
     fetchFeed();
-    pollTimer = setInterval(fetchFeed, 8000);
-
-    // Ambient simulation when no real events
-    const kinds: StageEvent["kind"][] = [
-      "tool.call", "tool.denied", "tool.authorized", "test.failed", "test.passed",
-      "heartbeat", "deploy", "idle",
-    ];
-    let timeout: ReturnType<typeof setTimeout>;
-    const schedule = () => {
-      timeout = setTimeout(() => {
-        const kind = Math.random() < 0.04 ? "boiler" : pick(kinds);
-        pushEvent({ kind });
-        schedule();
-      }, 2200 + Math.random() * 2200);
-    };
-    schedule();
+    const pollTimer = setInterval(fetchFeed, 8000);
 
     return () => {
       window.removeEventListener("office:event", handler as EventListener);
       clearInterval(pollTimer);
-      clearTimeout(timeout);
     };
   }, [pushEvent, gatewayUrl, projectId]);
 
@@ -429,6 +604,9 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
           <rect x="0" y="0" width="400" height="260" fill="url(#vignette)" pointerEvents="none" />
         </svg>
 
+        {agents.length === 0 && (
+          <div className="empty-office">NO AGENTS ON SHIFT · CAMERA LIVE</div>
+        )}
         <div className="chrome-top"><span className="rec-dot" /> LIVE · OFFICE CAM</div>
         <div className="chrome-tr">CH-04 · 4:20 PM</div>
 
@@ -462,6 +640,11 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
         }
         .rec-dot { width:8px; height:8px; border-radius:50%; background:#ff3b3b; box-shadow:0 0 6px #ff3b3b; animation:rec 1.1s ease-in-out infinite; }
         @keyframes rec { 50% { opacity:0.25; } }
+        .empty-office {
+          position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+          color:#f4ecd8; font:700 12px 'Courier New', monospace; letter-spacing:.14em;
+          text-shadow:0 1px 0 #000; opacity:.85; pointer-events:none;
+        }
         .captions { position:absolute; left:10px; right:10px; bottom:10px; display:flex; flex-direction:column; gap:4px; }
         .caption { background:rgba(20,10,4,0.85); border-left:3px solid #e07a3c; color:#f4ecd8;
           padding:4px 8px; font-size:10px; line-height:1.25; border-radius:2px;

@@ -504,6 +504,9 @@ git clone https://github.com/drdeeks/federation-watchtower
 cd federation-watchtower/source/federation-serverless
 npm install
 
+# Return to the repository root — the test scripts live in ./scripts there
+cd ../..
+
 # Run all local tests (TypeScript, unit, syntax, git)
 ./scripts/local-test-runner.sh
 
