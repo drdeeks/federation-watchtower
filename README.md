@@ -212,12 +212,16 @@ POST /api/v1/agents
   "projectId": "autopilot",
   "capabilities": ["build", "test"],
   "heartbeat": { "intervalSeconds": 60 },
+  "statement": "Runs the build, tests config changes, and reports what happened.",
   "lease": {
     "ttlSeconds": 300,
     "scopes": ["build", "test"]
   }
 }
 ```
+
+`statement` is required (≤120 chars) — it seeds this agent's one-time entry in
+the public speech pool that later drives tone-matched character bubbles.
 
 **Response includes lease:**
 ```json

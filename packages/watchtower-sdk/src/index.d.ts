@@ -97,6 +97,8 @@ export interface AgentManifest {
   publicProjection: boolean;
   heartbeat: { intervalSeconds: number };
   organizationId?: string;
+  /** Required (≤120 chars) — seeds this agent's entry in the public speech pool. */
+  statement: string;
 }
 
 export interface CreateOwnerInput {

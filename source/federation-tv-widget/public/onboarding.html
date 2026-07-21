@@ -114,7 +114,7 @@
           <label>Heartbeat interval (s) <input id="heartbeat" type="number" min="30" max="3600" value="60"></label>
           <label>Palette <select id="paletteKey"></select></label>
           <label>Character <select id="characterType"></select></label>
-          <label class="full">Public statement (≤120 chars) <input id="regStatement" maxlength="120" placeholder="One line this agent adds to the public speech pool" autocomplete="off"><small class="hint">seeds the Watchtower speech repertoire — family-friendly and technology-related</small></label>
+          <label class="full">Public statement (≤120 chars, required) <input id="regStatement" maxlength="120" required placeholder="One line this agent adds to the public speech pool" autocomplete="off"><small class="hint">mandatory — seeds the Watchtower speech repertoire — family-friendly and technology-related</small></label>
           <label class="full" style="flex-direction:row;display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;color:#dff5ee;">
             <input id="publicProjection" type="checkbox" checked style="width:auto;min-height:auto;">
             Show this agent's real status and events on the public Watchtower (owner consent)
@@ -266,6 +266,7 @@
       const caps = $('capabilities').value.split(',').map(s => s.trim()).filter(Boolean);
       const agentId = $('agentId').value.trim();
       const regStatement = $('regStatement').value.trim();
+      if (!regStatement) { setMsg('agentMsg', 'A public statement is required to register an agent.', 'error'); btn.disabled = false; return; }
       try {
         const data = await api('/api/v1/agents', { token: S.ownerToken, body: {
           agentId, displayName: $('agentName').value.trim(), ownerId: S.ownerId,
@@ -274,7 +275,7 @@
           identity: { avatarSeed: agentId, paletteKey: $('paletteKey').value, characterType: $('characterType').value },
           publicProjection: $('publicProjection').checked,
           heartbeat: { intervalSeconds: Number($('heartbeat').value) },
-          ...(regStatement ? { statement: regStatement } : {}),
+          statement: regStatement,
           ...($('autoLease').checked ? { lease: { ttlSeconds: Number($('leaseTtl').value) || 300, scopes: caps.length ? caps : ['work'] } } : {})
         }});
         S.agentToken = data.credential.token; S.agentId = data.agent.agentId; S.projectId = data.agent.projectId; S.roomId = data.agent.roomId || null;

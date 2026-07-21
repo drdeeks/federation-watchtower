@@ -66,7 +66,7 @@ test("registerAgent authenticates with the owner token and returns a wired agent
   const manifest = {
     agentId: "build-01", displayName: "Build 01", ownerId: "acme", projectId: "autopilot", role: "testing",
     capabilities: ["testing", "reporting"], identity: { avatarSeed: "build-01", paletteKey: "testing", characterType: "operator" },
-    publicProjection: true, heartbeat: { intervalSeconds: 30 },
+    publicProjection: true, heartbeat: { intervalSeconds: 30 }, statement: "Runs the test suite and reports results.",
   };
   const { agent, credential, next, client } = await owner.registerAgent(manifest);
   assert.equal(requests[0].url, "https://gateway.example/api/v1/agents");

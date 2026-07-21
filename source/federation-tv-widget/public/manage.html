@@ -441,7 +441,7 @@
       <h2><span class="grow">Room management</span>
         <input id="roomSearch" placeholder="search room or project" autocomplete="off">
         <select id="roomFilterStatus"><option value="">all rooms</option><option value="active">active</option><option value="empty">empty</option><option value="full">full</option></select>
-        <button id="addRoom" class="secondary" disabled>+ Add room</button>
+        <button id="addRoom" class="secondary" disabled title="Connect with an admin token first">+ Add room</button>
       </h2>
       <p class="section-desc">Create rooms for organizations, delete empty demo/test rooms. Rooms must be empty before deletion.</p>
       <div class="tablewrap" style="max-height:340px;">
@@ -858,7 +858,7 @@
             roomId: selectedRoom === 'all' ? 'all' : selectedRoom,
             gatewayUrl: state.apiUrl,
             presentationMode: 'embed',
-            refreshInterval: 30000,
+            refreshInterval: 10000,
             maxBubbles: 3
           });
         } catch (e) {
@@ -1103,6 +1103,7 @@
               setStatus('Admin token is required.', false);
               return;
             }
+            if (el.addRoom) { el.addRoom.disabled = false; el.addRoom.title = ''; }
             loadAll();
             startRefresh();
           });

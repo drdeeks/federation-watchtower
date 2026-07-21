@@ -69,5 +69,92 @@
     </section>
   </main>
   <dialog id="reasonDialog"><form method="dialog"><h2 id="dialogTitle">Incident action</h2><p class="sub">Record why this transition is appropriate. It becomes durable incident evidence.</p><label>Reason <input id="reason" maxlength="240" required></label><menu><button value="cancel" class="secondary">Cancel</button><button id="confirmAction" value="confirm">Confirm</button></menu></form></dialog>
+  <script>
+    const $ = id => document.getElementById(id);
+    const state = { projects: [], current: null, action: null, locked: null };
+    const api = $('api'), token = $('token'), project = $('project'), status = $('status');
+    const qs = new URLSearchParams(location.search);
+    api.value = qs.get('api') || (location.hostname === 'localhost' ? 'http://localhost:8787' : 'https://fapi.drdeeks.xyz');
+    // ?project=<id> locks this console to a single project — hand this URL to
+    // one organization's operator and they can never switch to see another
+    // project's incidents, sessions, budget, or tools. Without it, this stays
+    // the administrator's own console (see ACCESS_AND_ONBOARDING.md) and can
+    // switch between every registered project.
+    state.locked = qs.get('project') || null;
+    const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[char]);
+    const cls = value => esc(value).toLowerCase().replace(/[^a-z0-9_-]/g,'-');
+    const money = value => `$${Number(value || 0).toFixed(2)}`;
+    const date = value => value ? new Date(value).toLocaleString() : '—';
+    async function request(path, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (token.value.trim()) headers.Authorization = `Bearer ${token.value.trim()}`;
+      if (options.body) headers['Content-Type'] = 'application/json';
+      const response = await fetch(`${api.value.replace(/\/$/,'')}${path}`, { ...options, headers });
+      const contentType = response.headers.get('content-type') || '';
+      const body = contentType.includes('application/json') ? await response.json() : await response.text();
+      if (!response.ok) throw new Error(typeof body === 'object' ? (body.error || `HTTP ${response.status}`) : body || `HTTP ${response.status}`);
+      return body;
+    }
+    function setStatus(message, isError = false) { status.textContent = message; status.style.color = isError ? '#ff9582' : '#b8d8d4'; }
+    function requireConnection() { if (!state.current || !token.value.trim()) throw new Error('Connect with an admin token first.'); }
+    async function connect() {
+      $('connect').disabled = true; setStatus('Connecting…');
+      try {
+        const data = await request('/api/projects');
+        state.projects = state.locked ? data.filter(p => p.projectId === state.locked) : data;
+        if (state.locked && !state.projects.length) throw new Error(`Project "${state.locked}" not found.`);
+        project.innerHTML = state.projects.map(p => `<option value="${esc(p.projectId)}">${esc(p.emoji)} ${esc(p.name)} · ${esc(p.projectId)}</option>`).join('');
+        project.disabled = state.locked ? true : false;
+        $('copyAgents').disabled = false; $('export').disabled = false;
+        state.current = project.value;
+        await refresh();
+        setStatus(state.locked ? `Connected · locked to project "${state.locked}"` : `Connected · ${data.length} registered projects`);
+      } catch (error) { setStatus(error.message, true); }
+      finally { $('connect').disabled = false; }
+    }
+    function renderBudget(budget) { $('spend').textContent = money(budget.spentUsd); $('remaining').textContent = money(budget.remainingUsd); $('limit').value = Number(budget.limitUsd).toFixed(2); $('warning').value = Number(budget.warningUsd).toFixed(2); $('budgetNote').textContent = `Warning at ${money(budget.warningUsd)} · hard limit ${money(budget.limitUsd)}. Cost enters the ledger only from signed creditCostUsd event metadata.`; }
+    function renderIncidents(incidents) {
+      const open = incidents.filter(item => ['open','acknowledged'].includes(item.status)).length; $('incidents').textContent = open;
+      $('incidentList').innerHTML = incidents.length ? incidents.map(item => `<div class="row"><h3 class="${cls(item.severity)}">${esc(item.title)}</h3><p>${esc(item.id)} · agent ${esc(item.agentId || 'project')}</p><div class="meta"><span class="badge ${cls(item.status)}">${esc(item.status)}</span><span>${date(item.updatedAt)}</span><span>${esc(item.ruleId)}</span></div><div class="actions">${item.status === 'open' ? `<button data-action="acknowledge" data-id="${esc(item.id)}">Acknowledge</button>` : ''}${item.status === 'contained' ? `<button data-action="resolve" data-id="${esc(item.id)}">Resolve</button>` : ''}${['open','acknowledged','contained'].includes(item.status) ? `<button class="danger" data-action="dismiss" data-id="${esc(item.id)}">Dismiss</button>` : ''}</div></div>`).join('') : '<div class="empty">No incidents for this project.</div>';
+    }
+    function renderSessions(sessions) { const live = sessions.filter(item => item.status === 'active').length, blocked = sessions.filter(item => item.status === 'blocked').length; $('sessions').textContent = `${live} / ${blocked}`; $('sessionList').innerHTML = sessions.length ? sessions.map(item => `<div class="row"><h3>${esc(item.agentId)} <span class="badge ${cls(item.status)}">${esc(item.status)}</span></h3><p>run ${esc(item.runId)} · lease ${esc(item.leaseId || 'none')}</p><div class="meta"><span>${esc(item.controlState || 'no control hold')}</span><span>${date(item.updatedAt)}</span></div></div>`).join('') : '<div class="empty">No sessions recorded.</div>'; }
+    function renderTools(invocations) { $('toolList').innerHTML = invocations.length ? invocations.map(item => `<div class="row"><h3>${esc(item.toolName)}:${esc(item.action)} <span class="badge ${cls(item.status)}">${esc(item.status)}</span></h3><p>agent ${esc(item.agentId)} · request ${esc(item.requestId)}</p><div class="meta"><span>${esc(item.reason || 'active scoped lease')}</span><span>${date(item.createdAt)}</span></div></div>`).join('') : '<div class="empty">No controlled tool decisions yet.</div>'; }
+    async function refresh() {
+      try {
+        requireConnection(); state.current = project.value; setStatus(`Refreshing ${state.current}…`);
+        const base = `/api/v1/projects/${encodeURIComponent(state.current)}`;
+        const [budget, sessions, incidents, tools] = await Promise.all([request(`${base}/budget`), request(`${base}/sessions?limit=100`), request(`${base}/incidents?limit=100`), request(`${base}/tools/invocations?limit=100`)]);
+        renderBudget(budget.budget); renderSessions(sessions.sessions); renderIncidents(incidents.incidents); renderTools(tools.invocations); setStatus(`Live · refreshed ${new Date().toLocaleTimeString()}`);
+      } catch (error) { setStatus(error.message, true); }
+    }
+    let autoRefreshInterval = null;
+    $('connect').addEventListener('click', connect);
+    project.addEventListener('change', refresh);
+    $('autoRefresh').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        autoRefreshInterval = setInterval(refresh, 30000);
+        refresh();
+        setStatus('Auto-refresh enabled (30s)');
+      } else {
+        if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+        setStatus('Auto-refresh disabled');
+      }
+    });
+    $('copyAgents').addEventListener('click', async () => {
+      try {
+        requireConnection();
+        const data = await request('/api/v1/admin/agents?projectId=' + encodeURIComponent(state.current));
+        const text = data.agents.map(a => `${a.agentId} · ${a.displayName} · ${a.lifecycleState} · lease: ${a.roomId || 'none'}`).join('\n');
+        await navigator.clipboard.writeText(text);
+        setStatus(`Copied ${data.agents.length} agents to clipboard`);
+      } catch (error) { setStatus(error.message, true); }
+    });
+    $('budgetForm').addEventListener('submit', async event => { event.preventDefault(); try { requireConnection(); const base = `/api/v1/projects/${encodeURIComponent(state.current)}`; await request(`${base}/budget`, { method:'PUT', body: JSON.stringify({ limitUsd:Number($('limit').value), warningUsd:Number($('warning').value) }) }); await refresh(); } catch (error) { setStatus(error.message, true); } });
+    $('export').addEventListener('click', async () => { try { requireConnection(); const base = `/api/v1/projects/${encodeURIComponent(state.current)}`; const result = await request(`${base}/evidence/exports`, { method:'POST', body: JSON.stringify({ retentionDays:30 }) }); setStatus(`Evidence export ${result.exportId} retained through ${date(result.expiresAt)}.`); } catch (error) { setStatus(error.message, true); } });
+    $('incidentList').addEventListener('click', event => { const button = event.target.closest('button[data-action]'); if (!button) return; state.action = { action: button.dataset.action, id: button.dataset.id }; $('dialogTitle').textContent = `${state.action.action} ${state.action.id}`; $('reason').value=''; $('reasonDialog').showModal(); });
+    $('reasonDialog').addEventListener('close', async () => { if ($('reasonDialog').returnValue !== 'confirm' || !state.action) return; try { requireConnection(); const base = `/api/v1/projects/${encodeURIComponent(state.current)}`; await request(`${base}/incidents/${encodeURIComponent(state.action.id)}/${state.action.action}`, { method:'POST', body: JSON.stringify({ reason:$('reason').value }) }); await refresh(); } catch (error) { setStatus(error.message, true); } finally { state.action = null; } });
+    if (state.locked) { $('project').closest('label').firstChild.textContent = `Project (locked)`; }
+  </script>
 </body>
 </html>
