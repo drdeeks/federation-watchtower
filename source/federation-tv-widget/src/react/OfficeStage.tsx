@@ -741,7 +741,7 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
       <style>{`
         .stage-wrap { width:100%; display:flex; justify-content:center; padding:12px; box-sizing:border-box; background:#111; }
         .stage {
-          position:relative; width:100%; max-width:760px; aspect-ratio: 400/260;
+          position:relative; width:100%; aspect-ratio: 400/260;
           border-radius:14px; overflow:hidden;
           box-shadow: 0 0 0 6px #2b1608, 0 0 0 10px #6b3a1e, 0 20px 40px rgba(0,0,0,0.6);
           background:#000; font-family:'Courier New', monospace;
