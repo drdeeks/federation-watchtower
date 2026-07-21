@@ -140,7 +140,14 @@ export async function handleManagementRequest(input: {
       "INSERT INTO rooms (id, project_id, room_index, capacity, created_at) VALUES (?, ?, ?, ?, ?)"
     ).bind(roomId, projectId, roomIndex, capacity, now).run();
     await appendLifecycle(env, `room:${roomId}`, "room.created", `mgmt-room-create-${now}`, { projectId, capacity, roomIndex }, now);
-    return json({ room: { roomId, projectId, roomIndex, capacity, createdAt: now }, requestId: crypto.randomUUID() }, 201);
+    // Ready-to-paste embed for this exact room: the widget scopes its cast to
+    // the room, and single-project embeds paint the project's registered
+    // name/emoji/color on the office wall board (organization branding).
+    const embed = {
+      scriptTag: `<script src="https://watch.drdeeks.xyz/tv-widget.js" data-gateway="https://fapi.drdeeks.xyz" data-project="${projectId}" data-room="${roomId}" data-container="#federation-tv"></script>\n<div id="federation-tv"></div>`,
+      note: "Paste both lines into any page. Branding comes from the project's registered name, emoji, and color.",
+    };
+    return json({ room: { roomId, projectId, roomIndex, capacity, createdAt: now }, embed, requestId: crypto.randomUUID() }, 201);
   }
 
   // Delete a room (only if empty)

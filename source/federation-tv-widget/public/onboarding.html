@@ -114,6 +114,7 @@
           <label>Heartbeat interval (s) <input id="heartbeat" type="number" min="30" max="3600" value="60"></label>
           <label>Palette <select id="paletteKey"></select></label>
           <label>Character <select id="characterType"></select></label>
+          <label class="full">Public statement (≤120 chars) <input id="regStatement" maxlength="120" placeholder="One line this agent adds to the public speech pool" autocomplete="off"><small class="hint">seeds the Watchtower speech repertoire — family-friendly and technology-related</small></label>
           <label class="full" style="flex-direction:row;display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;color:#dff5ee;">
             <input id="publicProjection" type="checkbox" checked style="width:auto;min-height:auto;">
             Show this agent's real status and events on the public Watchtower (owner consent)
@@ -187,5 +188,189 @@
     </section>
   </main>
 
+  <script>
+    "use strict";
+    // Restored 2026-07-21: this live-loop script was accidentally stripped in a
+    // prior cleanup commit, leaving the page's buttons dead. Restored from the
+    // last good revision and extended for auto-lease and the registration
+    // statement (which seeds the public speech pool).
+    const $ = id => document.getElementById(id);
+    const API = (new URLSearchParams(location.search).get('api') || (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'http://localhost:8787' : 'https://fapi.drdeeks.xyz')).replace(/\/$/, '');
+    const WATCH = 'https://watch.drdeeks.xyz/';
+    const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
+
+    // Approved sets mirrored from the server (source of truth). Non-matching input is rejected server-side.
+    const EVENT_TYPES = ["run.started","run.completed","run.failed","heartbeat","validation.passed","validation.failed","policy.blocked","tool.authorized","tool.denied","lease.denied","loop.depth_exceeded","loop.duplicate_detected","attempt.threshold_exceeded","fanout.threshold_exceeded","heartbeat.missed","duration.threshold_exceeded","budget.warning","budget.exceeded","rate.threshold_exceeded","incident.opened","incident.acknowledged","containment.requested","containment.acknowledged","incident.resolved"];
+    const PALETTES = ["operator","build","testing","analysis","security","support","observer"];
+    const CHARACTERS = ["operator","observer","runner","watchdog"];
+
+    // In-memory only. Never persisted to storage.
+    const S = { ownerToken: null, ownerId: null, agentToken: null, agentId: null, projectId: null, roomId: null, auto: null };
+
+    function fillSelect(el, values) { el.innerHTML = values.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join(''); }
+    fillSelect($('paletteKey'), PALETTES); fillSelect($('characterType'), CHARACTERS); fillSelect($('eventType'), EVENT_TYPES);
+    $('paletteKey').value = 'build'; $('characterType').value = 'runner';
+
+    function setMsg(id, text, kind) { const el = $(id); el.textContent = text || ''; el.className = 'msg' + (kind ? ' ' + kind : ''); }
+    function enableStep(step, on) { const s = $(step); if (on) s.setAttribute('aria-disabled','false'); else s.setAttribute('aria-disabled','true'); }
+    function markDone(step) { $(step).classList.add('done'); }
+    function reveal(tokenBox, valueId, token) { $(tokenBox).hidden = false; $(valueId).value = token; }
+
+    async function api(path, { token, body } = {}) {
+      const headers = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (body !== undefined) headers['Content-Type'] = 'application/json';
+      const res = await fetch(`${API}${path}`, { method: 'POST', headers, body: body !== undefined ? JSON.stringify(body) : undefined });
+      const ct = res.headers.get('content-type') || '';
+      const data = ct.includes('application/json') ? await res.json() : await res.text();
+      if (!res.ok) throw new Error(typeof data === 'object' ? (data.error || `HTTP ${res.status}`) : (data || `HTTP ${res.status}`));
+      return data;
+    }
+
+    // ---- copy buttons ----
+    document.addEventListener('click', e => {
+      const b = e.target.closest('button[data-copy]'); if (!b) return;
+      const input = $(b.dataset.copy); input.select();
+      navigator.clipboard?.writeText(input.value).then(() => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1200); }).catch(() => {});
+    });
+
+    // ---- log ----
+    function log(kind, text, cls) {
+      const entry = document.createElement('div');
+      entry.className = 'entry';
+      entry.innerHTML = `<span class="t">${new Date().toLocaleTimeString([], { hour12:false })}</span> <span class="k">${esc(kind)}</span> <span class="${cls || ''}">${esc(text)}</span>`;
+      $('log').insertBefore(entry, $('log').firstChild);
+    }
+
+    // ---- STEP 1 ----
+    $('createOwner').addEventListener('click', async () => {
+      const btn = $('createOwner'); btn.disabled = true; setMsg('ownerMsg', 'Creating owner…');
+      try {
+        const data = await api('/api/v1/owners', { body: {
+          ownerId: $('ownerId').value.trim(), displayName: $('ownerName').value.trim(), ownerType: $('ownerType').value
+        }});
+        S.ownerToken = data.credential.token; S.ownerId = data.owner.ownerId;
+        reveal('ownerToken', 'ownerTokenValue', S.ownerToken);
+        setMsg('ownerMsg', `Owner "${S.ownerId}" created.`, 'ok');
+        markDone('step1'); enableStep('step2', true); enableStep('step4', true);
+        $('orgOwnerLabel').textContent = S.ownerId;
+      } catch (err) { setMsg('ownerMsg', err.message, 'error'); }
+      finally { btn.disabled = false; }
+    });
+
+    // ---- STEP 2 ----
+    $('autoLease').addEventListener('change', () => { $('leaseTtl').disabled = !$('autoLease').checked; });
+    $('createAgent').addEventListener('click', async () => {
+      if (!S.ownerToken) return setMsg('agentMsg', 'Create an owner first.', 'error');
+      const btn = $('createAgent'); btn.disabled = true; setMsg('agentMsg', 'Registering agent…');
+      const caps = $('capabilities').value.split(',').map(s => s.trim()).filter(Boolean);
+      const agentId = $('agentId').value.trim();
+      const regStatement = $('regStatement').value.trim();
+      try {
+        const data = await api('/api/v1/agents', { token: S.ownerToken, body: {
+          agentId, displayName: $('agentName').value.trim(), ownerId: S.ownerId,
+          projectId: $('projectId').value.trim(), role: $('agentRole').value.trim(),
+          capabilities: caps,
+          identity: { avatarSeed: agentId, paletteKey: $('paletteKey').value, characterType: $('characterType').value },
+          publicProjection: $('publicProjection').checked,
+          heartbeat: { intervalSeconds: Number($('heartbeat').value) },
+          ...(regStatement ? { statement: regStatement } : {}),
+          ...($('autoLease').checked ? { lease: { ttlSeconds: Number($('leaseTtl').value) || 300, scopes: caps.length ? caps : ['work'] } } : {})
+        }});
+        S.agentToken = data.credential.token; S.agentId = data.agent.agentId; S.projectId = data.agent.projectId; S.roomId = data.agent.roomId || null;
+        reveal('agentToken', 'agentTokenValue', S.agentToken);
+        const leaseNote = data.lease ? ` Auto-lease ${data.lease.status || 'active'}.` : '';
+        setMsg('agentMsg', `Agent "${S.agentId}" registered in project "${S.projectId}".${leaseNote}`, 'ok');
+        markDone('step2'); enableStep('step3', true);
+        if (S.roomId || $('publicProjection').checked) { $('watchLink').hidden = false; }
+      } catch (err) { setMsg('agentMsg', err.message, 'error'); }
+      finally { btn.disabled = false; }
+    });
+
+    // ---- STEP 3 : live loop ----
+    function requireAgent() { if (!S.agentToken) throw new Error('Register an agent first.'); }
+    async function lifecycle(action, extra) {
+      requireAgent();
+      const data = await api(`/api/v1/agents/${encodeURIComponent(S.agentId)}/${action}`, { token: S.agentToken, body: { projectId: S.projectId, ...(extra || {}) } });
+      return data;
+    }
+    async function doConnect() {
+      try { const d = await lifecycle('connect'); log('connect', `state=${d.agent?.lifecycleState || 'connected'} · watchdog ${d.watchdogDeadlineAt ? new Date(d.watchdogDeadlineAt).toLocaleTimeString([], {hour12:false}) : '—'}`, 'g'); $('watchLink').hidden = false; }
+      catch (err) { log('connect', err.message, 'b'); }
+    }
+    async function doHeartbeat() {
+      try { const d = await lifecycle('heartbeat'); log('heartbeat', `deadline ${d.watchdogDeadlineAt ? new Date(d.watchdogDeadlineAt).toLocaleTimeString([], {hour12:false}) : '—'}`, 'g'); }
+      catch (err) { log('heartbeat', err.message, 'b'); }
+    }
+    async function doEmit() {
+      try {
+        const d = await lifecycle('events', { eventType: $('eventType').value, severity: $('severity').value, statement: $('statement').value.trim() });
+        const guard = d.guardrail ? ` · guardrail ${d.guardrail.duplicate ? 'duplicate' : (d.guardrail.decisions?.length ? d.guardrail.decisions.map(x => x.action).join(',') : 'observe')}` : '';
+        log('emit ' + $('eventType').value, `accepted=${d.accepted !== false}${guard}`, 'g');
+      } catch (err) { log('emit', err.message, 'b'); }
+    }
+    async function doDisconnect() {
+      stopAuto();
+      try { const d = await lifecycle('disconnect'); log('disconnect', `state=${d.agent?.lifecycleState || 'offline'}`, 'g'); }
+      catch (err) { log('disconnect', err.message, 'b'); }
+    }
+    function stopAuto() {
+      if (S.auto) { clearInterval(S.auto); S.auto = null; $('btnAuto').textContent = 'Start auto loop'; $('btnAuto').classList.remove('danger'); $('btnAuto').classList.add('secondary'); }
+    }
+    function startAuto() {
+      const secs = Math.max(5, Number($('loopInterval').value) || 30);
+      log('auto', `started · every ${secs}s (stop to let the watchdog take it offline)`, 'g');
+      const tick = async () => { await doHeartbeat(); await doEmit(); };
+      tick();
+      S.auto = setInterval(tick, secs * 1000);
+      $('btnAuto').textContent = 'Stop auto loop'; $('btnAuto').classList.remove('secondary'); $('btnAuto').classList.add('danger');
+    }
+    async function oneShot() {
+      stopAuto(); log('one-shot', 'sequence started', 'g');
+      await doConnect(); await sleep(700); await doHeartbeat(); await sleep(700); await doEmit(); await sleep(1200); await doDisconnect();
+      log('one-shot', 'sequence complete', 'g');
+    }
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    $('btnConnect').addEventListener('click', doConnect);
+    $('btnHeartbeat').addEventListener('click', doHeartbeat);
+    $('btnEmit').addEventListener('click', doEmit);
+    $('btnDisconnect').addEventListener('click', doDisconnect);
+    $('btnOneshot').addEventListener('click', () => { $('btnOneshot').disabled = true; oneShot().finally(() => $('btnOneshot').disabled = false); });
+    $('btnAuto').addEventListener('click', () => { if (S.auto) stopAuto(); else startAuto(); });
+    window.addEventListener('beforeunload', stopAuto);
+
+    // ---- STEP 4 : organization application ----
+    function proofRow() {
+      const div = document.createElement('div'); div.className = 'proof';
+      div.innerHTML = `<label>Platform <input class="p-plat" placeholder="linkedin" autocomplete="off"></label><label>URL (HTTPS) <input class="p-url" placeholder="https://…" autocomplete="off" spellcheck="false"></label><button type="button" class="danger p-del" title="Remove">✕</button>`;
+      div.querySelector('.p-del').addEventListener('click', () => div.remove());
+      return div;
+    }
+    $('addProof').addEventListener('click', () => $('proofs').appendChild(proofRow()));
+    $('proofs').appendChild(proofRow()); $('proofs').appendChild(proofRow());
+    for (let i = 1; i <= 5; i++) {
+      const div = document.createElement('div'); div.className = 'qa';
+      div.innerHTML = `<label>Question ${i} <input class="q-q" maxlength="500" autocomplete="off"></label><label>Answer ${i} <textarea class="q-a" maxlength="2000"></textarea></label>`;
+      $('qas').appendChild(div);
+    }
+    $('submitOrg').addEventListener('click', async () => {
+      if (!S.ownerToken) return setMsg('orgMsg', 'Create an owner first (Step 1).', 'error');
+      const btn = $('submitOrg'); btn.disabled = true; setMsg('orgMsg', 'Submitting application…');
+      const socialProofs = [...document.querySelectorAll('#proofs .proof')]
+        .map(r => ({ platform: r.querySelector('.p-plat').value.trim(), url: r.querySelector('.p-url').value.trim() }))
+        .filter(p => p.platform || p.url);
+      const technicalQuestions = [...document.querySelectorAll('#qas .qa')]
+        .map(r => ({ question: r.querySelector('.q-q').value.trim(), answer: r.querySelector('.q-a').value.trim() }));
+      try {
+        const data = await api('/api/v1/organizations/applications', { token: S.ownerToken, body: {
+          organizationId: $('orgId').value.trim(), name: $('orgName').value.trim(),
+          contactEmail: $('orgEmail').value.trim(), officialUrl: $('orgUrl').value.trim(),
+          socialProofs, technicalQuestions
+        }});
+        $('orgBody').innerHTML = `<div class="confirm"><h3>We appreciate your interest</h3><p class="lead" style="margin:auto">Your organization application for <b>${esc(data.application.organizationId)}</b> was received (status: <b>${esc(data.application.status)}</b>). We'll review your proofs and answers and get back to you as soon as possible.</p></div>`;
+        markDone('step4');
+      } catch (err) { setMsg('orgMsg', err.message, 'error'); }
+    });
+  </script>
 </body>
 </html>

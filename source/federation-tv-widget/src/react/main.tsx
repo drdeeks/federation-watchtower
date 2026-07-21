@@ -12,13 +12,14 @@ import OfficeStage from './OfficeStage';
 
   var gatewayUrl = container.getAttribute('data-gateway') || 'https://fapi.drdeeks.xyz';
   var projectId = container.getAttribute('data-project') || 'autopilot';
+  var roomId = container.getAttribute('data-room') || undefined;
 
   // OfficeStage is a React function component. It MUST be handed to React via
   // createElement so its hooks run inside the render phase — calling
   // OfficeStage() directly throws "Invalid hook call" and mounts nothing,
   // which is what previously broke the React monitor.
   var root = createRoot(container);
-  root.render(createElement(OfficeStage, { gatewayUrl: gatewayUrl, projectId: projectId }));
+  root.render(createElement(OfficeStage, { gatewayUrl: gatewayUrl, projectId: projectId, roomId: roomId }));
 
   (window as any).__federationTVRoot = root;
   // Signal to the loader that the React monitor mounted, so it does not fall

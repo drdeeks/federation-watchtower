@@ -12,8 +12,15 @@ test("accepts a bounded owner-bound canonical lifecycle manifest", () => {
   assert.deepEqual(validateLifecycleManifest(manifest()), {
     agentId: "build-01", displayName: "Build Runner", ownerId: "owner-01", projectId: "autopilot", role: "build",
     capabilities: ["build", "test"], identity: { avatarSeed: "build-01", paletteKey: "build", characterType: "runner" },
-    publicProjection: true, heartbeatSeconds: 1800, organizationId: undefined, lease: undefined,
+    publicProjection: true, heartbeatSeconds: 1800, organizationId: undefined, lease: undefined, statement: undefined,
   });
+});
+
+test("accepts and bounds an optional registration statement", () => {
+  const withStatement = { ...manifest(), statement: "  One line for the public speech pool.  " };
+  assert.equal(validateLifecycleManifest(withStatement).statement, "One line for the public speech pool.");
+  const tooLong = { ...manifest(), statement: "x".repeat(121) };
+  assert.throws(() => validateLifecycleManifest(tooLong), /statement/);
 });
 
 test("rejects secret-shaped metadata and invalid liveness intervals", () => {

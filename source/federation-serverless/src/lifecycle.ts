@@ -26,6 +26,8 @@ interface Manifest {
   identity: { avatarSeed: string; paletteKey: string; characterType: string };
   publicProjection: boolean; heartbeatSeconds: number; organizationId?: string;
   lease?: { ttlSeconds: number; scopes: string[] };
+  /** Optional registration statement (≤120 chars) — seeds the public speech pool. */
+  statement?: string;
 }
 
 export async function handleLifecycleRequest(input: {
@@ -114,6 +116,13 @@ export async function handleLifecycleRequest(input: {
     const token = issue(AGENT_PREFIX);
     await env.DB.prepare("INSERT INTO federation_agent_credentials (id, agent_id, credential_hash, scopes, issued_at) VALUES (?, ?, ?, ?, ?)")
       .bind(`agentcred-${crypto.randomUUID()}`, canonicalId, await sha256Hex(token), JSON.stringify(["agent:connect", "agent:heartbeat", "agent:emit", "agent:disconnect"]), now).run();
+    // The registration statement seeds the public speech pool — this is how
+    // the repertoire "builds over time": one statement per agent at
+    // registration, five Q&A per organization application.
+    if (manifest.statement) {
+      await env.DB.prepare("INSERT OR IGNORE INTO federation_speech_lines (federation_id, agent_id, project_id, statement, is_unique, submitted_at) VALUES (?, ?, ?, ?, 1, ?)")
+        .bind(manifest.organizationId || owner.id, canonicalId, manifest.projectId, manifest.statement, now).run();
+    }
     const registrationEventId = `register-${crypto.randomUUID()}`;
     await appendLifecycle(env, canonicalId, "agent.registered", registrationEventId, { publicProjection: manifest.publicProjection, roomId: legacy?.roomId }, now);
     if (legacy?.roomId) await projectPublicScene(env, legacy, "registered", "agent.registered", registrationEventId, now);
@@ -222,7 +231,7 @@ export function validateLifecycleManifest(value: unknown): Manifest {
     };
   }
   rejectSensitive(body.metadata);
-  return { agentId: validateAgentId(body.agentId), displayName: text(body.displayName, "displayName", 80), ownerId: validateAgentId(body.ownerId), projectId: validateProjectId(body.projectId), role: text(body.role, "role", 80), capabilities, identity: { avatarSeed: validateAgentId(identity.avatarSeed), paletteKey, characterType }, publicProjection: body.publicProjection, heartbeatSeconds, organizationId: body.organizationId === undefined ? undefined : validateAgentId(body.organizationId), lease };
+  return { agentId: validateAgentId(body.agentId), displayName: text(body.displayName, "displayName", 80), ownerId: validateAgentId(body.ownerId), projectId: validateProjectId(body.projectId), role: text(body.role, "role", 80), capabilities, identity: { avatarSeed: validateAgentId(identity.avatarSeed), paletteKey, characterType }, publicProjection: body.publicProjection, heartbeatSeconds, organizationId: body.organizationId === undefined ? undefined : validateAgentId(body.organizationId), lease, statement: body.statement === undefined ? undefined : text(body.statement, "statement", 120) };
 }
 
 export async function appendLifecycle(env: WatchtowerEnv, agentId: string, eventType: string, idempotencyKey: string | undefined, detail: Record<string, unknown>, occurredAt: number): Promise<void> {
