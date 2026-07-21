@@ -604,15 +604,17 @@
             .lowtable::after { content:""; position:absolute; left:50%; top:-6px; width:8px; height:8px; background:rgba(96,196,205,.85);
               border:2px solid #101820; border-radius:2px; transform:translateX(-50%); }
             .tv-scene::after {
-              content: "";
+              content: "FEDERATION FLOOR · WATCHTOWER OFFICE";
               position: absolute;
-              inset: 0;
-              z-index: 3;
+              left: 14px;
+              top: 12px;
+              z-index: 4;
+              padding: 2px 6px;
+              color: #f5e6bd;
+              background: rgba(23,24,24,.55);
+              font: 700 10px ui-monospace, monospace;
+              letter-spacing: .08em;
               pointer-events: none;
-              background-image: radial-gradient(rgba(245,230,189,.6) 1px, transparent 1.4px);
-              background-size: 6px 6px;
-              opacity: .05;
-              mix-blend-mode: overlay;
             }
             .tv-agent {
               position: absolute; left: var(--scene-x, 50%); top: var(--scene-y, 50%);
