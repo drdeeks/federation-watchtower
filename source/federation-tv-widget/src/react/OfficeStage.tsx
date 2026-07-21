@@ -407,7 +407,7 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
       } catch { /* transient fetch error — keep the current cast */ }
     };
     fetchRoster();
-    const timer = setInterval(fetchRoster, 15_000);
+    const timer = setInterval(fetchRoster, 8_000);
     return () => { stopped = true; clearInterval(timer); };
   }, [gatewayUrl, projectId, roomId, agentConfig]);
 
@@ -483,7 +483,7 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
       const who = ev.agent
         ? (agentsRef.current.find((a) => a.id === ev.agent)?.name ?? ev.agent)
         : "";
-      setCaptions((c) => [...c.slice(-2), { id, text, kind: ev.kind, who }]);
+      setCaptions((c) => [...c.slice(-1), { id, text, kind: ev.kind, who }]);
       setTimeout(() => setCaptions((c) => c.filter((x) => x.id !== id)), 4800);
     },
     [],
@@ -536,13 +536,20 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
 
     // Initial fetch + periodic polling
     fetchFeed();
-    const pollTimer = setInterval(fetchFeed, 8000);
+    const pollTimer = setInterval(fetchFeed, 4000);
 
     return () => {
       window.removeEventListener("office:event", handler as EventListener);
       clearInterval(pollTimer);
     };
   }, [pushEvent, gatewayUrl, projectId]);
+
+  // WatchDog patrols the floor on a slow back-and-forth walk instead of
+  // standing still — it is the always-on station mascot, so it should read
+  // as "on duty" even when idle.
+  const watchdogPhase = tick * 0.006;
+  const watchdogX = 34 + (Math.sin(watchdogPhase) * 0.5 + 0.5) * 332;
+  const watchdogFacing = Math.cos(watchdogPhase) >= 0 ? 1 : -1;
 
   return (
     <div className="stage-wrap">
@@ -718,8 +725,8 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
           )}
 
           {/* CRT scanlines + vignette */}
-          <WatchdogMascot x={36} y={244} tick={tick} />
-          {watchdogBubble && <SpeechBubble x={36} y={244 - 22} text={watchdogBubble} kind="idle" />}
+          <WatchdogMascot x={watchdogX} facing={watchdogFacing} y={244} tick={tick} />
+          {watchdogBubble && <SpeechBubble x={watchdogX} y={244 - 22} text={watchdogBubble} kind="idle" />}
           <rect x="0" y="0" width="400" height="260" fill="url(#scan)" opacity="0.14" pointerEvents="none" />
           <rect x="0" y="0" width="400" height="260" fill="url(#vignette)" pointerEvents="none" />
         </svg>
@@ -782,12 +789,13 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
         .cameo b { font:800 8px 'Courier New', monospace; color:#f4ecd8; letter-spacing:.08em; text-shadow:0 1px 0 #000; }
         .cameo span { font:700 6px 'Courier New', monospace; color:#c8b992; letter-spacing:.06em; text-transform:uppercase; text-shadow:0 1px 0 #000; }
         @keyframes cameo-cross { from { left:-18%; opacity:0; } 12% { opacity:1; } 88% { opacity:1; } to { left:104%; opacity:0; } }
-        .captions { position:absolute; left:10px; right:10px; bottom:10px; display:flex; flex-direction:column; gap:4px; }
-        .caption { background:rgba(20,10,4,0.85); border-left:3px solid #e07a3c; color:#f4ecd8;
-          padding:4px 8px; font-size:10px; line-height:1.25; border-radius:2px;
-          animation:cap-in .25s ease-out; display:flex; gap:8px; align-items:baseline; }
-        .caption-tag { color:#e07a3c; font-weight:bold; letter-spacing:0.1em; font-size:8px; white-space:nowrap; }
-        .caption-text { flex:1; }
+        .captions { position:absolute; left:0; right:0; bottom:0; display:flex; flex-direction:column; gap:2px; padding:6px 10px; }
+        .caption { background:rgba(10,6,3,0.92); border-left:3px solid #e07a3c; color:#f8f3e6;
+          padding:5px 9px; font-size:13px; line-height:1.3; border-radius:2px;
+          animation:cap-in .25s ease-out; display:flex; gap:8px; align-items:baseline;
+          white-space:nowrap; overflow:hidden; }
+        .caption-tag { color:#ffb37a; font-weight:bold; letter-spacing:0.08em; font-size:10px; white-space:nowrap; flex-shrink:0; }
+        .caption-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .caption-test { border-left-color:#c94f4f; } .caption-test .caption-tag { color:#ff8a8a; }
         .caption-heartbeat { border-left-color:#7ec8e3; } .caption-heartbeat .caption-tag { color:#7ec8e3; }
         .caption-deploy { border-left-color:#7fd18a; } .caption-deploy .caption-tag { color:#7fd18a; }
@@ -1020,30 +1028,33 @@ function SpeechBubble({
  * A small pixel dog on patrol duty by the floor's edge. It is drawn outside
  * the agents array so it can never enter the roster, feed, or any record.
  */
-function WatchdogMascot({ x, y, tick }: { x: number; y: number; tick: number }) {
+function WatchdogMascot({ x, y, tick, facing = 1 }: { x: number; y: number; tick: number; facing?: number }) {
   const wag = Math.sin(tick * 0.25) * 18;
-  const bob = Math.sin(tick * 0.06) * 0.6;
+  const bob = Math.abs(Math.sin(tick * 0.15)) * 1.4;
   return (
     <g transform={`translate(${x}, ${y - bob})`} style={{ pointerEvents: "none" }}>
-      <ellipse cx="0" cy="10" rx="10" ry="2.4" fill="#000" opacity="0.25" />
-      {/* tail (wags) */}
-      <line x1="8" y1="2" x2="12" y2="-4" stroke="#8a5a2b" strokeWidth="2.2" strokeLinecap="round" transform={`rotate(${wag} 8 2)`} />
-      {/* body */}
-      <ellipse cx="0" cy="3" rx="9" ry="6" fill="#a8743c" stroke="#3a1f0e" strokeWidth="1.2" />
-      {/* legs */}
-      <rect x="-7" y="6" width="2.6" height="4.5" rx="1" fill="#8a5a2b" />
-      <rect x="4" y="6" width="2.6" height="4.5" rx="1" fill="#8a5a2b" />
-      {/* head */}
-      <circle cx="-8" cy="-4" r="5.4" fill="#a8743c" stroke="#3a1f0e" strokeWidth="1.2" />
-      {/* ears */}
-      <polygon points="-12,-8 -9,-11 -8,-6" fill="#6b3a1e" />
-      <polygon points="-5,-9 -3,-12 -2,-6" fill="#6b3a1e" opacity="0.9" />
-      {/* snout, nose, eye */}
-      <circle cx="-11.5" cy="-3" r="2.2" fill="#c9955c" />
-      <circle cx="-13" cy="-3.4" r="0.9" fill="#1a1a1a" />
-      <circle cx="-7" cy="-5.5" r="0.8" fill="#1a1a1a" />
-      {/* collar */}
-      <rect x="-11" y="-0.5" width="6" height="1.6" rx="0.8" fill="#c94f4f" />
+      {/* Body is mirrored to face the walk direction; labels stay upright. */}
+      <g transform={`scale(${facing}, 1)`}>
+        <ellipse cx="0" cy="10" rx="10" ry="2.4" fill="#000" opacity="0.25" />
+        {/* tail (wags) */}
+        <line x1="8" y1="2" x2="12" y2="-4" stroke="#8a5a2b" strokeWidth="2.2" strokeLinecap="round" transform={`rotate(${wag} 8 2)`} />
+        {/* body */}
+        <ellipse cx="0" cy="3" rx="9" ry="6" fill="#a8743c" stroke="#3a1f0e" strokeWidth="1.2" />
+        {/* legs */}
+        <rect x="-7" y="6" width="2.6" height="4.5" rx="1" fill="#8a5a2b" />
+        <rect x="4" y="6" width="2.6" height="4.5" rx="1" fill="#8a5a2b" />
+        {/* head */}
+        <circle cx="-8" cy="-4" r="5.4" fill="#a8743c" stroke="#3a1f0e" strokeWidth="1.2" />
+        {/* ears */}
+        <polygon points="-12,-8 -9,-11 -8,-6" fill="#6b3a1e" />
+        <polygon points="-5,-9 -3,-12 -2,-6" fill="#6b3a1e" opacity="0.9" />
+        {/* snout, nose, eye */}
+        <circle cx="-11.5" cy="-3" r="2.2" fill="#c9955c" />
+        <circle cx="-13" cy="-3.4" r="0.9" fill="#1a1a1a" />
+        <circle cx="-7" cy="-5.5" r="0.8" fill="#1a1a1a" />
+        {/* collar */}
+        <rect x="-11" y="-0.5" width="6" height="1.6" rx="0.8" fill="#c94f4f" />
+      </g>
       <text x="0" y="18" textAnchor="middle" fontFamily="'Courier New', monospace" fontSize="5.4" fill="#f4ecd8" stroke="#3a1f0e" strokeWidth="0.4" paintOrder="stroke">WATCHDOG</text>
       <text x="0" y="24" textAnchor="middle" fontFamily="'Courier New', monospace" fontSize="3.4" fill="#c8b992">station mascot · presentation</text>
     </g>

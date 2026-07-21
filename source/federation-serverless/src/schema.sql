@@ -164,7 +164,11 @@ CREATE TABLE IF NOT EXISTS verified_federations (
 );
 CREATE INDEX IF NOT EXISTS idx_verified_feds_status ON verified_federations(status);
 
--- Federation speech lines (unique statements from verified federation agents)
+-- Federation speech lines: one mandatory statement per agent at registration
+-- (individual owners included, not just verified organizations) plus five
+-- Q&A per organization application. federation_id is an owner id or
+-- organization id — intentionally not FK-bound to verified_federations,
+-- since most submitters are never a verified organization.
 CREATE TABLE IF NOT EXISTS federation_speech_lines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     federation_id TEXT NOT NULL,
@@ -172,8 +176,7 @@ CREATE TABLE IF NOT EXISTS federation_speech_lines (
     project_id TEXT NOT NULL,
     statement TEXT NOT NULL UNIQUE,         -- must be globally unique
     is_unique INTEGER DEFAULT 1,            -- always 1, enforced by UNIQUE constraint
-    submitted_at INTEGER NOT NULL,
-    FOREIGN KEY (federation_id) REFERENCES verified_federations(id)
+    submitted_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_fed_speech_federation ON federation_speech_lines(federation_id);
 CREATE INDEX IF NOT EXISTS idx_fed_speech_project ON federation_speech_lines(project_id);

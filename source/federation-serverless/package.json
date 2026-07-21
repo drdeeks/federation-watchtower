@@ -14,6 +14,7 @@
     "migrate:management": "wrangler d1 execute federation-db --remote --file=src/migrations/0005_management.sql",
     "migrate:alert-sink": "wrangler d1 execute federation-db --remote --file=src/migrations/0006_alert_webhook_receipts.sql",
     "migrate:audit-chain-integrity": "wrangler d1 execute federation-db --remote --file=src/migrations/0008_audit_chain_integrity.sql",
+    "migrate:speech-lines-drop-fk": "wrangler d1 execute federation-db --remote --file=src/migrations/0009_speech_lines_drop_federation_fk.sql",
     "test": "node --experimental-strip-types --test src/*.test.ts",
     "security:socket": "socket scan create --report --no-interactive .",
     "security:socket:dry-run": "socket scan create --dry-run --no-interactive ."

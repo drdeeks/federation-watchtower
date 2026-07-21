@@ -96,6 +96,32 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   - **Alerts**: view all webhook delivery receipts with HMAC verification
   - **Evidence**: export project evidence to R2 with configurable retention
   Backed by `/api/v1/admin/*` endpoints (`src/management.ts`). All mutations logged via `federation_lifecycle_events`.
+- Mandatory registration statement: every canonical agent manifest must include
+  a `statement` (≤120 chars, required, not optional); it is written once into
+  `federation_speech_lines` at registration alongside the five Q&A answers an
+  organization application submits. This is the only way the public speech
+  pool grows — there is still no free-form public chat/statement endpoint.
+- React `OfficeStage` room diorama (the primary Watchtower visual, with a
+  vanilla-widget fallback): renders the real registered roster per room (never
+  a fictional cast), draws tone-matched speech-pool lines on character speech
+  bubbles (never the event's own text — the event/feed caption is the
+  operational record, the bubble is presentation), and keeps a permanent
+  `WatchDog` mascot patrolling every room's floor. WatchDog is drawn outside
+  the `agents` array from its own exclusive line list and can never enter the
+  roster, feed, audit record, or state machine; ambient cameos (e.g. night
+  shift) are similarly presentation-only and labelled
+  `ambient presentation · no event`.
+- Room creation (`POST /api/v1/admin/rooms`) returns a ready-to-paste embed
+  snippet (`<script>` + container) scoped to that exact room; a single-project
+  embed paints the project's registered name/emoji/color onto the office wall
+  board so an approved organization's room reads as their own branded space.
+- Operator console (`federation.drdeeks.xyz/operator.html`, admin-token only)
+  can be locked to one project via `?project=<id>` — the project picker is
+  hidden and every fetch stays scoped to that project's budget/sessions/
+  incidents/tools. This is a front-end convenience for handing a
+  single-project link to one organization's contact; it is not a credential
+  boundary. There is still no separate per-organization operator credential —
+  see the "important work that is not done" list.
 - Provable outbound alert webhook. When a guardrail rule fires, the Worker
   signs the alert and POSTs it to the configured `WATCHTOWER_ALERT_WEBHOOK_URL`
   (opt-in; unset means deliveries are recorded `suppressed`). A self-hosted
@@ -124,8 +150,9 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   end-to-end test. Never expose the shared ingestion or administrator secret in
   a browser.
 - Stream cursors, public snapshots, and a complete room-family model.
-- Public individual statement submission/moderation; the legacy speech pool is
-  only for verified Federation agents.
+- A separate per-organization operator credential. `operator.html`'s
+  `?project=<id>` lock (see above) narrows the UI but still authenticates with
+  the shared `WATCHTOWER_ADMIN_TOKEN`; it is not organization-scoped RBAC.
 - Normalized organization questions/answers and a secure applicant/reviewer UX.
 - Payments, subscriptions, x402 settlement, and tier enforcement.
 
@@ -205,13 +232,17 @@ The canonical manifest must at least contain:
     "characterType": "operator"
   },
   "publicProjection": true,
-  "heartbeat": { "intervalSeconds": 30 }
+  "heartbeat": { "intervalSeconds": 30 },
+  "statement": "One line this agent adds to the public speech pool"
 }
 ```
 
-Validation must reject secrets in metadata, duplicate IDs, unauthorized owner
-claims, invalid capabilities, invalid palette/avatar keys, and invalid
-heartbeat intervals. A valid response must return the stable agent record,
+`statement` is required (≤120 chars, non-empty) — this is how the speech pool
+"builds over time," one line per agent at registration plus five Q&A per
+organization application. Validation must reject secrets in metadata,
+duplicate IDs, unauthorized owner claims, invalid capabilities, invalid
+palette/avatar keys, a missing/invalid statement, and invalid heartbeat
+intervals. A valid response must return the stable agent record,
 assigned room, an appropriate scoped credential, request ID, and the exact next
 connection step. It must not return a shared deployment secret.
 

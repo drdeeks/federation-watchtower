@@ -6,21 +6,25 @@ const manifest = () => ({
   agentId: "build-01", displayName: "Build Runner", ownerId: "owner-01", projectId: "autopilot", role: "build",
   capabilities: ["build", "test"], identity: { avatarSeed: "build-01", paletteKey: "build", characterType: "runner" },
   publicProjection: true, heartbeat: { intervalSeconds: 1800 }, metadata: { source: "sdk" },
+  statement: "Ready to build and test on request.",
 });
 
 test("accepts a bounded owner-bound canonical lifecycle manifest", () => {
   assert.deepEqual(validateLifecycleManifest(manifest()), {
     agentId: "build-01", displayName: "Build Runner", ownerId: "owner-01", projectId: "autopilot", role: "build",
     capabilities: ["build", "test"], identity: { avatarSeed: "build-01", paletteKey: "build", characterType: "runner" },
-    publicProjection: true, heartbeatSeconds: 1800, organizationId: undefined, lease: undefined, statement: undefined,
+    publicProjection: true, heartbeatSeconds: 1800, organizationId: undefined, lease: undefined,
+    statement: "Ready to build and test on request.",
   });
 });
 
-test("accepts and bounds an optional registration statement", () => {
+test("bounds the mandatory registration statement and rejects it when missing", () => {
   const withStatement = { ...manifest(), statement: "  One line for the public speech pool.  " };
   assert.equal(validateLifecycleManifest(withStatement).statement, "One line for the public speech pool.");
   const tooLong = { ...manifest(), statement: "x".repeat(121) };
   assert.throws(() => validateLifecycleManifest(tooLong), /statement/);
+  const missing = manifest(); delete missing.statement;
+  assert.throws(() => validateLifecycleManifest(missing), /statement/);
 });
 
 test("rejects secret-shaped metadata and invalid liveness intervals", () => {
