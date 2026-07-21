@@ -743,21 +743,20 @@
       // ── Room filter population ─────────────────────────────────────────
       function populateRoomFilter() {
         if (!el.filterRoom) return;
-        var rooms = {};
-        for (var i = 0; i < state.agents.length; i++) {
-          var r = state.agents[i].roomId;
-          if (r) rooms[r] = (rooms[r] || 0) + 1;
-        }
         var current = el.filterRoom.value;
         el.filterRoom.innerHTML = '<option value="">all rooms</option>';
-        var keys = Object.keys(rooms).sort();
-        for (var j = 0; j < keys.length; j++) {
+        // Populate from all available rooms, not just ones with agents
+        for (var i = 0; i < state.rooms.length; i++) {
+          var r = state.rooms[i];
           var opt = document.createElement('option');
-          opt.value = keys[j];
-          opt.textContent = keys[j] + ' (' + rooms[keys[j]] + ')';
+          opt.value = r.roomId;
+          opt.textContent = r.roomId + ' (' + (r.usedCount || 0) + '/' + (r.capacity || 35) + ')';
           el.filterRoom.appendChild(opt);
         }
-        el.filterRoom.value = current;
+        // Restore selection if still valid
+        if (current && Array.from(el.filterRoom.options).some(function (o) { return o.value === current; })) {
+          el.filterRoom.value = current;
+        }
       }
 
       // ── Agent rendering ────────────────────────────────────────────────
