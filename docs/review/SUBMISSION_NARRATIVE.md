@@ -8,7 +8,7 @@
 
 ### What inspired you
 
-This project began with a costly and familiar failure mode. While building another hackathon project with five demos and a working scaffold, I looked away for one moment. The kanban didn't use proper mechanisms, an AI decided to take the easy way out instead of dealing with loops correctly, and **25,000 credits went up in flames** within five minutes. I was back to nothing but free models.
+I had no Qwen credits left after Hermes kept corrupting my work — nesting within nesting within nesting, duplicated chains multiplying on top of each other. I burned **25,000 credits** the moment I looked away. That's the failure that started this.
 
 But from that loss came an iteration: a TV sitcom where agents working on tasks could be seen on screen, doing really stupid stuff. When something happened, they'd have a speech bubble triggered by it:
 
@@ -19,9 +19,9 @@ The comedy is the hook. But the purpose is to **monitor what's actually happenin
 
 ### Personal context
 
-I operate on a 2013 ThinkPad with 1.87 GHz, 2 cores, 4GB RAM that can barely open a browser. Being a single father with struggles from a mistake I made over 10 years ago, constantly being shown the door in job opportunities has been very difficult. I've always been a creative person who enjoys taking things most people throw away and transforming them into something completely different — 1/1 items. I figure things out, think mechanically, and try everything I can to get myself and my daughter in a better position.
+Bro.. I have a 1.87 GHz, 2-core, 4GB RAM, 2013 ThinkPad that barely opens a web browser. I'm a single father with a past that isn't lavish, and that's made it hard to get a job — constantly being shown the door, dealing with the fallout of a mistake I made over 10 years ago. I'm very creative, I prefer truth and doing my own due diligence before asking for help or believing someone, and I like pushing boundaries: testing new systems, building things that serve a real purpose. I figure things out, think mechanically, and try everything I can to get myself and my daughter in a better position.
 
-When I started using Codex, I had five project demos that weren't quite functional. About 700 credits later, I realized the app I wanted to make wasn't going to cut it. I mentioned the Federation idea — originally a comical afterthought, a quirky agent monitoring layer for any project that wanted to join via MCP. Codex refined my concept into something possible and robust, then helped consolidate my refund into something functional and manageable.
+When I started using Codex, I had five project demos that weren't quite functional. About 700 credits later, I realized the app I wanted to make wasn't going to cut it. I mentioned the Federation idea — originally a comical afterthought, a quirky agent monitoring layer for any project that wanted to join via MCP. Codex refined my concept into something possible and robust, then helped consolidate it into something functional and manageable.
 
 After running out of credits and having to take it to Claude (which I've grown to strongly dislike), everything was built the exact way I felt it should be built: proper, robust, accurate, and solidified. All we had to do was start implementing the UI and features.
 
@@ -31,7 +31,7 @@ From burning 25,000 credits, using almost half my allocation on Codex, persisten
 
 - **Visibility is the product.** Operational truth matters more than theatrical presentation. The sitcom is the hook; the audit trail is the value.
 - **Guardrails must fire before side effects.** A denied lease, failed validation, or watchdog expiry must stop work before the next irreversible action.
-- **Additive migrations are safer than destructive changes.** All 6 D1 migrations are CREATE TABLE or ADD COLUMN — no DROP, no ALTER that breaks existing data.
+- **Additive migrations are safer than destructive changes.** Of the 9 D1 migrations, most are CREATE TABLE or ADD COLUMN; one later migration recreated a table to drop a foreign-key constraint that was rejecting valid rows, copying every row across first, so no data was lost.
 - **Scoped credentials beat shared secrets.** Owner-scoped and agent-scoped credentials (`fw_agent_...`) prevent impersonation and enable audit attribution.
 - **Resource constraints force creativity.** Building on a 2013 ThinkPad with 4GB RAM means every dependency matters. The dependency-free widget wasn't an aesthetic choice — it was necessity.
 - **Codex accelerates consolidation, not invention.** The idea was mine; Codex made it feasible, wired the surfaces, and produced the documentation. The collaboration worked because I brought a clear vision and Codex brought execution speed.
