@@ -786,7 +786,15 @@
         }
 
         var scrollY = window.scrollY;
-        el.rows.innerHTML = filtered.map(function (a) {
+        var existingRows = {};
+        for (var r = 0; r < el.rows.children.length; r++) {
+          var key = el.rows.children[r].dataset.key;
+          if (key) existingRows[key] = el.rows.children[r];
+        }
+        var html = filtered.map(function (a) {
+          var key = a.projectId + ':' + a.agentId;
+          el.rows._keyMap = el.rows._keyMap || {};
+          el.rows._keyMap[key] = a;
           var pill = agentStatusPill(a);
           var hb = a.lastHeartbeatAt ? timeAgo(a.lastHeartbeatAt) : '—';
           var actions = '';
@@ -799,7 +807,7 @@
             actions += '<button class="ghost pause-agent" data-project="' + esc(a.projectId) + '" data-agent="' + esc(a.agentId) + '">Pause</button>';
             actions += '<button class="danger revoke-agent" data-project="' + esc(a.projectId) + '" data-agent="' + esc(a.agentId) + '">Revoke</button>';
           }
-          return '<tr>' +
+          return '<tr data-key="' + esc(key) + '">' +
             '<td class="name"><b>' + esc(a.displayName) + '</b><small>' + esc(a.agentId) + '</small></td>' +
             '<td>' + esc(a.projectId) + '</td>' +
             '<td>' + esc(a.roomId || '—') + '</td>' +
@@ -808,6 +816,7 @@
             '<td class="act">' + actions + '</td>' +
             '</tr>';
         }).join('');
+        el.rows.innerHTML = html;
         window.scrollTo(0, scrollY);
       }
 
@@ -1009,21 +1018,36 @@
       }
 
       // ── Alert rendering ────────────────────────────────────────────────
-      function renderAlerts() {
+      function renderAlerts(silent) {
         if (!el.alertRows) return;
+        var existing = el.alertRows.children.length;
         if (!state.alerts.length) {
           el.alertRows.innerHTML = '<tr><td colspan="5" class="empty">No alert deliveries recorded.</td></tr>';
           return;
         }
-        el.alertRows.innerHTML = state.alerts.map(function (a) {
-          return '<tr>' +
-            '<td>' + formatDate(a.receivedAt) + '</td>' +
-            '<td>' + esc(a.projectId) + '</td>' +
-            '<td><span class="pill ' + (a.severity === 'critical' ? 'revoked' : a.severity === 'high' ? 'paused' : 'offline') + '">' + esc(a.severity || '—') + '</span></td>' +
-            '<td>' + esc(a.action) + '</td>' +
-            '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(a.statement) + '">' + esc(a.statement) + '</td>' +
-            '</tr>';
-        }).join('');
+        if (silent && existing > 0) {
+          var start = existing;
+          for (var i = start; i < state.alerts.length; i++) {
+            var a = state.alerts[i];
+            var row = document.createElement('tr');
+            row.innerHTML = '<td>' + formatDate(a.receivedAt) + '</td>' +
+              '<td>' + esc(a.projectId) + '</td>' +
+              '<td><span class="pill ' + (a.severity === 'critical' ? 'revoked' : a.severity === 'high' ? 'paused' : 'offline') + '">' + esc(a.severity || '—') + '</span></td>' +
+              '<td>' + esc(a.action) + '</td>' +
+              '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(a.statement) + '">' + esc(a.statement) + '</td>';
+            el.alertRows.insertBefore(row, el.alertRows.firstChild);
+          }
+        } else {
+          el.alertRows.innerHTML = state.alerts.map(function (a) {
+            return '<tr>' +
+              '<td>' + formatDate(a.receivedAt) + '</td>' +
+              '<td>' + esc(a.projectId) + '</td>' +
+              '<td><span class="pill ' + (a.severity === 'critical' ? 'revoked' : a.severity === 'high' ? 'paused' : 'offline') + '">' + esc(a.severity || '—') + '</span></td>' +
+              '<td>' + esc(a.action) + '</td>' +
+              '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="' + esc(a.statement) + '">' + esc(a.statement) + '</td>' +
+              '</tr>';
+          }).join('');
+        }
         if (el.alertStatus) el.alertStatus.textContent = ' (' + state.alerts.length + ' receipts)';
       }
 
