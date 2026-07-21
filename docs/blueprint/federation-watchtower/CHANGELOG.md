@@ -641,6 +641,38 @@ Rollback Ref: restore previous README structure and remove judge testing
               section, narrative sections, and webhook test script
 ```
 
+## CL-0026 — TV Widget Cleanup and Legacy Table Removal
+
+```
+Date        : 2026-07-20
+Contributor : Claude
+Modules     : [MOD-008, MOD-009, MOD-015]
+Section Tags: [[CAMERA-PROJECTION-v1], [QUALITY-v1], [DATA-ARCH-v1]]
+Files Changed: [source/federation-tv-widget/src/tv-widget.js,
+                source/federation-tv-widget/public/tv-widget.js,
+                source/federation-serverless/src/federation-coordinator.ts,
+                docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : Removed all decorative overlays from TV widget: corner text
+              "FEDERATION FLOOR · WATCHTOWER OFFICE" (tv-scene::before),
+              dot grid pattern overlay (tv-scene::after). TV widget now
+              fetches agents from all projects unconditionally (removed
+              agentCount > 0 filter that relied on federation_agents counts),
+              ensuring agents in legacy table appear regardless of canonical
+              table state. Agent filtering uses server-side status field
+              (status !== 'offline') set by watchdog on missed heartbeats,
+              no client-side timestamp math. Office scene furniture retained
+              (desks, floor, wall, cooler, plants, couch) as functional
+              positioning context for agent sprites.
+Tests Passing: source/federation-serverless: npm run types PASS; node
+               --experimental-strip-types --test src/*.test.ts 34/34;
+               packages/watchtower-sdk: npm test 8/8; node --check on both
+               tv-widget.js copies (kept identical); git diff --check clean
+Phase       : PHASE-4 visual cleanup; legacy agents table still serves
+              public API until full federation_agents migration
+Rollback Ref: restore tv-scene::before with corner text, tv-scene::after
+              with dot grid, add agentCount > 0 filter in fetchAgents()
+```
+
 ## CL-0025 — Full Admin Room and Organization Management
 
 ```
