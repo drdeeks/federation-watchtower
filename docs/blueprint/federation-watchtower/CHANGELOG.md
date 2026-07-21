@@ -976,3 +976,75 @@ Phase       : PHASE-6 — public projection is real-data end to end
 Rollback Ref: wrangler rollback to version 5260289f; revert this commit to
               restore the prior widget/page behavior
 ```
+
+## CL-0033 — Mandatory Registration Statement, FK Regression Fix, Console Repairs, WatchDog Patrol
+
+```
+Date        : 2026-07-21
+Contributor : Claude
+Modules     : [MOD-006, MOD-008, MOD-009, MOD-010, MOD-015]
+Section Tags: [[DATA-ARCH-v1], [CHOREOGRAPHY-v1], [ACCESS-v1], [QUALITY-v1]]
+Files Changed: [source/federation-serverless/src/lifecycle.ts,
+                source/federation-serverless/src/lifecycle.test.ts,
+                source/federation-serverless/src/schema.sql,
+                source/federation-serverless/src/migrations/0009_speech_lines_drop_federation_fk.sql,
+                source/federation-serverless/package.json,
+                packages/watchtower-sdk/src/index.d.ts,
+                packages/watchtower-sdk/test/index.test.js,
+                source/federation-tv-widget/public/manage.html,
+                source/federation-tv-widget/public/onboarding.html,
+                source/federation-tv-widget/public/operator.html,
+                source/federation-tv-widget/src/react/OfficeStage.tsx,
+                source/federation-tv-widget/public/react-dist/assets/office-stage.js,
+                scripts/demo-autonomous-agent.sh,
+                README.md, AGENTS.md]
+Description : The registration statement is now required, not optional,
+              matching stated product intent (every agent seeds the public
+              speech pool). This uncovered a live foreign-key regression:
+              federation_speech_lines.federation_id was FK-bound to
+              verified_federations, so once the statement insert became
+              unconditional, every individual (non-organization) owner's
+              agent registration hit a constraint violation and 500'd —
+              confirmed live against production before the fix. Migration
+              0009 rebuilds the table without the FK (all 41 existing rows
+              preserved, verified by count before/after); schema.sql
+              updated to match for fresh installs. manage.html: the
+              "+ Add room" button was hardcoded disabled with nothing ever
+              re-enabling it, so room creation was silently impossible;
+              enabled on connect. operator.html: an earlier commit had
+              deleted its entire <script> block (same root cause as the
+              onboarding.html regression fixed earlier this session),
+              leaving the console completely dead; restored, fixing a
+              latent `$('refresh')` reference to a button that no longer
+              exists in the current markup, and adding an optional
+              `?project=<id>` lock so a single-project link can be handed
+              to one organization's operator without exposing every
+              project (manage.html remains the intentional full god-view
+              admin console per AGENTS.md; operator.html is the one this
+              concern applies to). OfficeStage: the WatchDog mascot now
+              patrols the floor instead of standing still (mirrors body
+              only, not the labels, when it turns); caption/feed text
+              enlarged, single-line truncated, and capped at 2 concurrent
+              lines instead of 3 for legibility on a small embed; roster
+              and feed poll intervals tightened (15s/8s -> 8s/4s) to
+              reduce visible lag between an event firing and the diorama
+              reacting. Updated the SDK's AgentManifest type/tests,
+              demo-autonomous-agent.sh, README, and AGENTS.md's canonical
+              manifest example for the mandatory-statement contract change.
+Tests Passing: serverless tests 30/30, watchtower-sdk tests 8/8, npm run
+               types PASS, tv-widget build clean, node --check on all
+               touched widget JS, git diff --check clean; post-deploy live
+               verification: registration without statement now 400s,
+               registration with statement succeeds end to end,
+               operator.html/manage.html both 200 through the host
+               redirect, office-stage.js bundle live, full
+               demo-autonomous-agent.sh run completed all 7 phases against
+               production (registration, heartbeat, guardrail incident +
+               webhook alert, deploy block, recovery, watchdog offline
+               transition, reconnect, clean disconnect).
+Phase       : PHASE-6 — public projection is real-data end to end
+Rollback Ref: revert commit 891ff0f; re-apply migration 0009's FK if ever
+              reverting the mandatory-statement change (do not revert the
+              FK drop alone — that reintroduces the individual-owner
+              registration outage)
+```
