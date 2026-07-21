@@ -691,8 +691,9 @@ Description : Fixed admin console "internal server error" caused by missing
               auto-refresh: loadAll() now accepts silent flag — background
               15s refresh preserves scroll position, suppresses status messages
               and metric flash animations, and stops destroying/recreating the
-              embedded FederationTV widget every cycle. Agent table data
-              updates in-place without DOM thrashing.
+              embedded FederationTV widget every cycle. Alert feed now streams
+              new events by appending rows instead of rebuilding the table.
+              Agent table preserves scroll position on data updates.
 Tests Passing: source/federation-serverless: npm run types PASS; node
                --experimental-strip-types --test src/*.test.ts 34/34;
                packages/watchtower-sdk: npm test 8/8; node --check on both

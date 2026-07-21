@@ -677,6 +677,7 @@
         renderAgents();
         updateMetrics(data.summary || {}, silent);
         populateRoomFilter();
+        if (!silent) updateTV();
       }
 
       async function loadRooms(silent) {
