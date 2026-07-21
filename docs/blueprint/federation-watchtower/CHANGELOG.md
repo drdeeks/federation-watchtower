@@ -673,6 +673,35 @@ Rollback Ref: restore tv-scene::before with corner text, tv-scene::after
               with dot grid, add agentCount > 0 filter in fetchAgents()
 ```
 
+## CL-0027 — Admin Console Silent Auto-Refresh and Production Fixes
+
+```
+Date        : 2026-07-21
+Contributor : Claude
+Modules     : [MOD-002, MOD-011, MOD-015]
+Section Tags: [[ADMIN-MGMT-v1], [QUALITY-v1], [DATA-ARCH-v1]]
+Files Changed: [source/federation-serverless/src/management.ts,
+                source/federation-tv-widget/public/manage.html,
+                source/federation-tv-widget/src/tv-widget.js,
+                source/federation-tv-widget/public/tv-widget.js,
+                docs/blueprint/federation-watchtower/CHANGELOG.md]
+Description : Fixed admin console "internal server error" caused by missing
+              organization_id column in federation_organizations table. Added
+              column via remote D1 migration, backfilled existing rows. Fixed
+              auto-refresh: loadAll() now accepts silent flag — background
+              15s refresh preserves scroll position, suppresses status messages
+              and metric flash animations, and stops destroying/recreating the
+              embedded FederationTV widget every cycle. Agent table data
+              updates in-place without DOM thrashing.
+Tests Passing: source/federation-serverless: npm run types PASS; node
+               --experimental-strip-types --test src/*.test.ts 34/34;
+               packages/watchtower-sdk: npm test 8/8; node --check on both
+               tv-widget.js copies (kept identical); git diff --check clean
+Phase       : PHASE-6 admin console production-ready
+Rollback Ref: remove organization_id column, restore loadAll() DOM rebuild
+              pattern, re-enable updateTV() in loadAgents()
+```
+
 ## CL-0025 — Full Admin Room and Organization Management
 
 ```
