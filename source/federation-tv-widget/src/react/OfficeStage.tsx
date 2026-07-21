@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
  * OfficeStage — embeddable retro-cartoon office scene.
  * Agents wander between stations (desk, cooler, coffee, whiteboard, printer),
  * do activities (type, drink, scribble, panic), and react to tool-call events
- * with speech bubbles + lower-third captions.
+ * with speech bubbles. The monitor only ever shows character sprites and
+ * their speech bubbles — the operational feed/event log lives in the page's
+ * own feed panel underneath the widget, never duplicated on-screen here.
  *
  * Feed events: window.__officeStage?.push({kind, agent?, text?})
  * or:          window.dispatchEvent(new CustomEvent('office:event', { detail }))
@@ -14,9 +16,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export type StageEvent = {
   agent?: string;
   /**
-   * Super-statement-packet visibility: when false the event still captions on
-   * the monitor (it is in the public feed) but must NOT pop a chat bubble or
-   * animate the character (visibility.publicBubble === false).
+   * Super-statement-packet visibility: when false the event is still recorded
+   * in the public feed (elsewhere on the page) but must NOT pop a chat bubble
+   * or animate the character on the monitor (visibility.publicBubble === false).
    */
   bubble?: boolean;
   kind:
@@ -235,8 +237,6 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
   const agentsRef = useRef<Agent[]>([]);
   const seenEventsRef = useRef<Set<string>>(new Set());
   const hydratedRef = useRef(false);
-  const [captions, setCaptions] = useState<Array<{ id: number; text: string; kind: StageEvent["kind"]; who: string }>>([]);
-  const captionId = useRef(0);
   const [tick, setTick] = useState(0);
 
   useEffect(() => { agentsRef.current = agents; }, [agents]);
@@ -385,13 +385,13 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
     const fetchRoster = async () => {
       try {
         if (projectId === "all") {
-          const res = await fetch(`${gatewayUrl}/api/projects`);
+          const res = await fetch(`${gatewayUrl}/api/projects`, { cache: "no-store" });
           if (!res.ok) return;
           const data = await res.json();
           const projects = Array.isArray(data) ? data : (data.projects || []);
           const groups = await Promise.all(projects.map(async (p: { projectId: string }) => {
             try {
-              const r = await fetch(`${gatewayUrl}/api/projects/${encodeURIComponent(p.projectId)}/agents`);
+              const r = await fetch(`${gatewayUrl}/api/projects/${encodeURIComponent(p.projectId)}/agents`, { cache: "no-store" });
               if (!r.ok) return [];
               const d = await r.json();
               return (d.agents || []).map(toEntry);
@@ -399,7 +399,7 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
           }));
           if (!stopped) reconcile(groups.flat());
         } else {
-          const res = await fetch(`${gatewayUrl}/api/projects/${encodeURIComponent(projectId)}/agents`);
+          const res = await fetch(`${gatewayUrl}/api/projects/${encodeURIComponent(projectId)}/agents`, { cache: "no-store" });
           if (!res.ok) return;
           const data = await res.json();
           if (!stopped) reconcile((data.agents || []).map(toEntry));
@@ -478,13 +478,6 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
           };
         });
       });
-      const id = ++captionId.current;
-      const text = ev.text ?? pick(QUIPS[ev.kind]);
-      const who = ev.agent
-        ? (agentsRef.current.find((a) => a.id === ev.agent)?.name ?? ev.agent)
-        : "";
-      setCaptions((c) => [...c.slice(-1), { id, text, kind: ev.kind, who }]);
-      setTimeout(() => setCaptions((c) => c.filter((x) => x.id !== id)), 4800);
     },
     [],
   );
@@ -743,15 +736,6 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
         )}
         <div className="chrome-top"><span className="rec-dot" /> LIVE · OFFICE CAM</div>
         <div className="chrome-tr">CH-04 · 4:20 PM</div>
-
-        <div className="captions">
-          {captions.map((c) => (
-            <div key={c.id} className={`caption caption-${c.kind.split(".")[0]}`}>
-              <span className="caption-tag">{c.kind.replace(".", " · ").toUpperCase()}</span>
-              <span className="caption-text">{c.text}</span>
-            </div>
-          ))}
-        </div>
       </div>
 
       <style>{`
@@ -789,19 +773,6 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
         .cameo b { font:800 8px 'Courier New', monospace; color:#f4ecd8; letter-spacing:.08em; text-shadow:0 1px 0 #000; }
         .cameo span { font:700 6px 'Courier New', monospace; color:#c8b992; letter-spacing:.06em; text-transform:uppercase; text-shadow:0 1px 0 #000; }
         @keyframes cameo-cross { from { left:-18%; opacity:0; } 12% { opacity:1; } 88% { opacity:1; } to { left:104%; opacity:0; } }
-        .captions { position:absolute; left:0; right:0; bottom:0; display:flex; flex-direction:column; gap:2px; padding:6px 10px; }
-        .caption { background:rgba(10,6,3,0.92); border-left:3px solid #e07a3c; color:#f8f3e6;
-          padding:5px 9px; font-size:13px; line-height:1.3; border-radius:2px;
-          animation:cap-in .25s ease-out; display:flex; gap:8px; align-items:baseline;
-          white-space:nowrap; overflow:hidden; }
-        .caption-tag { color:#ffb37a; font-weight:bold; letter-spacing:0.08em; font-size:10px; white-space:nowrap; flex-shrink:0; }
-        .caption-text { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .caption-test { border-left-color:#c94f4f; } .caption-test .caption-tag { color:#ff8a8a; }
-        .caption-heartbeat { border-left-color:#7ec8e3; } .caption-heartbeat .caption-tag { color:#7ec8e3; }
-        .caption-deploy { border-left-color:#7fd18a; } .caption-deploy .caption-tag { color:#7fd18a; }
-        .caption-boiler { border-left-color:#ffdd55; background:rgba(120,20,0,0.9); }
-        .caption-boiler .caption-tag { color:#ffdd55; }
-        @keyframes cap-in { from { opacity:0; transform:translateY(6px); } }
       `}</style>
     </div>
   );
@@ -987,7 +958,7 @@ function SpeechBubble({
   const words = text.split(" ");
   const lines: string[] = [];
   let line = "";
-  const maxChars = 22;
+  const maxChars = 15;
   for (const w of words) {
     if ((line + " " + w).trim().length > maxChars) {
       lines.push(line.trim());
@@ -995,24 +966,27 @@ function SpeechBubble({
     } else line += " " + w;
   }
   if (line.trim()) lines.push(line.trim());
-  const w = Math.max(60, Math.min(140, Math.max(...lines.map((l) => l.length)) * 3.4 + 10));
-  const h = lines.length * 7 + 8;
+  // This bubble is the only text the monitor itself shows — the operational
+  // feed lives in the page's feed panel, not on the diorama — so it is sized
+  // to actually be read, not squeezed to fit like a decorative prop label.
+  const w = Math.max(70, Math.min(180, Math.max(...lines.map((l) => l.length)) * 5.2 + 14));
+  const h = lines.length * 11 + 10;
   const bx = Math.max(4, Math.min(400 - w - 4, x - w / 2));
   return (
     <g transform={`translate(${bx}, ${y - h})`} style={{ pointerEvents: "none" }}>
-      <rect x="0" y="0" width={w} height={h} rx="4" ry="4" fill={bg} stroke="#1a1a1a" strokeWidth="1" />
+      <rect x="0" y="0" width={w} height={h} rx="5" ry="5" fill={bg} stroke="#1a1a1a" strokeWidth="1.4" />
       <polygon
-        points={`${x - bx - 4},${h} ${x - bx + 4},${h} ${x - bx},${h + 5}`}
-        fill={bg} stroke="#1a1a1a" strokeWidth="1"
+        points={`${x - bx - 5},${h} ${x - bx + 5},${h} ${x - bx},${h + 6}`}
+        fill={bg} stroke="#1a1a1a" strokeWidth="1.4"
       />
       {lines.map((l, i) => (
         <text
           key={i}
           x={w / 2}
-          y={9 + i * 7}
+          y={13 + i * 11}
           textAnchor="middle"
           fontFamily="'Courier New', monospace"
-          fontSize="5.4"
+          fontSize="8.5"
           fontWeight={alarm ? "bold" : "normal"}
           fill={fg}
         >
