@@ -521,10 +521,19 @@
     </form>
   </dialog>
 
-  <script src="/tv-widget.js"></script>
   <script>
     (function () {
       'use strict';
+
+      // Stub FederationTV for live floor view (optional, not critical for admin)
+      if (!window.FederationTV) {
+        window.FederationTV = function (opts) {
+          return {
+            stop: function () {},
+            setRoom: function () {}
+          };
+        };
+      }
 
       // ── State ──────────────────────────────────────────────────────────
       var state = {

@@ -24,28 +24,20 @@
     <div id="federation-tv"></div>
     <div class="status" id="status">Connecting to Federation API…</div>
   </main>
-  <script src="/tv-widget.js"></script>
-  <script>
-    const tv = new FederationTV({
-      projectId: 'autopilot',
-      container: '#federation-tv',
-      gatewayUrl: 'https://fapi.drdeeks.xyz',
-      refreshInterval: 1000,
-      maxPolls: 120,
-      randomSpeech: false,
-      speechInterval: 0
-    });
-    window.tv = tv;
-    let statusTicks = 0;
-    const updateStatus = () => {
-      document.getElementById('status').textContent =
-        `federation API · ${tv.agents.size} agents · ${tv.eventFeed.length} feed events · ${tv.activeBubbles.size} active bubbles`;
-      if (++statusTicks < 120) setTimeout(updateStatus, 500);
-    };
-    updateStatus();
+   <script src="/tv-widget.js" data-gateway="https://fapi.drdeeks.xyz" data-project="autopilot"></script>
+   <script>
+     // The React OfficeStage component is loaded via tv-widget.js
+     // This script just updates the status display
+     let statusTicks = 0;
+     const updateStatus = () => {
+       document.getElementById('status').textContent =
+         'Federation Watchtower · React OfficeStage loaded';
+       if (++statusTicks < 1) setTimeout(updateStatus, 500);
+     };
+     updateStatus();
 
-    // This public demo is read-only. Agents submit events through the API or MCP
-    // integration; the page renders those events as they arrive.
-  </script>
+     // This public demo is read-only. Agents submit events through the API or MCP
+     // integration; the page renders those events as they arrive.
+   </script>
 </body>
 </html>

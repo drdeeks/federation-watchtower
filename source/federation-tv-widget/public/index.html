@@ -365,7 +365,9 @@
           <span id="camera-state">Read-only public projection</span>
         </div>
         <div class="camera-stage">
-          <div id="federation-tv"></div>
+          <div id="federation-tv">
+            <div id="office-stage-root"></div>
+          </div>
         </div>
       </section>
 
@@ -503,7 +505,9 @@
       safeText('agent-capabilities',Array.isArray(agent.capabilities) && agent.capabilities.length ? agent.capabilities.join(', ') : 'None published');
       safeText('agent-id',agent.agentId); renderHistory(agent); agentDialog.showModal();
     }
-    const tv = new FederationTV({ projectId:'all', roomId:'all', container:'#federation-tv', gatewayUrl:gateway, refreshInterval:12000, randomSpeech:false, presentationMode:'camera', onAgentSelect:openAgent, onAgentsUpdate:renderAgents, onFeedUpdate:items => { feed=items; renderFeed(); }});
+    // TV widget is loaded via tv-widget.js script tag
+    // FederationTV stub is provided by tv-widget.js for backward compatibility
+    var tv = window.FederationTV ? new window.FederationTV({ projectId:'all', roomId:'all', container:'#federation-tv', gatewayUrl:gateway, refreshInterval:12000, randomSpeech:false, presentationMode:'camera', onAgentSelect:openAgent, onAgentsUpdate:renderAgents, onFeedUpdate:items => { feed=items; renderFeed(); }}) : null;
     $('close-agent').addEventListener('click',()=>agentDialog.close());
     $('agent-picker').addEventListener('change',event=>{ const agent=agents.find(item=>item.agentId===event.target.value); if(agent) openAgent(agent); event.target.value=''; });
     document.querySelector('.tabs').addEventListener('click',event=>{ const button=event.target.closest('.tab'); if (!button) return; activeFilter=button.dataset.filter; document.querySelectorAll('.tab').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button))); renderFeed(); });
@@ -513,7 +517,7 @@
       if (!entry) return;
       $('camera-title').textContent = entry.label;
       $('camera-state').textContent = entry.roomId === 'all' ? 'Read-only public projection' : `${entry.used || 0}/${entry.capacity || 35} slots visible`;
-      tv.setRoom(entry.roomId, entry.projectId);
+      if (tv) tv.setRoom(entry.roomId, entry.projectId);
       if (el.roomPills) {
         el.roomPills.querySelectorAll('.room-pill').forEach(pill => {
           pill.classList.toggle('active', pill.dataset.key === key);
