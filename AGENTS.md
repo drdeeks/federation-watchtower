@@ -366,3 +366,41 @@ and `federation_agents`):
   chain, seed representative rows in every inbound-FK child table, and confirm
   the migration succeeds and the CHECK actually rejects invalid values before
   running it against the real database.
+
+### Next steps (handoff — do not re-derive, read this first)
+
+Open threads left in-flight; pick up here instead of re-investigating from
+scratch.
+
+1. **Org approve/suspend fix — code done, migration proven, NOT deployed.**
+   `management.ts` now writes the canonical `'approved'`/`'suspended'` enum
+   values (was writing `mcp_organizations` vocabulary `'active'`). Migration
+   `src/migrations/0010_organizations_widen_status.sql` widens the CHECK and
+   is fully verified against the free `federation-db-staging` fork (id
+   `929f8ef0-daf9-4e43-b88e-daf226df24ae`, account `Drdeeks` `04c92088…`) —
+   not yet run against production. Next: get explicit go-ahead, then run
+   `npm run migrate:organizations-widen-status` (remote) and deploy. Decide
+   the staging fork's fate afterward — keep as a standing de-risking target
+   for future migrations, expand into a full `[env.staging]`, or
+   `wrangler d1 delete federation-db-staging`.
+2. **`fix/rooms-agents-migrations` branch is blocked, not lost.** In the MAIN
+   worktree (`/home/drdeek/projects/federation`, not this one), that branch
+   has uncommitted `room-scene.ts` / `room-scene-model.ts` /
+   `room-scene.test.ts` work plus a competing, softer `management.ts`
+   room-delete edit. Confirmed via git forensics: nothing here was ever
+   pushed or stashed — a real push around 2026-07-21 16:07 (`09e20ef`) was
+   docs-only (`README.md` + `SUBMISSION_NARRATIVE.md`); the room-scene edits
+   were made ~4 hours later (~20:07) and never committed anywhere. Before
+   cherry-picking `63acb8e` (the eviction-based room-delete already merged)
+   onto this branch, the user needs to either commit/save the uncommitted
+   room-scene work or discard it, and drop the competing `management.ts`
+   room-delete hunk in favor of `63acb8e`'s approach.
+3. **Org-management cascade behavior is unbuilt.** Pause should pause an
+   org's agents; delete should evict agents to HQ and remove rooms while
+   preserving records. Separate from the CHECK-constraint fix above — not
+   started.
+4. **`.claude/` + root `CLAUDE.md` git-history cleanup is paused.** 145
+   `.claude/` files and root `CLAUDE.md` are on public `origin/main` (a
+   Devpost hackathon repo) from an old force-add commit. User emailed the
+   hackathon manager for permission to do a history rewrite; do nothing to
+   remote/history until that approval is confirmed.
