@@ -92,7 +92,17 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   only): full god-view control over agents, rooms, and organizations.
   - **Agents**: list/filter/search, pause/resume/revoke any agent in any project
   - **Rooms**: create new rooms for organizations, delete empty demo/test rooms
-  - **Organizations**: review applications (5 Q&A + social proofs), approve/reject/suspend
+  - **Organizations**: review applications (5 Q&A + social proofs), approve/reject/suspend.
+    Approve/suspend were broken in production until migration 0010 (see
+    "Validation before handoff") widens `federation_organizations.status`'s
+    CHECK constraint — `reject` worked by coincidence, but the original code
+    wrote the `mcp_organizations` vocabulary (`active`/`suspended`) into a
+    column whose 0004 CHECK only allowed `draft/submitted/approved/rejected`,
+    so every approve/suspend call threw a CHECK constraint violation. Do not
+    describe organization approve/suspend as working until migration 0010 has
+    actually run against `federation-db` — confirm via `wrangler d1 execute
+    federation-db --remote --command "SELECT sql FROM sqlite_master WHERE
+    name='federation_organizations'"` before relying on it.
   - **Alerts**: view all webhook delivery receipts with HMAC verification
   - **Evidence**: export project evidence to R2 with configurable retention
   Backed by `/api/v1/admin/*` endpoints (`src/management.ts`). All mutations logged via `federation_lifecycle_events`.
@@ -319,3 +329,40 @@ the installed Wrangler version. Do not cite it as passing validation.
 For a production change, add targeted route/contract tests, run the required
 remote migration only with an approved rollback plan, validate public domains,
 and record the release evidence. Do not deploy merely because local tests pass.
+
+### D1 migration gotcha: recreating a table with inbound foreign keys
+
+SQLite cannot widen/narrow a `CHECK` constraint or drop a column constraint in
+place — the standard recreate pattern is `CREATE new → INSERT SELECT old →
+DROP old → RENAME new`, used by migrations 0009 and 0010. That pattern is
+safe when nothing else references the table (0009). It is **not** automatically
+safe when other tables hold a `FOREIGN KEY` into the table being rebuilt
+(0010's `federation_organizations`, referenced by
+`federation_organization_social_proofs`, `federation_organization_questions`,
+and `federation_agents`):
+
+- D1 runs each `wrangler d1 execute --file` as a single transaction with
+  foreign keys enforced (matching `PRAGMA foreign_keys = on`).
+- `DROP TABLE` on a referenced parent orphans the child rows for the duration
+  of the transaction. SQLite's deferred-FK violation *counter* is incremented
+  by that drop and is **not** decremented by the subsequent rename, so
+  `PRAGMA defer_foreign_keys = true` does not save you — the `COMMIT` still
+  fails with `FOREIGN KEY constraint failed`, even though `PRAGMA
+  foreign_key_check` reports no violations and the final data is fully
+  consistent. This was verified against a real remote D1 database, not just a
+  local SQLite shim — the naive recreate reproducibly failed and rolled back
+  cleanly on D1 with exactly that error.
+- The working fix (see 0010): detach every child from the parent *before* the
+  rebuild — null out nullable child foreign keys (e.g. `federation_agents
+  .organization_id`) into a scratch table, and stash+clear NOT-NULL child rows
+  into scratch tables — then rebuild the parent, then reinsert/restore the
+  children from scratch, then drop the scratch tables. Verify locally with
+  `PRAGMA foreign_keys = ON` and the whole file wrapped in one
+  `BEGIN; ...; COMMIT;`, matching D1's execution model, before ever running
+  `--remote`.
+- Prefer proving a risky migration against a disposable forked D1 database
+  (`wrangler d1 create <name>-staging`, free on the Workers Free plan — 10 D1
+  databases / 5 GB included) rather than production. Load the same migration
+  chain, seed representative rows in every inbound-FK child table, and confirm
+  the migration succeeds and the CHECK actually rejects invalid values before
+  running it against the real database.
