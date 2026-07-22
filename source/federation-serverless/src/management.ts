@@ -78,20 +78,19 @@ export async function handleManagementRequest(input: {
       return json({ agent: { agentId, projectId, paused: false }, requestId: crypto.randomUUID() });
     }
 
-    // pause + revoke both stop the agent and drop it from the public scene.
-    await watchdog.disconnect({ projectId, agentId });
-    const publicAgent = await registry.setAgentStatus(agentId, "offline");
     if (op === "pause") {
+      // Pause is reversible: stop the agent and drop it from the public scene,
+      // but keep its scene row so resume can restore it to its room.
+      await watchdog.disconnect({ projectId, agentId });
+      const publicAgent = await registry.setAgentStatus(agentId, "offline");
       await env.DB.prepare("UPDATE federation_agents SET paused_at = ?, lifecycle_state = CASE WHEN lifecycle_state = 'connected' THEN 'offline' ELSE lifecycle_state END, updated_at = ? WHERE id = ?").bind(now, now, canonicalId).run();
       await appendLifecycle(env, canonicalId, "agent.paused", `mgmt-pause-${now}`, { by: "admin" }, now);
       if (publicAgent) await projectPublicScene(env, publicAgent, "offline", "agent.paused", `mgmt-pause-${now}`, now);
       return json({ agent: { agentId, projectId, paused: true, pausedAt: now }, requestId: crypto.randomUUID() });
     }
-    // revoke
-    await env.DB.prepare("UPDATE federation_agents SET lifecycle_state = 'revoked', disconnected_at = ?, updated_at = ? WHERE id = ?").bind(now, now, canonicalId).run();
-    await env.DB.prepare("UPDATE federation_agent_credentials SET revoked_at = ? WHERE agent_id = ? AND revoked_at IS NULL").bind(now, canonicalId).run();
-    await appendLifecycle(env, canonicalId, "agent.revoked", `mgmt-revoke-${now}`, { by: "admin" }, now);
-    if (publicAgent) await projectPublicScene(env, publicAgent, "offline", "agent.revoked", `mgmt-revoke-${now}`, now);
+    // revoke — hard removal: kill credentials, mark revoked, project an offline
+    // exit, and evict the agent from the live scene so it leaves its room.
+    await hardRevokeAgent(env, projectId, agentId, "admin-revoke", now);
     return json({ agent: { agentId, projectId, lifecycleState: "revoked" }, requestId: crypto.randomUUID() });
   }
 
@@ -150,17 +149,33 @@ export async function handleManagementRequest(input: {
     return json({ room: { roomId, projectId, roomIndex, capacity, createdAt: now }, embed, requestId: crypto.randomUUID() }, 201);
   }
 
-  // Delete a room (only if empty)
+  // Delete a room. It always succeeds — occupants are never blocked, never
+  // revoked, and never lose data. Each agent still inside is evicted to the
+  // first available room in its project (our always-on HQ once the test rooms
+  // are gone); credentials and all records are preserved for audit. Killing an
+  // agent's credentials is the separate, explicit revoke action. The WatchDog is
+  // presentation-only and never a scene row, so it is ignored here.
   const roomDelete = path.match(/^\/api\/v1\/admin\/rooms\/([^/]+)$/);
   if (roomDelete && method === "DELETE") {
     const roomId = validateAgentId(decodeURIComponent(roomDelete[1]));
     const room = await env.DB.prepare("SELECT id, project_id FROM rooms WHERE id = ?").bind(roomId).first<{ id: string; project_id: string }>();
     if (!room) return json({ error: "room not found" }, 404);
-    const agentCount = await env.DB.prepare("SELECT COUNT(*) as cnt FROM agents WHERE room_id = ?").bind(roomId).first<{ cnt: number }>();
-    if ((agentCount?.cnt ?? 0) > 0) return json({ error: "room must be empty before deletion", agentCount: agentCount?.cnt }, 409);
+    const now = Date.now();
+    const registry = env.AGENT_REGISTRY.get(env.AGENT_REGISTRY.idFromName(`${room.project_id}-registry`)) as DurableObjectStub<AgentRegistry>;
+    // Read occupants, then delete the room so it is no longer an eviction target,
+    // then relocate each occupant to the first remaining room in the lineup.
+    const occupants = await env.DB.prepare("SELECT agent_id FROM agents WHERE room_id = ?").bind(roomId).all<{ agent_id: string }>();
     await env.DB.prepare("DELETE FROM rooms WHERE id = ?").bind(roomId).run();
-    await appendLifecycle(env, `room:${roomId}`, "room.deleted", `mgmt-room-delete-${Date.now()}`, { projectId: room.project_id }, Date.now());
-    return json({ deleted: true, roomId }, 200);
+    const evicted: Array<{ agentId: string; roomId: string }> = [];
+    for (const occupant of occupants.results || []) {
+      const moved = await registry.reassignToNextRoom(occupant.agent_id);
+      if (!moved?.roomId) continue;
+      // Keep the canonical record's room in sync (no-op for legacy-only agents).
+      await env.DB.prepare("UPDATE federation_agents SET room_id = ?, updated_at = ? WHERE id = ?").bind(moved.roomId, now, `${room.project_id}:${occupant.agent_id}`).run();
+      evicted.push({ agentId: occupant.agent_id, roomId: moved.roomId });
+    }
+    await appendLifecycle(env, `room:${roomId}`, "room.deleted", `mgmt-room-delete-${now}`, { projectId: room.project_id, evicted: evicted.map(e => e.agentId) }, now);
+    return json({ deleted: true, roomId, evicted }, 200);
   }
 
   // ==================== ORGANIZATION MANAGEMENT ====================
@@ -215,6 +230,31 @@ export async function handleManagementRequest(input: {
   }
 
   return null;
+}
+
+// Force-revoke a single agent and evict it from the live scene. Stops the
+// watchdog, marks the canonical record revoked and kills its credentials — but
+// only when a canonical record exists, since legacy signed-producer agents live
+// only in the scene table and federation_lifecycle_events.agent_id is FK-bound
+// to federation_agents. Projects an offline exit, then removes the scene row so
+// the agent truly leaves its room and frees the slot. Lifecycle evidence is
+// preserved. Shared by the admin revoke action and cascading room deletion.
+async function hardRevokeAgent(env: WatchtowerEnv, projectId: string, agentId: string, reason: string, now: number): Promise<void> {
+  const canonicalId = `${projectId}:${agentId}`;
+  const registry = env.AGENT_REGISTRY.get(env.AGENT_REGISTRY.idFromName(`${projectId}-registry`)) as DurableObjectStub<AgentRegistry>;
+  const watchdog = env.AGENT_WATCHDOG.get(env.AGENT_WATCHDOG.idFromName(`${projectId}:${agentId}`)) as DurableObjectStub<AgentWatchdog>;
+  await watchdog.disconnect({ projectId, agentId });
+  const publicAgent = await registry.setAgentStatus(agentId, "offline");
+  const canonical = await env.DB.prepare("SELECT id FROM federation_agents WHERE id = ?").bind(canonicalId).first<{ id: string }>();
+  if (canonical) {
+    const key = `mgmt-revoke-${now}-${agentId}`;
+    await env.DB.prepare("UPDATE federation_agents SET lifecycle_state = 'revoked', room_id = NULL, disconnected_at = ?, updated_at = ? WHERE id = ?").bind(now, now, canonicalId).run();
+    await env.DB.prepare("UPDATE federation_agent_credentials SET revoked_at = ? WHERE agent_id = ? AND revoked_at IS NULL").bind(now, canonicalId).run();
+    await appendLifecycle(env, canonicalId, "agent.revoked", key, { by: "admin", reason }, now);
+    if (publicAgent) await projectPublicScene(env, publicAgent, "offline", "agent.revoked", key, now);
+  }
+  // Remove from the live scene/room table so the room empties and the slot frees.
+  await registry.unregisterAgent(agentId);
 }
 
 interface AgentRow {
