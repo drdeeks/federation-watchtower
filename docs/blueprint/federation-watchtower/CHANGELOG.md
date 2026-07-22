@@ -913,6 +913,74 @@ Rollback Ref: wrangler rollback to the previous deployment version (or
               from CL-0030 is independent and stays
 ```
 
+## CL-0034 — Organization Approve/Suspend CHECK Fix, D1 Rebuild Gotcha Documented
+
+```
+Date        : 2026-07-22
+Contributor : Claude
+Modules     : [MOD-011, MOD-015]
+Section Tags: [[ORG-VERIFY-v1], [DATA-ARCH-v1], [QUALITY-v1]]
+Files Changed: [source/federation-serverless/src/management.ts,
+                source/federation-serverless/src/migrations/0010_organizations_widen_status.sql,
+                source/federation-serverless/package.json,
+                AGENTS.md, README.md]
+Description : management.ts's admin organization approve/reject/suspend
+              route wrote the mcp_organizations vocabulary ('active',
+              'suspended') into federation_organizations.status, whose 0004
+              CHECK only permits ('draft','submitted','approved','rejected').
+              approve and suspend both threw a CHECK constraint violation in
+              production; reject worked only by coincidence ('rejected' is
+              in the enum). Fixed by (a) approve now writes 'approved', the
+              existing canonical value, and (b) migration 0010 recreates the
+              table with the CHECK widened to add 'suspended', a genuine
+              post-approval admin action distinct from the application-review
+              states. A naive DROP+RENAME recreate of federation_organizations
+              fails on real D1 with "FOREIGN KEY constraint failed" — the
+              table has three inbound foreign keys
+              (federation_organization_social_proofs,
+              federation_organization_questions, federation_agents) and D1
+              runs each migration file as one transaction with foreign keys
+              enforced; SQLite's deferred-FK violation counter is incremented
+              by the DROP's implicit child-row orphaning and is not
+              decremented by the rename, so PRAGMA defer_foreign_keys does
+              not prevent the COMMIT failure even though foreign_key_check
+              reports no violations. This was reproduced and confirmed against
+              a real, disposable, non-production D1 fork
+              (federation-db-staging, database id
+              929f8ef0-daf9-4e43-b88e-daf226df24ae, created under the same
+              Cloudflare account, free-tier — 10 D1 databases/5 GB included)
+              before it could reach production federation-db: the full
+              schema chain (schema.sql, 0001-0009) was loaded into the fork,
+              representative rows were seeded in federation_organizations
+              and all three inbound-FK child tables, the naive migration was
+              applied and observed to fail and cleanly auto-rollback, then
+              the corrected migration (detach every child before the
+              rebuild, rebuild the table, reattach the children) was applied
+              and verified: data and child references preserved,
+              'suspended' accepted, an invalid status value still rejected
+              by the widened CHECK, no scratch tables left behind. AGENTS.md
+              gained a "D1 migration gotcha" subsection under "Validation
+              before handoff" so a future table recreate with inbound
+              foreign keys does not repeat this failure mode; README.md's
+              "Deliberate current boundaries" section now states this fix is
+              proven but not yet deployed, and links the live Slack alert
+              destination for the global Watchtower alert webhook.
+Tests Passing: source/federation-serverless npm run types PASS; npm test
+               30/30; migration 0010 applied and verified against the
+               federation-db-staging fork (17 queries executed, data and
+               inbound FK references preserved, widened CHECK accepts
+               'suspended' and rejects an invalid value)
+Phase       : PHASE-6 — fix validated on a disposable D1 fork, NOT yet
+              applied to production federation-db and NOT yet deployed
+Rollback Ref: git revert commit 323d320 on branch
+              worktree-bridge-cse_011McsXiCUReHKCuBhtdfYQc (uncommitted to
+              main, not pushed); the federation-db-staging fork used to
+              validate this migration is disposable — wrangler d1 delete
+              federation-db-staging removes it and touches nothing in
+              production; production federation-db was never modified by
+              this change
+```
+
 ## CL-0032 — Real-Data React Stage, Pool-Driven Bubbles, Feed Integrity
 
 ```
