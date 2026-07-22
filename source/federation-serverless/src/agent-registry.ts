@@ -148,6 +148,25 @@ export class AgentRegistry extends DurableObject<WatchtowerEnv> {
     await this.emitFeedEvent({ ...event, projectId: this.projectId });
   }
 
+  // Move an agent to the first available room in this project (the one with the
+  // lowest room_index that has capacity), creating a default room if none remain.
+  // Used when a room is deleted: occupants are evicted, never destroyed, and land
+  // in the first room in the lineup — the always-on HQ once test rooms are gone.
+  // Credentials and all records are untouched. Serialized like registration so
+  // the check-then-act on room capacity cannot race.
+  async reassignToNextRoom(agentId: string): Promise<Agent | null> {
+    return this.ctx.blockConcurrencyWhile(() => this.reassignToNextRoomLocked(agentId));
+  }
+
+  private async reassignToNextRoomLocked(agentId: string): Promise<Agent | null> {
+    const existing = await this.getAgent(agentId);
+    if (!existing) return null;
+    const roomId = await this.assignToRoom();
+    const moved = await this.updateAgent(agentId, { roomId });
+    await this.emitFeedEvent({ projectId: this.projectId, eventType: 'agentEvicted', agentId, message: `Agent ${existing.name} relocated to ${roomId}`, priority: 'normal', metadata: { agentId, fromRoomId: existing.roomId, toRoomId: roomId } });
+    return moved;
+  }
+
   async unregisterAgent(agentId: string): Promise<boolean> {
     const id = `${this.projectId}:${agentId}`;
     const agent = await this.getAgent(agentId);
