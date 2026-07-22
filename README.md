@@ -304,6 +304,12 @@ Watchtower is not represented as more complete than it is. The following are now
 - Canonical manifests plus owner → credential → connect → heartbeat/event → disconnect flows with watchdog expiry.
 - Organization applications with five technical Q&A and two non-GitHub social proofs (reviewer UI and role controls are not implemented).
 - Room lifecycle management beyond the current single-room projection.
+- Organization approve/suspend in the admin console: fixed locally and validated
+  against a real (forked, non-production) D1 database, but not yet applied to
+  production `federation-db` — migration `0010` and the `management.ts` fix
+  must both ship before this is live. See `AGENTS.md`'s "Validation before
+  handoff" section for the underlying D1 recreate-with-inbound-foreign-keys
+  gotcha this migration had to work around.
 
 ## How to try it
 
@@ -402,6 +408,14 @@ WATCHTOWER_ALERT_WEBHOOK_SECRET=your-test-secret
 - Creating duplicate chain keys
 
 **4. Check the admin console** at [manage.html](https://federation.drdeeks.xyz/manage.html) for alert receipts
+
+**Global Watchtower alert channel:** production guardrail alerts (runaway/duplicate
+chains, budget thresholds, heartbeat-missed incidents) are also delivered to the
+Slack destination configured via `WATCHTOWER_ALERT_WEBHOOK_URL` /
+`WATCHTOWER_ALERT_WEBHOOK_FORMAT=slack`:
+[the drdeeks Slack workspace's alert channel](https://drdeeks.slack.com/archives/C0BHYPAMT4P).
+Delivery is opt-in — if no webhook URL is configured, alerts are recorded
+`suppressed` in `alert_webhook_receipts` and nothing is sent externally.
 
 ## Architecture
 
