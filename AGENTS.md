@@ -173,8 +173,58 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
 - A separate per-organization operator credential. `operator.html`'s
   `?project=<id>` lock (see above) narrows the UI but still authenticates with
   the shared `WATCHTOWER_ADMIN_TOKEN`; it is not organization-scoped RBAC.
+  **Owner's explicit directive (2026-08-13): organizations must never share
+  the platform admin key.** This is not optional polish — it's the
+  prerequisite for the next two items to work correctly, since neither
+  branding nor webhook attribution can be scoped to "this org" without a
+  real, distinct identity for that org to hold.
 - Normalized organization questions/answers and a secure applicant/reviewer UX.
 - Payments, subscriptions, x402 settlement, and tier enforcement.
+- **Organization branding (logo + color), gated on approval status.**
+  `projects.color`/`projects.emoji` columns already exist in the schema and
+  are already read by `getAllRooms()` for room display, but the only writer
+  (`lifecycle.ts`'s canonical registration) hardcodes `color: "#4fd1c5",
+  emoji: "📡"` for every project unconditionally — no field exists anywhere
+  to customize it. A `logo` concept doesn't exist in the schema at all
+  (only the single emoji character). Owner's directive: an organization
+  gets **no** customization by default — only after being accepted/approved
+  should it have the opportunity to upload a logo and choose a color scheme
+  for its room. Needs: a logo field/upload path (no image storage wired to
+  `federation_organizations` today, though `federation-vault` R2 bucket
+  exists for evidence exports and could plausibly serve this), a real color
+  picker somewhere in the org's own flow (not admin-only), and an
+  approval-status gate in front of both.
+- **Per-organization and per-agent designated webhook destinations.**
+  Today's alert webhook is global and singular
+  (`WATCHTOWER_ALERT_WEBHOOK_URL`/`WATCHTOWER_ALERT_WEBHOOK_FORMAT`, one
+  destination for the whole platform — see `alert-webhook.ts` and
+  `docs/review/COMPLETE_SPEC.md` §4). Owner wants each organization AND
+  each individual agent to have its own webhook, so notifications are
+  correctly attributed to the actual recipient instead of all funneling
+  through one shared destination. Depends on the real per-org/per-agent
+  identity item above — attribution is only meaningful once there's a real
+  distinct identity to attribute to.
+- **Watch page's "On camera" counter needs a companion global-total stat,
+  not a replacement.** `index.html`'s `agent-count` (labeled "On camera")
+  is deliberately scoped to whichever room is currently selected — a
+  code comment there explains this was a fix for a real prior bug (a
+  global count next to a single-room diorama produced "nonsense like '15
+  agents live' next to a 3-agent room"). Do not revert that. Owner wants a
+  genuinely separate, clearly-labeled total showing every currently
+  active/registered agent platform-wide, displayed alongside the existing
+  room-scoped count. `GET /api/status` → `FederationCoordinator.getSystemStatus()`
+  already computes a real global total (`SELECT COUNT(*) FROM
+  federation_agents WHERE lifecycle_state != 'revoked'`) — it's just not
+  wired into any page's UI yet. This is additive, not a fix to the existing
+  counter.
+- **Character Kit ⇄ Watchtower adapter (`~/projects/hackathon/canonical/adapter/`)
+  needs review and finalization to become genuinely functional**, not just
+  scaffolded. Per that adapter's own README (last checked 2026-08-13):
+  12/12 unit tests pass and `tsc --noEmit` is clean, but `character-kit.ts`
+  is an explicit boundary stub that throws "unavailable" by design — no live
+  Character Kit socket connection, no live delivery to any real Watchtower
+  instance has ever been exercised. Not yet reviewed in this repo's context;
+  do that review before attempting to wire it up for real.
 
 Do not describe any item in this second list as live or complete.
 
