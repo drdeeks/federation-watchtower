@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { WatchtowerEnv } from "./agent-registry";
-import { emptyScene, projectAmbientBeat, projectSceneEvent, type RoomSceneSnapshot, type SceneProjectionInput } from "./room-scene-model";
+import { emptyScene, projectAmbientBeat, projectSceneEvent, pruneOfflineAgents, type RoomSceneSnapshot, type SceneProjectionInput } from "./room-scene-model";
 
 /**
  * The authoritative presentation coordinator for one public Watchtower room.
@@ -21,8 +21,12 @@ export class RoomScene extends DurableObject<WatchtowerEnv> {
 
   async alarm(): Promise<void> {
     const scene = await this.load(this.ctx.id.name);
-    if (!projectAmbientBeat(scene)) return;
-    await this.save(scene);
+    // Clear out agents that have finished their exit walk, then (if anyone is
+    // left) run an ambient beat. Pruning must happen even when no agent is
+    // active, or a room of only-offline agents would freeze forever.
+    const pruned = pruneOfflineAgents(scene, Date.now());
+    const beat = projectAmbientBeat(scene) !== null;
+    if (pruned || beat) await this.save(scene);
     await this.schedule(scene);
   }
 
@@ -35,8 +39,10 @@ export class RoomScene extends DurableObject<WatchtowerEnv> {
   }
 
   private async schedule(scene: RoomSceneSnapshot): Promise<void> {
-    const active = scene.agents.some(agent => agent.lifecycleState !== "offline");
-    if (!active) { await this.ctx.storage.deleteAlarm(); return; }
+    // Keep the alarm running while ANY agent remains — active agents drive the
+    // ambient beat, and lingering offline agents still need a pass to be pruned.
+    // Only stop once the room is genuinely empty.
+    if (scene.agents.length === 0) { await this.ctx.storage.deleteAlarm(); return; }
     const jitter = hash(`${scene.roomId}:${scene.sequence}`) % 30_000;
     await this.ctx.storage.setAlarm(Date.now() + 45_000 + jitter);
   }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { projectAmbientBeat, projectSceneEvent, type RoomSceneSnapshot } from "./room-scene-model.ts";
+import { OFFLINE_EXIT_GRACE_MS, projectAmbientBeat, projectSceneEvent, pruneOfflineAgents, type RoomSceneSnapshot } from "./room-scene-model.ts";
 
 function empty(): RoomSceneSnapshot {
   return { roomId: "watchtower:room-0", sequence: 0, generatedAt: 0, agents: [], events: [] };

@@ -43,7 +43,29 @@ export function projectSceneEvent(scene: RoomSceneSnapshot, input: SceneProjecti
   const occurredAt = input.occurredAt || Date.now(); const index = scene.agents.findIndex(agent => agent.agentId === input.agentId); const previous = index >= 0 ? scene.agents[index] : undefined; const nextPresentation = presentation(input, previous); const destination = placement(targetZone(nextPresentation.operationalAction), `${input.agentId}:${input.eventType}:${scene.sequence}`, scene.agents.filter(agent => agent.agentId !== input.agentId));
   const next: SceneAgent = { agentId: input.agentId, displayName: input.displayName, role: input.role || "agent", paletteKey: input.paletteKey || "operator", lifecycleState: nextPresentation.lifecycleState, operationalAction: nextPresentation.operationalAction, position: previous?.position || placement("entry", input.agentId, scene.agents), destination, animation: nextPresentation.animation, presentation: nextPresentation.presentation, updatedAt: occurredAt };
   if (index >= 0) scene.agents[index] = next; else scene.agents.push(next);
+  // Drop any *other* agent that has been offline past the exit grace, so a
+  // freshly active room never keeps rendering a dead cast around the newcomer.
+  pruneOfflineAgents(scene, occurredAt, input.agentId);
   record(scene, { eventId: input.sourceEventId || `scene-${input.agentId}-${occurredAt}`, agentId: input.agentId, origin: nextPresentation.presentation.origin, eventType: input.eventType, label: nextPresentation.presentation.label, occurredAt }); return scene;
+}
+// How long an offline agent lingers (its "exit" walk) before it is removed from
+// the scene entirely. The room alarm fires on roughly this cadence, so an
+// offline agent plays its exit and is gone by the following beat.
+export const OFFLINE_EXIT_GRACE_MS = 45_000;
+/**
+ * Remove agents that went offline longer than the exit grace ago. Offline
+ * agents are kept briefly so the widget can animate their walk to the exit,
+ * then dropped so they never freeze on screen. Returns true if anything was
+ * removed. `exceptAgentId` protects an agent just touched this tick (its exit
+ * animation should still play).
+ */
+export function pruneOfflineAgents(scene: RoomSceneSnapshot, now = Date.now(), exceptAgentId?: string): boolean {
+  const before = scene.agents.length;
+  scene.agents = scene.agents.filter(agent =>
+    agent.agentId === exceptAgentId ||
+    agent.lifecycleState !== "offline" ||
+    now - agent.updatedAt < OFFLINE_EXIT_GRACE_MS);
+  return scene.agents.length !== before;
 }
 export function projectAmbientBeat(scene: RoomSceneSnapshot, occurredAt = Date.now()): RoomSceneSnapshot | null {
   const candidates = scene.agents.filter(agent => agent.lifecycleState !== "offline" && agent.operationalAction !== "alerting"); if (candidates.length === 0) return null;
