@@ -156,8 +156,11 @@ export async function handleManagementRequest(input: {
     const roomId = validateAgentId(decodeURIComponent(roomDelete[1]));
     const room = await env.DB.prepare("SELECT id, project_id FROM rooms WHERE id = ?").bind(roomId).first<{ id: string; project_id: string }>();
     if (!room) return json({ error: "room not found" }, 404);
-    const agentCount = await env.DB.prepare("SELECT COUNT(*) as cnt FROM agents WHERE room_id = ?").bind(roomId).first<{ cnt: number }>();
-    if ((agentCount?.cnt ?? 0) > 0) return json({ error: "room must be empty before deletion", agentCount: agentCount?.cnt }, 409);
+    // Only *live* agents block deletion. Offline agents keep their room_id for
+    // audit but should never wedge a room shut — they are detached on delete.
+    const agentCount = await env.DB.prepare("SELECT COUNT(*) as cnt FROM agents WHERE room_id = ? AND status != 'offline'").bind(roomId).first<{ cnt: number }>();
+    if ((agentCount?.cnt ?? 0) > 0) return json({ error: "room has active agents; move or disconnect them before deletion", agentCount: agentCount?.cnt }, 409);
+    await env.DB.prepare("UPDATE agents SET room_id = NULL WHERE room_id = ?").bind(roomId).run();
     await env.DB.prepare("DELETE FROM rooms WHERE id = ?").bind(roomId).run();
     await appendLifecycle(env, `room:${roomId}`, "room.deleted", `mgmt-room-delete-${Date.now()}`, { projectId: room.project_id }, Date.now());
     return json({ deleted: true, roomId }, 200);
