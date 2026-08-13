@@ -20,7 +20,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PORT = 41207;
-const VAULT_PATH = '/home/ubuntu/qwen-cloud-2026/memory';
+const VAULT_PATH = process.env.FEDERATION_VAULT_PATH || join(__dirname, '.vault');
 const DAILY_PATH = join(VAULT_PATH, 'daily');
 const ENTITIES_PATH = join(VAULT_PATH, 'entities');
 const TEMPLATES_PATH = join(VAULT_PATH, 'templates');
@@ -39,22 +39,23 @@ const MEMORY_PATH = join(VAULT_PATH, 'MEMORY.md');
 import { AgentRegistry } from '../shared/agent-registry.js';
 import { PluginManager, AvatarPlugin, RoomPlugin, FederationPlugin, HealthPlugin, TVRoomPlugin } from '../shared/agent-plugins.js';
 
-// Project configurations
-const PROJECTS = {
-  autopilot: { name: 'Autopilot', track: 'Track 4: Autopilot Agent', color: '#22c55e', emoji: '⚙️', prefix: 'AP' },
-  aires: { name: 'Aires', track: 'Track 2: AI Showrunner', color: '#a855f7', emoji: '🎬', prefix: 'AI' },
-  mnemosyne: { name: 'Mnemosyne', track: 'Track 1: MemoryAgent', color: '#3b82f6', emoji: '🧠', prefix: 'MN' },
-  agora: { name: 'Agora', track: 'Track 3: Agent Society', color: '#f59e0b', emoji: '🏛️', prefix: 'AG' },
-  edgewalker: { name: 'Edgewalker', track: 'Track 5: EdgeAgent', color: '#ef4444', emoji: '⚡', prefix: 'EW' }
-};
+// No fixed project roster: any well-formed projectId is valid, and its
+// registry is created on first real use (first agent registration), not
+// pre-seeded at boot. This is a harness — it ships no agents of its own.
+function isValidProjectId(id) {
+  return typeof id === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/i.test(id);
+}
 
-// Global registries per project
+// Global registries per project, created lazily
 const projectRegistries = new Map();
 const pluginManagers = new Map();
+const registryInitPromises = new Map(); // projectId -> in-flight init Promise, avoids double-init races
 
-// Initialize all project registries
-async function initializeProjectRegistries() {
-  for (const [projectId, config] of Object.entries(PROJECTS)) {
+async function getOrCreateRegistry(projectId) {
+  if (projectRegistries.has(projectId)) return projectRegistries.get(projectId);
+  if (registryInitPromises.has(projectId)) return registryInitPromises.get(projectId);
+
+  const initPromise = (async () => {
     const registry = new AgentRegistry({
       federationUrl: `http://localhost:${PORT}`,
       projectId,
@@ -71,8 +72,12 @@ async function initializeProjectRegistries() {
     projectRegistries.set(projectId, registry);
     pluginManagers.set(projectId, pluginManager);
 
-    console.log(`✅ ${config.name} registry initialized (${registry.agents.size} agents, ${registry.rooms.length} rooms)`);
-  }
+    console.log(`✅ project '${projectId}' registry initialized (${registry.agents.size} agents, ${registry.rooms.length} rooms)`);
+    return registry;
+  })();
+
+  registryInitPromises.set(projectId, initPromise);
+  return initPromise;
 }
 
 // ============================================================================
@@ -652,7 +657,7 @@ async function handleRequest(req, res) {
       uptime: process.uptime(),
       agents: totalAgents,
       rooms: totalRooms,
-      projects: PROJECTS
+      projects: Array.from(projectRegistries.keys())
     }));
     return;
   }
@@ -663,13 +668,14 @@ async function handleRequest(req, res) {
     return;
   }
 
-  // Blueprints
+  // Projects currently registered (no fixed roster — reports whatever has
+  // actually registered at least one agent since this server started)
   if (pathname === '/api/blueprints' && method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
-      projects: Object.entries(PROJECTS).map(([id, config]) => ({
-        id, ...config, version: '1.0'
+      projects: Array.from(projectRegistries.entries()).map(([id, r]) => ({
+        id, agentCount: r.agents.size, roomCount: r.rooms.length
       })),
       timestamp: new Date().toISOString()
     }));
@@ -689,18 +695,13 @@ async function handleRequest(req, res) {
         const data = JSON.parse(body);
         const { agentId, projectId, ...agentData } = data;
 
-        if (!projectId || !PROJECTS[projectId]) {
+        if (!projectId || !isValidProjectId(projectId)) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'Invalid projectId' }));
           return;
         }
 
-        const registry = projectRegistries.get(projectId);
-        if (!registry) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: 'Registry not initialized' }));
-          return;
-        }
+        const registry = await getOrCreateRegistry(projectId);
 
         const agent = await registry.registerAgent({ ...agentData, agentId, projectId });
 
@@ -722,7 +723,7 @@ async function handleRequest(req, res) {
     const agentId = pathname.split('/')[3];
     const projectId = query.projectId;
 
-    if (!projectId || !PROJECTS[projectId]) {
+    if (!projectId || !isValidProjectId(projectId)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: 'projectId required' }));
       return;
@@ -746,7 +747,7 @@ async function handleRequest(req, res) {
   if (pathname === '/api/agents' && method === 'GET') {
     const projectId = query.projectId;
 
-    if (projectId && PROJECTS[projectId]) {
+    if (projectId && isValidProjectId(projectId)) {
       const registry = projectRegistries.get(projectId);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, agents: registry.getAllAgents(), timestamp: new Date().toISOString() }));
@@ -772,13 +773,18 @@ async function handleRequest(req, res) {
         const projectId = query.projectId;
         const data = JSON.parse(body);
 
-        if (!projectId || !PROJECTS[projectId]) {
+        if (!projectId || !isValidProjectId(projectId)) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'projectId required' }));
           return;
         }
 
         const registry = projectRegistries.get(projectId);
+        if (!registry) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'project not found' }));
+          return;
+        }
         const agent = await registry.updateAgent(agentId, data);
 
         broadcastToProject(projectId, { type: 'agentUpdated', agent });
@@ -798,13 +804,18 @@ async function handleRequest(req, res) {
     const agentId = pathname.split('/')[3];
     const projectId = query.projectId;
 
-    if (!projectId || !PROJECTS[projectId]) {
+    if (!projectId || !isValidProjectId(projectId)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: 'projectId required' }));
       return;
     }
 
     const registry = projectRegistries.get(projectId);
+    if (!registry) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'project not found' }));
+      return;
+    }
     await registry.removeAgent(agentId);
 
     broadcastToProject(projectId, { type: 'agentRemoved', agentId });
@@ -818,7 +829,7 @@ async function handleRequest(req, res) {
   if (pathname === '/api/rooms' && method === 'GET') {
     const projectId = query.projectId;
 
-    if (projectId && PROJECTS[projectId]) {
+    if (projectId && isValidProjectId(projectId)) {
       const registry = projectRegistries.get(projectId);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, rooms: registry.getRooms(), timestamp: new Date().toISOString() }));
@@ -838,14 +849,14 @@ async function handleRequest(req, res) {
     const roomId = pathname.split('/')[3];
     const projectId = query.projectId;
 
-    if (!projectId || !PROJECTS[projectId]) {
+    if (!projectId || !isValidProjectId(projectId)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: 'projectId required' }));
       return;
     }
 
     const registry = projectRegistries.get(projectId);
-    const room = registry.rooms.find(r => r.id === roomId);
+    const room = registry?.rooms.find(r => r.id === roomId);
 
     if (!room) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -868,13 +879,13 @@ async function handleRequest(req, res) {
         const data = JSON.parse(body);
         const { agentId, projectId, role } = data;
 
-        if (!agentId || !projectId || !PROJECTS[projectId]) {
+        if (!agentId || !projectId || !isValidProjectId(projectId)) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'agentId and valid projectId required' }));
           return;
         }
 
-        const registry = projectRegistries.get(projectId);
+        const registry = await getOrCreateRegistry(projectId);
         const agent = await registry.registerAgent({ agentId, projectId, role });
 
         broadcastToProject(projectId, { type: 'agentRegistered', agent, rooms: registry.getRooms() });
@@ -1131,8 +1142,8 @@ server.on('upgrade', (req, socket, head) => {
 
 // Start
 async function startServer() {
-  await initializeProjectRegistries();
-
+  // No fixed roster to pre-initialize — project registries spin up lazily
+  // on first agent registration (see getOrCreateRegistry above).
   server.listen(PORT, () => {
     console.log('\n╔══════════════════════════════════════════════════════════════════════╗');
     console.log('║  🤖 AGENT FEDERATION SERVER - PRODUCTION GRADE                      ║');

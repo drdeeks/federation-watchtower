@@ -10,7 +10,7 @@
  * tv-widget.js. This file remains a minimal drop-in for the diorama alone.
  *
  * Usage:
- *   <script src="/office-stage.js" data-gateway="https://fapi.drdeeks.xyz" data-project="autopilot"></script>
+ *   <script src="/office-stage.js" data-gateway="https://fapi.drdeeks.xyz" data-project="default"></script>
  *   <div id="federation-tv"></div>
  */
 (function () {
@@ -18,7 +18,7 @@
   if (!script) return;
 
   var gatewayUrl = script.getAttribute('data-gateway') || 'https://fapi.drdeeks.xyz';
-  var projectId = script.getAttribute('data-project') || 'autopilot';
+  var projectId = script.getAttribute('data-project') || 'default';
   var containerSel = script.getAttribute('data-container') || '#federation-tv';
 
   var container = document.querySelector(containerSel);

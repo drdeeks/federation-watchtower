@@ -13,7 +13,7 @@
  * live. Presentation is ambient; the callbacks carry the real operational data.
  *
  * Usage:
- *   <script src="/tv-widget.js" data-gateway="https://fapi.drdeeks.xyz" data-project="autopilot"></script>
+ *   <script src="/tv-widget.js" data-gateway="https://fapi.drdeeks.xyz" data-project="default"></script>
  *   <div id="federation-tv"></div>
  * or:
  *   new FederationTV({ projectId, container, gatewayUrl, onAgentsUpdate, onFeedUpdate, onAgentSelect })
@@ -290,7 +290,7 @@
     var container = document.querySelector('#federation-tv');
     if (!container) return;
     var gatewayUrl = (LOADER_SCRIPT && LOADER_SCRIPT.getAttribute('data-gateway')) || DEFAULT_GATEWAY;
-    var projectId = (LOADER_SCRIPT && LOADER_SCRIPT.getAttribute('data-project')) || 'autopilot';
+    var projectId = (LOADER_SCRIPT && LOADER_SCRIPT.getAttribute('data-project')) || 'default';
     var roomId = (LOADER_SCRIPT && LOADER_SCRIPT.getAttribute('data-room')) || 'all';
     var containerSel = (LOADER_SCRIPT && LOADER_SCRIPT.getAttribute('data-container')) || '#federation-tv';
     new FederationTV({ gatewayUrl: gatewayUrl, projectId: projectId, roomId: roomId, container: containerSel });

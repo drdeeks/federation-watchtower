@@ -158,7 +158,14 @@ export async function handleManagementRequest(input: {
   const roomDelete = path.match(/^\/api\/v1\/admin\/rooms\/([^/]+)$/);
   if (roomDelete && method === "DELETE") {
     const roomId = validateAgentId(decodeURIComponent(roomDelete[1]));
-    const room = await env.DB.prepare("SELECT id, project_id FROM rooms WHERE id = ?").bind(roomId).first<{ id: string; project_id: string }>();
+    // room_index 0 is Watchtower HQ: the permanent default room every project
+    // gets on first registry init (AgentRegistry.initialize), and where
+    // self-registering agents and evicted occupants land by construction
+    // (assignToRoom always prefers the lowest room_index with capacity).
+    // No code-level block on deleting it -- this whole route is already
+    // gated by requireAdmin()/WATCHTOWER_ADMIN_TOKEN, which only the platform
+    // owner holds; organizations never reach this endpoint at all.
+    const room = await env.DB.prepare("SELECT id, project_id, room_index FROM rooms WHERE id = ?").bind(roomId).first<{ id: string; project_id: string; room_index: number }>();
     if (!room) return json({ error: "room not found" }, 404);
     const now = Date.now();
     const registry = env.AGENT_REGISTRY.get(env.AGENT_REGISTRY.idFromName(`${room.project_id}-registry`)) as DurableObjectStub<AgentRegistry>;

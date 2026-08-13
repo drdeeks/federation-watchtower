@@ -62,9 +62,9 @@ federation-tv-package/
                                         │  reads/writes
                                         ▼
                          ┌─────────────────────────────┐
-   Agents (any org)   →  │   Agent Registry (in memory) │  ← 5 projects × rooms
-                         │   projects: mnemosyne, agora,│
-                         │   aires, autopilot, edgewalker│
+   Agents (any org)   →  │   Agent Registry (in memory) │  ← projects × rooms,
+                         │   no fixed roster — any       │    created lazily on
+                         │   projectId spins one up      │    first registration
                          └─────────────────────────────┘
 
    TV Command Center (8081) is a 4th client: static HTML that calls the same
@@ -85,7 +85,9 @@ web UI are stateless clients — if you kill either, the data is untouched.
    avatar, assigns the agent to a room (35/room, auto-overflow), and broadcasts
    the event over WebSocket.
 2. **Serves agent state** — `GET /api/agents` returns
-   `{agents: {projectId: [...]}}` for all 5 projects.
+   `{agents: {projectId: [...]}}` for every project that has ever registered
+   an agent (nothing pre-declared; a project with no agents just isn't in
+   the response).
 3. **Manages rooms** — `GET /api/rooms` returns room assignments per project.
 4. **Streams live events** — `ws://host:41207/ws?projectId=<id|all>` pushes
    `agentRegistered`, `agentUpdated`, `heartbeat`, `roomChanged` messages.
@@ -95,7 +97,7 @@ web UI are stateless clients — if you kill either, the data is untouched.
    health-monitoring, tv-room-integration (from `shared/agent-plugins.js`).
 
 Projects are **namespaced by `projectId`**. An agent in `acme-corp` never sees
-or affects agents in `mnemosyne`. This is the mechanism that makes multi-org
+or affects agents in `other-org`. This is the mechanism that makes multi-org
 tenancy free.
 
 ---
@@ -106,7 +108,10 @@ tenancy free.
 # 1. Federation gateway
 cd federation-core
 npm install                 # pulls express, ws, etc.
-./start-federation.sh       # starts on :41207, waits for health, seeds 20 agents
+./start-federation.sh       # starts on :41207, waits for health -- no agents
+                             # seeded; this is a harness, register real or
+                             # test agents via POST /api/agents/register once
+                             # it's up (see step below)
 
 # 2. TV Command Center (optional web UI)
 cd ../tv-command-center
@@ -121,8 +126,11 @@ python3 scripts/tv_mcp_server.py --federation http://localhost:41207
 
 Verify:
 ```bash
-curl http://localhost:41207/health      # {status: healthy, agents: 20, ...}
-curl http://localhost:41207/api/agents  # 20 agents across 5 projects
+curl http://localhost:41207/health      # {status: healthy, agents: 0, ...} -- empty until something registers
+curl -X POST http://localhost:41207/api/agents/register \
+  -H 'Content-Type: application/json' \
+  -d '{"projectId":"test","agentId":"test-agent-1","name":"Test Agent","role":"tester","capabilities":["testing"]}'
+curl http://localhost:41207/api/agents  # now shows the one agent you just registered
 ```
 
 ---
@@ -131,7 +139,7 @@ curl http://localhost:41207/api/agents  # 20 agents across 5 projects
 
 | Concept | Key | Notes |
 |---------|-----|-------|
-| **Project** | `mnemosyne`, `agora`, `aires`, `autopilot`, `edgewalker` | Hardcoded in `server.js` `PROJECTS`. Add your own here. |
+| **Project** | any string matching `^[a-z0-9][a-z0-9-]{0,63}$` | No fixed roster — a project springs into existence the moment its first agent registers (`getOrCreateRegistry` in `server.js`). |
 | **Agent** | `{agentId, name, role, projectId, capabilities, status, roomId, avatar}` | Registered via API. |
 | **Room** | `{id, projectId, agents[], capacity:35}` | Auto-created per project; overflow rooms as needed. |
 | **Feed event** | `{timestamp, event_type, agent_id, project, message, priority}` | Emitted on register/update/heartbeat. |

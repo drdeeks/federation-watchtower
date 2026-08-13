@@ -81,7 +81,7 @@ Every agent lifecycle request includes `projectId` in its JSON body and uses
 
 ```json
 {
-  "projectId": "autopilot",
+  "projectId": "your-project-id",
   "eventType": "run.started",
   "severity": "info",
   "statement": "Starting the bounded build run.",

@@ -520,7 +520,7 @@
     // the React bundle fails to load or render.
     // No default project/room here: the widget mounts once loadSystem() has
     // resolved a real room (see switchRoom/loadSystem below), never to 'all'.
-    var tv = window.FederationTV ? new window.FederationTV({ projectId:'autopilot', roomId:undefined, container:'#federation-tv', gatewayUrl:gateway, refreshInterval:12000, randomSpeech:false, presentationMode:'camera', onAgentSelect:openAgent, onAgentsUpdate:renderAgents, onFeedUpdate:items => { feed=items; renderFeed(); }}) : null;
+    var tv = window.FederationTV ? new window.FederationTV({ projectId:'default', roomId:undefined, container:'#federation-tv', gatewayUrl:gateway, refreshInterval:12000, randomSpeech:false, presentationMode:'camera', onAgentSelect:openAgent, onAgentsUpdate:renderAgents, onFeedUpdate:items => { feed=items; renderFeed(); }}) : null;
     $('close-agent').addEventListener('click',()=>agentDialog.close());
     $('agent-picker').addEventListener('change',event=>{ const agent=agents.find(item=>item.agentId===event.target.value); if(agent) openAgent(agent); event.target.value=''; });
     document.querySelector('.tabs').addEventListener('click',event=>{ const button=event.target.closest('.tab'); if (!button) return; activeFilter=button.dataset.filter; document.querySelectorAll('.tab').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button))); renderFeed(); });
@@ -549,16 +549,16 @@
         // No "All rooms" choice: it summed agent counts across every project
         // while the on-screen diorama only ever showed one room, producing
         // nonsense like "15 agents live" next to a 3-agent room. Every option
-        // here is a single, real room; the picker defaults to one of them
-        // (preferring the `autopilot` project) rather than an aggregate view.
+        // here is a single, real room; the picker defaults to the first one
+        // in the list (whatever the gateway returns first), no project
+        // preferred over another.
         let firstKey = null;
-        let preferredKey = null;
 
         for (const room of rooms) {
-          const label = `${room.project_emoji || '◉'} ${room.project_name || room.project_id} · Room ${(room.room_index || 0) + 1}`;
+          const roomLabel = room.room_index === 0 ? 'Watchtower HQ' : `Room ${(room.room_index || 0) + 1}`;
+          const label = `${room.project_emoji || '◉'} ${room.project_name || room.project_id} · ${roomLabel}`;
           const key = `${room.project_id}:${room.id}`;
           if (!firstKey) firstKey = key;
-          if (!preferredKey && room.project_id === 'autopilot') preferredKey = key;
           roomIndex.set(key, {
             roomId: room.id,
             projectId: room.project_id,

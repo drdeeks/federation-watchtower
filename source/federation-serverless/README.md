@@ -226,9 +226,9 @@ lease is not active. Wrap a consequential tool or Loop Enforcer step with it:
 export WATCHTOWER_INGESTION_SECRET='set-outside-the-repository'
 ADAPTER=../federation-tv-package/mcp-skill/federation-agent/watchtower_loop.py
 
-python3 "$ADAPTER" --project autopilot --agent build-01 lease --run deploy-42 --scope deploy
+python3 "$ADAPTER" --project acme --agent build-01 lease --run deploy-42 --scope deploy
 # Persist the returned leaseId, then immediately before an external side effect:
-python3 "$ADAPTER" --project autopilot --agent build-01 validate --lease lease_example
+python3 "$ADAPTER" --project acme --agent build-01 validate --lease lease_example
 ```
 
 Agents must stop when the validate command returns `3`. A `contained` receipt
@@ -351,7 +351,7 @@ or credentials.
 
 ```bash
 API=https://fapi.drdeeks.xyz
-PROJECT=autopilot
+PROJECT=acme
 AGENT=demo-agent-01
 
 curl -X POST "$API/api/projects/$PROJECT/agents" \

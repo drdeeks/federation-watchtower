@@ -128,13 +128,8 @@ class TVFeedEntry:
 class TVRoomManager:
     def __init__(self, federation_url: str):
         self.client = FederationClient(federation_url)
-        self.projects = {
-            "mnemosyne": {"name": "Mnemosyne", "emoji": "🧠", "color": "#3b82f6"},
-            "agora": {"name": "Agora", "emoji": "🏛️", "color": "#f59e0b"},
-            "aires": {"name": "Aires", "emoji": "🎬", "color": "#a855f7"},
-            "autopilot": {"name": "Autopilot", "emoji": "⚙️", "color": "#22c55e"},
-            "edgewalker": {"name": "Edgewalker", "emoji": "⚡", "color": "#ef4444"},
-        }
+        # No fixed project roster: whatever has actually registered an agent
+        # is what shows up here (see get_all_rooms/get_system_status).
         self.max_per_room = 35
 
     def _agent_to_snapshot(self, agent: Dict, project_id: str) -> AgentSnapshot:
@@ -174,20 +169,11 @@ class TVRoomManager:
     def get_all_rooms(self) -> List[RoomSnapshot]:
         rooms = []
         agents_by_project = self.client.get_agents()
-        
-        for project_id, project_info in self.projects.items():
-            agents = agents_by_project.get(project_id, [])
+
+        for project_id, agents in agents_by_project.items():
             if not agents:
-                # Still create the room structure even if empty
-                rooms.append(RoomSnapshot(
-                    room_id=f"{project_id.upper()}-ROOM-1",
-                    project=project_id,
-                    agents=[],
-                    capacity=self.max_per_room,
-                    is_production=True
-                ))
                 continue
-            
+
             # Group agents by room
             rooms_by_id = {}
             for agent in agents:
@@ -277,18 +263,19 @@ class TVRoomManager:
         total_agents = sum(len(r.agents) for r in rooms)
         active_agents = sum(len([a for a in r.agents if a.status == "active"]) for r in rooms)
         production_rooms = [r for r in rooms if r.is_production]
-        
+        project_ids = sorted({r.project for r in rooms})
+
         return {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "federation_status": health.get("status", "unknown"),
-            "projects": len(self.projects),
+            "project_count": len(project_ids),
             "total_rooms": len(rooms),
             "production_rooms": len(production_rooms),
             "total_agents": total_agents,
             "active_agents": active_agents,
             "idle_agents": total_agents - active_agents,
             "global_utilization": round(total_agents / (len(rooms) * self.max_per_room) * 100, 1) if rooms else 0,
-            "projects": {p: self.projects[p]["name"] for p in self.projects},
+            "projects": project_ids,
             "uptime": health.get("uptime", 0)
         }
 

@@ -13,10 +13,10 @@ test("client signs the exact JSON request body without exposing its secret", asy
     gateway: "https://gateway.example/", ingestionSecret: "test-secret", producer: "sdk-test",
     fetch: async (url, init) => { requests.push({ url, init }); return new Response(JSON.stringify({ accepted: true }), { status: 201 }); },
   });
-  const result = await client.requestLease({ projectId: "autopilot", agentId: "build-01", runId: "run-1", ttlSeconds: 60, scopes: ["deploy"] });
+  const result = await client.requestLease({ projectId: "acme", agentId: "build-01", runId: "run-1", ttlSeconds: 60, scopes: ["deploy"] });
   assert.deepEqual(result, { accepted: true });
-  assert.equal(requests[0].url, "https://gateway.example/api/v1/projects/autopilot/leases");
-  assert.equal(requests[0].init.body, '{"agentId":"build-01","projectId":"autopilot","runId":"run-1","scopes":["deploy"],"ttlSeconds":60}');
+  assert.equal(requests[0].url, "https://gateway.example/api/v1/projects/acme/leases");
+  assert.equal(requests[0].init.body, '{"agentId":"build-01","projectId":"acme","runId":"run-1","scopes":["deploy"],"ttlSeconds":60}');
   const timestamp = requests[0].init.headers.get("X-Watchtower-Timestamp");
   const expected = await hmacSha256Hex("test-secret", `${timestamp}.${requests[0].init.body}`);
   assert.equal(requests[0].init.headers.get("X-Watchtower-Signature"), `sha256=${expected}`);
@@ -29,18 +29,18 @@ test("client turns rejected Watchtower responses into structured errors", async 
     fetch: async () => new Response(JSON.stringify({ error: "lease blocked" }), { status: 409 }),
   });
   await assert.rejects(
-    () => client.validateLease({ projectId: "autopilot", agentId: "build-01", leaseId: "lease-1" }),
+    () => client.validateLease({ projectId: "acme", agentId: "build-01", leaseId: "lease-1" }),
     error => error instanceof WatchtowerApiError && error.status === 409 && error.message === "lease blocked",
   );
 });
 
 test("agent lifecycle client uses only its scoped credential", async () => {
   const requests = [];
-  const client = new FederationAgentClient({ projectId: "autopilot", agentId: "build-01", agentToken: "fw_agent_test", fetch: async (url, init) => { requests.push({ url, init }); return new Response(JSON.stringify({ accepted: true })); } });
+  const client = new FederationAgentClient({ projectId: "acme", agentId: "build-01", agentToken: "fw_agent_test", fetch: async (url, init) => { requests.push({ url, init }); return new Response(JSON.stringify({ accepted: true })); } });
   await client.heartbeat({ idempotencyKey: "heartbeat-1" });
   assert.equal(requests[0].url, "https://fapi.drdeeks.xyz/api/v1/agents/build-01/heartbeat");
   assert.equal(requests[0].init.headers.Authorization, "Bearer fw_agent_test");
-  assert.equal(requests[0].init.body, '{"idempotencyKey":"heartbeat-1","projectId":"autopilot"}');
+  assert.equal(requests[0].init.body, '{"idempotencyKey":"heartbeat-1","projectId":"acme"}');
 });
 
 test("createOwner posts the unauthenticated owner body and binds the returned token", async () => {
@@ -62,9 +62,9 @@ test("owner client rejects a non-owner token", () => {
 
 test("registerAgent authenticates with the owner token and returns a wired agent client", async () => {
   const requests = [];
-  const owner = new FederationOwnerClient({ gateway: "https://gateway.example/", ownerToken: "fw_owner_abc", fetch: async (url, init) => { requests.push({ url, init }); return new Response(JSON.stringify({ agent: { agentId: "build-01", projectId: "autopilot", roomId: "room-1" }, credential: { token: "fw_agent_xyz" }, next: { connect: "/api/v1/agents/build-01/connect" } }), { status: 201 }); } });
+  const owner = new FederationOwnerClient({ gateway: "https://gateway.example/", ownerToken: "fw_owner_abc", fetch: async (url, init) => { requests.push({ url, init }); return new Response(JSON.stringify({ agent: { agentId: "build-01", projectId: "acme", roomId: "room-1" }, credential: { token: "fw_agent_xyz" }, next: { connect: "/api/v1/agents/build-01/connect" } }), { status: 201 }); } });
   const manifest = {
-    agentId: "build-01", displayName: "Build 01", ownerId: "acme", projectId: "autopilot", role: "testing",
+    agentId: "build-01", displayName: "Build 01", ownerId: "acme", projectId: "acme", role: "testing",
     capabilities: ["testing", "reporting"], identity: { avatarSeed: "build-01", paletteKey: "testing", characterType: "operator" },
     publicProjection: true, heartbeat: { intervalSeconds: 30 }, statement: "Runs the test suite and reports results.",
   };
@@ -77,7 +77,7 @@ test("registerAgent authenticates with the owner token and returns a wired agent
   assert.equal(next.connect, "/api/v1/agents/build-01/connect");
   assert.ok(client instanceof FederationAgentClient);
   assert.equal(client.agentToken, "fw_agent_xyz");
-  assert.equal(client.projectId, "autopilot");
+  assert.equal(client.projectId, "acme");
   assert.equal(client.agentId, "build-01");
 });
 

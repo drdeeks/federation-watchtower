@@ -262,13 +262,9 @@
     <span>👥 <span id="totalAgents">0</span> Agents</span>
     <span>🏠 <span id="totalRooms">0</span> Rooms</span>
   </div>
-  <div class="nav-links">
+  <div class="nav-links" id="navLinks">
     <a href="#" onclick="showProject('all')">All Projects</a>
-    <a href="#" onclick="showProject('autopilot')">Autopilot</a>
-    <a href="#" onclick="showProject('aires')">Aires</a>
-    <a href="#" onclick="showProject('mnemosyne')">Mnemosyne</a>
-    <a href="#" onclick="showProject('agora')">Agora</a>
-    <a href="#" onclick="showProject('edgewalker')">Edgewalker</a>
+    <!-- per-project links are rendered dynamically in renderNav() from whatever has actually registered -->
   </div>
 </header>
 
@@ -323,16 +319,18 @@
 // LIVE DATA — populated from the federation gateway (no static mock agents)
 let AGENTS = {};
 
-// Project display metadata (name/accent/emoji/color) keyed by projectId
-const PROJECT_META = {
-  autopilot:  { name: 'Autopilot',  accent: '#22c55e', emoji: '⚙️', color: 'rgba(34,197,94,0.2)' },
-  aires:      { name: 'Aires',      accent: '#a855f7', emoji: '🎬', color: 'rgba(168,85,247,0.2)' },
-  mnemosyne:  { name: 'Mnemosyne',  accent: '#3b82f6', emoji: '🧠', color: 'rgba(59,130,246,0.2)' },
-  agora:      { name: 'Agora',      accent: '#f59e0b', emoji: '🏛️', color: 'rgba(245,158,11,0.2)' },
-  edgewalker: { name: 'Edgewalker', accent: '#ef4444', emoji: '⚡', color: 'rgba(239,68,68,0.2)' }
-};
+// Deterministic accent color for any project id -- no fixed roster, no
+// per-project entry to maintain; a brand-new project gets a color for free.
+function projectAccent(id) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  const hue = hash % 360;
+  return { accent: `hsl(${hue}, 70%, 55%)`, color: `hsla(${hue}, 70%, 55%, 0.2)` };
+}
 
-// Pull real agents from the federation registry and reshape into AGENTS
+// Pull real agents from the federation registry and reshape into AGENTS.
+// Iterates whatever the gateway actually returned -- not a fixed guess list --
+// so a project with zero agents registered never shows up as a phantom room.
 async function loadAgents() {
   try {
     const res = await fetch('/api/agents');
@@ -340,11 +338,11 @@ async function loadAgents() {
     const data = await res.json();
     const remote = (data && data.agents) || {};
     const next = {};
-    for (const key of Object.keys(PROJECT_META)) {
-      const meta = PROJECT_META[key];
+    for (const key of Object.keys(remote)) {
       const list = remote[key] || [];
+      const { accent, color } = projectAccent(key);
       next[key] = {
-        name: meta.name, accent: meta.accent, emoji: meta.emoji, color: meta.color,
+        name: key, accent, emoji: '🤖', color,
         agents: list.map(a => ({
           id: a.agentId || a.id,
           name: a.name || a.agentId || 'unknown',
@@ -355,11 +353,28 @@ async function loadAgents() {
       };
     }
     AGENTS = next;
+    renderNav();
     refresh();
     document.getElementById('federationStatus') && (document.getElementById('federationStatus').textContent = '● LIVE');
   } catch (e) {
     console.error('loadAgents failed:', e);
     document.getElementById('federationStatus') && (document.getElementById('federationStatus').textContent = '○ OFFLINE');
+  }
+}
+
+// Rebuild the per-project nav links from whatever is currently registered.
+function renderNav() {
+  const nav = document.getElementById('navLinks');
+  if (!nav) return;
+  const existing = nav.querySelectorAll('a[data-project-link]');
+  existing.forEach(a => a.remove());
+  for (const key of Object.keys(AGENTS)) {
+    const a = document.createElement('a');
+    a.href = '#';
+    a.dataset.projectLink = '1';
+    a.textContent = AGENTS[key].name;
+    a.onclick = (e) => { e.preventDefault(); showProject(key); };
+    nav.appendChild(a);
   }
 }
 

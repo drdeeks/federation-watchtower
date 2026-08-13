@@ -10,11 +10,11 @@ test("parses only a bounded organization API credential", () => {
 });
 
 test("checks global and project MCP scopes independently", () => {
-  const scopes = ["watchtower:read", "watchtower:lease", "project:autopilot:read", "project:autopilot:control"];
-  assert.equal(hasMcpScope(scopes, "watchtower:read", "autopilot"), true);
-  assert.equal(hasMcpScope(scopes, "watchtower:lease", "autopilot", "control"), true);
-  assert.equal(hasMcpScope(scopes, "watchtower:read", "mnemosyne"), false);
-  assert.equal(hasMcpScope(scopes, "watchtower:actions:authorize", "autopilot", "control"), false);
+  const scopes = ["watchtower:read", "watchtower:lease", "project:acme:read", "project:acme:control"];
+  assert.equal(hasMcpScope(scopes, "watchtower:read", "acme"), true);
+  assert.equal(hasMcpScope(scopes, "watchtower:lease", "acme", "control"), true);
+  assert.equal(hasMcpScope(scopes, "watchtower:read", "other-proj"), false);
+  assert.equal(hasMcpScope(scopes, "watchtower:actions:authorize", "acme", "control"), false);
 });
 
 test("verifies sha256 credential verifiers and CIDR allowlists", async () => {

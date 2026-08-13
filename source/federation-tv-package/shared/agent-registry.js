@@ -647,14 +647,15 @@ class AgentRegistry {
     }
 
     getProjectColors(projectId) {
-        const colorMap = {
-            autopilot: { primary: '#0f172a', accent: '#22c55e', bg: '#14141f' },
-            aires: { primary: '#0f172a', accent: '#a855f7', bg: '#14141f' },
-            mnemosyne: { primary: '#0f172a', accent: '#3b82f6', bg: '#14141f' },
-            agora: { primary: '#0f172a', accent: '#f59e0b', bg: '#14141f' },
-            edgewalker: { primary: '#0f172a', accent: '#ef4444', bg: '#14141f' }
-        };
-        return colorMap[projectId] || colorMap.autopilot;
+        // Deterministic accent derived from the project id itself -- no fixed
+        // roster of named projects. Same id always yields the same color;
+        // any new project gets one for free, nothing to hardcode or update.
+        let hash = 0;
+        for (let i = 0; i < projectId.length; i++) {
+            hash = (hash * 31 + projectId.charCodeAt(i)) >>> 0;
+        }
+        const hue = hash % 360;
+        return { primary: '#0f172a', accent: `hsl(${hue}, 70%, 55%)`, bg: '#14141f' };
     }
 
     /**
