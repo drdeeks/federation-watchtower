@@ -205,7 +205,7 @@ export async function handleManagementRequest(input: {
     const now = Date.now();
     const org = await env.DB.prepare("SELECT id, status FROM federation_organizations WHERE id = ?").bind(orgId).first<{ id: string; status: string }>();
     if (!org) return json({ error: "organization not found" }, 404);
-    const newStatus = action === "approve" ? "active" : action === "reject" ? "rejected" : "suspended";
+    const newStatus = action === "approve" ? "approved" : action === "reject" ? "rejected" : "suspended";
     await env.DB.prepare("UPDATE federation_organizations SET status = ?, updated_at = ? WHERE id = ?").bind(newStatus, now, orgId).run();
     // If approved, add to verified_federations
     if (action === "approve") {
