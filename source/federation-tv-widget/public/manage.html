@@ -396,7 +396,7 @@
       <h2><span class="grow">Management Capabilities</span></h2>
       <div class="capabilities-grid">
         <div class="capability-item"><strong>Agents</strong><p>Search by name, ID, owner, or room. Filter by room or status (live/paused/offline/revoked). Actions: Pause (hide from Watchtower), Resume (restore), Revoke (permanently disable, preserves event history).</p></div>
-        <div class="capability-item"><strong>Rooms</strong><p>Create rooms for organizations. Delete empty rooms only (0 agents). View capacity and usage.</p></div>
+        <div class="capability-item"><strong>Rooms</strong><p>Create rooms for organizations. Deleting a room evicts its occupants to the next available room -- never blocked, never harms them. Room index 0 in every project is Watchtower HQ, the permanent default room self-registering agents land in; it's deletable here (admin-only) but flagged with an extra warning. View capacity and usage.</p></div>
         <div class="capability-item"><strong>Organizations</strong><p>Review applications (5 technical Q&A + social proofs). Actions: Approve (adds to verified_federations), Reject, Suspend.</p></div>
         <div class="capability-item"><strong>Alert Webhook</strong><p>View all guardrail alert deliveries with HMAC signature verification from WATCHTOWER_ALERT_WEBHOOK_URL.</p></div>
         <div class="capability-item"><strong>Live Floor</strong><p>Real-time visualization via FederationTV. Agents automatically disappear after heartbeat timeout (agent.heartbeat_seconds &times; 1.5, default 180s).</p></div>
@@ -443,7 +443,7 @@
         <select id="roomFilterStatus"><option value="">all rooms</option><option value="active">active</option><option value="empty">empty</option><option value="full">full</option></select>
         <button id="addRoom" class="secondary" disabled title="Connect with an admin token first">+ Add room</button>
       </h2>
-      <p class="section-desc">Create rooms for organizations, delete empty demo/test rooms. Rooms must be empty before deletion.</p>
+      <p class="section-desc">Create rooms for organizations; delete any room -- occupants are evicted to the next available room, never blocked, never harmed. Room 0 (Watchtower HQ) is the permanent default landing room and carries an extra confirmation.</p>
       <div class="tablewrap" style="max-height:340px;">
         <table>
           <colgroup>
@@ -905,15 +905,15 @@
         el.roomRows.innerHTML = rooms.map(function (r) {
           var st = getRoomStatus(r);
           var used = r.usedCount != null ? r.usedCount : (r.used != null ? r.used : '—');
-          var canDel = (typeof used === 'number' && used === 0);
+          var isHQ = r.roomIndex === 0;
           return '<tr data-room-id="' + esc(r.roomId) + '">' +
-            '<td class="name"><b>' + esc(r.roomId) + '</b></td>' +
+            '<td class="name"><b>' + esc(r.roomId) + '</b>' + (isHQ ? ' <span class="pill" title="Permanent default room -- self-registering agents land here; cannot be deleted">HQ</span>' : '') + '</td>' +
             '<td>' + esc(r.projectId) + '</td>' +
             '<td>' + (r.roomIndex != null ? r.roomIndex : '—') + '</td>' +
             '<td>' + (r.capacity != null ? r.capacity : '—') + '</td>' +
             '<td><span class="pill ' + st + '">' + used + '</span></td>' +
             '<td class="act">' +
-            (canDel ? '<button class="danger delete-room" data-room-id="' + esc(r.roomId) + '">Delete</button>' : '') +
+            '<button class="danger delete-room" data-room-id="' + esc(r.roomId) + '" data-is-hq="' + (isHQ ? '1' : '0') + '">Delete</button>' +
             '</td></tr>';
         }).join('');
       }
@@ -948,8 +948,11 @@
         }
       }
 
-      async function deleteRoom(roomId) {
-        if (!confirm('Delete room "' + roomId + '"? This cannot be undone.')) return;
+      async function deleteRoom(roomId, isHQ) {
+        var msg = isHQ
+          ? 'Delete "' + roomId + '"? This is Watchtower HQ -- the permanent default room self-registering agents land in. This is NOT undoable through this console.'
+          : 'Delete room "' + roomId + '"? This cannot be undone.';
+        if (!confirm(msg)) return;
         try {
           await fetchJsonDelete('/api/v1/admin/rooms/' + encodeURIComponent(roomId));
           await loadRooms();
@@ -1147,7 +1150,7 @@
           el.roomRows.addEventListener('click', function (e) {
             var btn = e.target.closest('.delete-room');
             if (!btn) return;
-            deleteRoom(btn.dataset.roomId);
+            deleteRoom(btn.dataset.roomId, btn.dataset.isHq === '1');
           });
         }
 

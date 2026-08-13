@@ -11,7 +11,7 @@ import OfficeStage from './OfficeStage';
   if (!container) return;
 
   var gatewayUrl = container.getAttribute('data-gateway') || 'https://fapi.drdeeks.xyz';
-  var projectId = container.getAttribute('data-project') || 'autopilot';
+  var projectId = container.getAttribute('data-project') || 'default';
   var roomId = container.getAttribute('data-room') || undefined;
 
   // OfficeStage is a React function component. It MUST be handed to React via

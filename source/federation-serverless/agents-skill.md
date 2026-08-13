@@ -51,7 +51,7 @@ For local development, override it with the FEDERATION_GATEWAY environment varia
 
 1. EMIT AN OPERATIONAL EVENT
    POST /api/v1/events
-   Body: { "schemaVersion": "2026-07-17", "eventId": "evt-unique", "idempotencyKey": "run-1-attempt-1", "projectId": "autopilot", "agentId": "your-agent-id", "runId": "run-1", "eventType": "validation.failed", "severity": "error", "occurredAt": "2026-07-17T16:00:00Z", "statement": "The gate said no in YAML.", "metadata": { "attempt": 3 } }
+   Body: { "schemaVersion": "2026-07-17", "eventId": "evt-unique", "idempotencyKey": "run-1-attempt-1", "projectId": "acme", "agentId": "your-agent-id", "runId": "run-1", "eventType": "validation.failed", "severity": "error", "occurredAt": "2026-07-17T16:00:00Z", "statement": "The gate said no in YAML.", "metadata": { "attempt": 3 } }
    Sign the exact body as HMAC-SHA-256 of "<timestamp>.<body>" with WATCHTOWER_INGESTION_SECRET.
 
    For a cooperative agent, emit a `heartbeat` at least once before the
@@ -84,7 +84,7 @@ POST /api/v1/agents
 Authorization: Bearer fw_owner_...
 {
   "agentId": "build-runner-01",
-  "projectId": "autopilot",
+  "projectId": "acme",
   "capabilities": ["build", "test"],
   "heartbeat": { "intervalSeconds": 60 },
   "lease": {
@@ -106,7 +106,7 @@ Authorization: Bearer fw_owner_...
     "reason": null
   },
   "next": {
-    "leaseValidate": "/api/v1/projects/autopilot/leases/lease_uuid123/validate"
+    "leaseValidate": "/api/v1/projects/acme/leases/lease_uuid123/validate"
   }
 }
 ```
@@ -123,14 +123,14 @@ Authorization: Bearer fw_owner_...
 # 1. Register (no lease)
 curl -X POST https://fapi.drdeeks.xyz/api/v1/agents \
   -H "Authorization: Bearer fw_owner_..." \
-  -d '{"agentId":"build-01","projectId":"autopilot","capabilities":["build"],"heartbeat":{"intervalSeconds":60}}'
+  -d '{"agentId":"build-01","projectId":"acme","capabilities":["build"],"heartbeat":{"intervalSeconds":60}}'
 
 # 2. Request lease before work
-curl -X POST https://fapi.drdeeks.xyz/api/v1/projects/autopilot/leases \
+curl -X POST https://fapi.drdeeks.xyz/api/v1/projects/acme/leases \
   -H "Authorization: Bearer fw_agent_..." \
   -H "Content-Type: application/json" \
   -d '{
-    "projectId": "autopilot",
+    "projectId": "acme",
     "agentId": "build-01",
     "runId": "build-run-42",
     "ttlSeconds": 300,
@@ -196,7 +196,7 @@ curl -X POST https://fapi.drdeeks.xyz/api/v1/projects/autopilot/leases \
 import { FederationAgentClient } from "@federation-watchtower/sdk";
 
 const agent = new FederationAgentClient({
-  projectId: "autopilot",
+  projectId: "acme",
   agentId: "build-01",
   agentToken: process.env.FEDERATION_AGENT_TOKEN,
 });
@@ -260,7 +260,7 @@ Embeddable agent diorama showing:
 - Live event feed (real federation activity)
 
 ```html
-<script src="https://watch.drdeeks.xyz/tv-widget.js" data-project="autopilot" data-gateway="https://fapi.drdeeks.xyz"></script>
+<script src="https://watch.drdeeks.xyz/tv-widget.js" data-project="acme" data-gateway="https://fapi.drdeeks.xyz"></script>
 <div id="federation-tv"></div>
 ```
 
@@ -342,17 +342,17 @@ agent must not begin the next tool call in that case.
 ADAPTER=source/federation-tv-package/mcp-skill/federation-agent/watchtower_loop.py
 
 # Before beginning or renewing a run. Save leaseId from the JSON response.
-python3 "$ADAPTER" --project autopilot --agent build-01 lease --run run-42 --scope deployment
+python3 "$ADAPTER" --project acme --agent build-01 lease --run run-42 --scope deployment
 
 # Surround local pre/loop/post gates with their durable operational events.
-python3 "$ADAPTER" --project autopilot --agent build-01 event --type run.started --severity info --statement "Deployment gate opened." --run run-42 --metadata '{"chainDepth":1}'
+python3 "$ADAPTER" --project acme --agent build-01 event --type run.started --severity info --statement "Deployment gate opened." --run run-42 --metadata '{"chainDepth":1}'
 
 # Immediately before every external side effect. Exit 3 means stop.
-python3 "$ADAPTER" --project autopilot --agent build-01 validate --lease lease_example
+python3 "$ADAPTER" --project acme --agent build-01 validate --lease lease_example
 
 # Poll and acknowledge control commands after containment.
-python3 "$ADAPTER" --project autopilot --agent build-01 commands
-python3 "$ADAPTER" --project autopilot --agent build-01 ack --command cmd_example --outcome contained --note "Runner stopped before deploy."
+python3 "$ADAPTER" --project acme --agent build-01 commands
+python3 "$ADAPTER" --project acme --agent build-01 ack --command cmd_example --outcome contained --note "Runner stopped before deploy."
 ```
 
 The adapter uses the same `WATCHTOWER_INGESTION_SECRET` as event ingestion.
@@ -370,7 +370,7 @@ later contained receipt or command expiry.
 ## WebSocket Protocol
 
 ```javascript
-const ws = new WebSocket('wss://fapi.drdeeks.xyz/ws?projectId=autopilot');
+const ws = new WebSocket('wss://fapi.drdeeks.xyz/ws?projectId=acme');
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data);
   if (msg.type === 'feed_snapshot') { /* initial load */ }
@@ -396,7 +396,7 @@ ws.onmessage = (event) => {
 import hashlib, hmac, json, os, time, uuid, requests
 
 GATEWAY = os.getenv("FEDERATION_GATEWAY", "https://fapi.drdeeks.xyz")
-PROJECT = "autopilot"
+PROJECT = "acme"
 AGENT_ID = "my-agent-1"
 SECRET = os.environ["WATCHTOWER_INGESTION_SECRET"]
 

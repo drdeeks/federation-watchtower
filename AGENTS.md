@@ -380,37 +380,63 @@ and `federation_agents`):
 ### Next steps (handoff — do not re-derive, read this first)
 
 Open threads left in-flight; pick up here instead of re-investigating from
-scratch.
+scratch. **Updated 2026-08-13** — items 2 and (partially) 4 below from the
+prior version of this section are resolved; see CL-0034/0035/0036.
 
-1. **Org approve/suspend fix — code done, migration proven, NOT deployed.**
-   `management.ts` now writes the canonical `'approved'`/`'suspended'` enum
-   values (was writing `mcp_organizations` vocabulary `'active'`). Migration
-   `src/migrations/0010_organizations_widen_status.sql` widens the CHECK and
-   is fully verified against the free `federation-db-staging` fork (id
-   `929f8ef0-daf9-4e43-b88e-daf226df24ae`, account `Drdeeks` `04c92088…`) —
-   not yet run against production. Next: get explicit go-ahead, then run
-   `npm run migrate:organizations-widen-status` (remote) and deploy. Decide
-   the staging fork's fate afterward — keep as a standing de-risking target
-   for future migrations, expand into a full `[env.staging]`, or
-   `wrangler d1 delete federation-db-staging`.
-2. **`fix/rooms-agents-migrations` branch is blocked, not lost.** In the MAIN
-   worktree (`/home/drdeek/projects/federation`, not this one), that branch
-   has uncommitted `room-scene.ts` / `room-scene-model.ts` /
-   `room-scene.test.ts` work plus a competing, softer `management.ts`
-   room-delete edit. Confirmed via git forensics: nothing here was ever
-   pushed or stashed — a real push around 2026-07-21 16:07 (`09e20ef`) was
-   docs-only (`README.md` + `SUBMISSION_NARRATIVE.md`); the room-scene edits
-   were made ~4 hours later (~20:07) and never committed anywhere. Before
-   cherry-picking `63acb8e` (the eviction-based room-delete already merged)
-   onto this branch, the user needs to either commit/save the uncommitted
-   room-scene work or discard it, and drop the competing `management.ts`
-   room-delete hunk in favor of `63acb8e`'s approach.
-3. **Org-management cascade behavior is unbuilt.** Pause should pause an
+1. **Org approve/suspend fix — code done, migration proven, still NOT
+   deployed.** `management.ts` writes the canonical `'approved'`/`'suspended'`
+   enum values; migration `src/migrations/0010_organizations_widen_status.sql`
+   widens the CHECK. Verified against the free `federation-db-staging` fork
+   (id `929f8ef0-daf9-4e43-b88e-daf226df24ae`) — still not run against
+   production. This is now on `fix/rooms-agents-migrations` (merged
+   2026-08-13, commit `663b4a6`), not stuck on an isolated worktree branch
+   anymore. Next: explicit go-ahead, then `npm run
+   migrate:organizations-widen-status` (remote) + deploy.
+2. ~~`fix/rooms-agents-migrations` branch is blocked~~ — **RESOLVED
+   2026-08-13.** Both orphaned worktree branches
+   (`worktree-bridge-cse_011McsXiCUReHKCuBhtdfYQc` org-migration,
+   `worktree-bridge-cse_01P91YhKrzoDMTyFfhAsCd32` rooms) merged into
+   `fix/rooms-agents-migrations` (commits `663b4a6`, `2eef8f3`). The
+   competing `management.ts` room-delete edit mentioned in the old version of
+   this note was resolved by taking the eviction-based approach
+   (`63acb8e`) wholesale — it fully supersedes the narrower offline-aware
+   block it replaced. Both worktree branches kept on disk as backups (not
+   deleted). Branch is now 9 commits ahead of `origin/main`, **not pushed**.
+3. **Watchtower HQ now has real identity, but is intentionally NOT
+   code-blocked from deletion.** `room_index 0` (every project's
+   auto-created first room, where `assignToRoom()` always lands
+   self-registering agents by construction) is now labeled "Watchtower HQ"
+   in the public Watch room picker and the admin console, with an extra
+   confirm() warning before deleting it in `manage.html`. Owner's explicit
+   call: leave it deletable — `/api/v1/admin/rooms/*` is already
+   `requireAdmin()`-gated on the shared token only the owner holds, so a
+   hard block would be redundant; organizations never reach this endpoint.
+4. **Org-management cascade behavior is unbuilt.** Pause should pause an
    org's agents; delete should evict agents to HQ and remove rooms while
    preserving records. Separate from the CHECK-constraint fix above — not
-   started.
-4. **`.claude/` + root `CLAUDE.md` git-history cleanup is paused.** 145
-   `.claude/` files and root `CLAUDE.md` are on public `origin/main` (a
-   Devpost hackathon repo) from an old force-add commit. User emailed the
-   hackathon manager for permission to do a history rewrite; do nothing to
-   remote/history until that approval is confirmed.
+   started. Related, also unbuilt: real per-organization operator
+   credentials — `operator.html`'s `?project=<id>` lock narrows the UI but
+   still authenticates with the shared admin token, not org-scoped RBAC (see
+   "Important work that is not done" above). The owner's stated intent:
+   organizations should ultimately manage only their own room and agents.
+5. **`.claude/` + root `CLAUDE.md` git-history cleanup is still paused for
+   the history-rewrite part.** The rooms worktree's `9b824d2` (merged
+   2026-08-13) untracks `.claude/` and `CLAUDE.md` **going forward only** —
+   files stay on disk, just stop being version-controlled from this commit
+   on. It does **not** purge them from the old commits already on public
+   `origin/main`. That rewrite still needs the hackathon manager's
+   permission (user emailed, unconfirmed as of this writing) — do nothing to
+   remote history until that's confirmed.
+6. **Hardcoded agents/rooms fully removed from code, 2026-08-13 (CL-0036).**
+   The live Worker/widget only ever had `'autopilot'` as a single default
+   value (never a roster); the real fixed 5-project roster
+   (Autopilot/Aires/Agora/Edgewalker/Mnemosyne) lived entirely in
+   `federation-tv-package/` — confirmed still required (it's the local
+   backend `tv-sitcom-mcp`'s MCP server talks to on :41207), so genericized
+   rather than deleted. See CL-0036 for the full file list. Production
+   `federation-db` still has the demo/test rows for those 5 project ids
+   sitting in several tables (partially cleaned mid-session, then explicitly
+   paused by the owner — "don't fuck anything up on the databases" — before
+   `rooms`/`agents`/`federation_agents`/`projects`/`operational_events`/
+   `audit_events` were touched). That DB cleanup is still open, deliberately
+   not resumed without explicit direction.

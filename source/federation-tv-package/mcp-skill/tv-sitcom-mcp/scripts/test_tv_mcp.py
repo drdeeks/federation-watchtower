@@ -100,11 +100,12 @@ def test_mcp_tool_signatures():
     assert isinstance(feed, list)
     print(f"  ✓ get_tv_feed(5) -> list[{len(feed)}]")
     
-    agent = get_agent(list(feed[0].keys())[0] if feed else "mnemosyne-lead-1")
+    fallback_agent_id = (rooms[0]["agents"][0]["agent_id"] if rooms[0].get("agents") else rooms[0]["room_id"])
+    agent = get_agent(list(feed[0].keys())[0] if feed else fallback_agent_id)
     assert "agent_id" in agent
     print(f"  ✓ get_agent() -> dict")
-    
-    summary = get_project_summary("mnemosyne")
+
+    summary = get_project_summary(rooms[0]["project"])
     assert "project" in summary
     print(f"  ✓ get_project_summary() -> dict")
     

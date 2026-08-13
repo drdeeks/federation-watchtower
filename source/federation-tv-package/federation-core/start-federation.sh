@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Start the federation gateway and seed the 20 crew agents so the TV stays live across restarts.
+# Start the federation gateway. No agents are seeded -- this is a harness,
+# not a demo cast; register real or test agents via POST /api/agents/register
+# (or /api/join) once the server is up, the same way any real agent would.
 set -u
 PORT=41207
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -25,25 +27,5 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-# 4) Seed agents from JSON
-python3 - "$PORT" <<'PY'
-import json, sys, urllib.request
-port = sys.argv[1]
-seed = json.load(open('seed-agents.json'))
-count = 0
-for project, agents in seed.items():
-    for a in agents:
-        payload = json.dumps({**a, "projectId": project}).encode()
-        req = urllib.request.Request(
-            f"http://localhost:{port}/api/agents/register",
-            data=payload, headers={"Content-Type": "application/json"}, method="POST")
-        try:
-            urllib.request.urlopen(req, timeout=5)
-            count += 1
-        except Exception as e:
-            print("seed failed", a["agentId"], e)
-print(f"seeded {count} agents")
-PY
-
-echo "federation ready on :${PORT}"
+echo "federation ready on :${PORT} (empty -- no agents registered yet)"
 wait "$SRV"

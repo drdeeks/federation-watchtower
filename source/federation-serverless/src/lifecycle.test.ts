@@ -3,7 +3,7 @@ import test from "node:test";
 import { validateLifecycleManifest } from "./lifecycle.ts";
 
 const manifest = () => ({
-  agentId: "build-01", displayName: "Build Runner", ownerId: "owner-01", projectId: "autopilot", role: "build",
+  agentId: "build-01", displayName: "Build Runner", ownerId: "owner-01", projectId: "acme", role: "build",
   capabilities: ["build", "test"], identity: { avatarSeed: "build-01", paletteKey: "build", characterType: "runner" },
   publicProjection: true, heartbeat: { intervalSeconds: 1800 }, metadata: { source: "sdk" },
   statement: "Ready to build and test on request.",
@@ -11,7 +11,7 @@ const manifest = () => ({
 
 test("accepts a bounded owner-bound canonical lifecycle manifest", () => {
   assert.deepEqual(validateLifecycleManifest(manifest()), {
-    agentId: "build-01", displayName: "Build Runner", ownerId: "owner-01", projectId: "autopilot", role: "build",
+    agentId: "build-01", displayName: "Build Runner", ownerId: "owner-01", projectId: "acme", role: "build",
     capabilities: ["build", "test"], identity: { avatarSeed: "build-01", paletteKey: "build", characterType: "runner" },
     publicProjection: true, heartbeatSeconds: 1800, organizationId: undefined, lease: undefined,
     statement: "Ready to build and test on request.",

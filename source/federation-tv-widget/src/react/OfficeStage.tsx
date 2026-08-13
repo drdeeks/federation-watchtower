@@ -37,7 +37,7 @@ export type StageEvent = {
 /**
  * OfficeStageProps — configuration for the office scene.
  * @param gatewayUrl - Federation API gateway (default: https://fapi.drdeeks.xyz)
- * @param projectId - Project to watch (default: autopilot)
+ * @param projectId - Project to watch (default: 'default')
  * @param agents - Optional list of agents to render (uses default set if not provided)
  */
 export interface OfficeStageProps {
@@ -228,7 +228,7 @@ function pathTo(from: {x:number;y:number}, to: {x:number;y:number}) {
   ];
 }
 
-export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', projectId = 'autopilot', roomId, agents: agentConfig }: OfficeStageProps = {}) {
+export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', projectId = 'default', roomId, agents: agentConfig }: OfficeStageProps = {}) {
   const stationsRef = useRef<Station[]>(STATIONS.map((s) => ({ ...s, occupants: [] })));
   // The cast is the REAL registered roster, reconciled from the API below.
   // The stage never invents an agent — an empty office is the truth

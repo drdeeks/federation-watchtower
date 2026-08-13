@@ -913,74 +913,6 @@ Rollback Ref: wrangler rollback to the previous deployment version (or
               from CL-0030 is independent and stays
 ```
 
-## CL-0034 — Organization Approve/Suspend CHECK Fix, D1 Rebuild Gotcha Documented
-
-```
-Date        : 2026-07-22
-Contributor : Claude
-Modules     : [MOD-011, MOD-015]
-Section Tags: [[ORG-VERIFY-v1], [DATA-ARCH-v1], [QUALITY-v1]]
-Files Changed: [source/federation-serverless/src/management.ts,
-                source/federation-serverless/src/migrations/0010_organizations_widen_status.sql,
-                source/federation-serverless/package.json,
-                AGENTS.md, README.md]
-Description : management.ts's admin organization approve/reject/suspend
-              route wrote the mcp_organizations vocabulary ('active',
-              'suspended') into federation_organizations.status, whose 0004
-              CHECK only permits ('draft','submitted','approved','rejected').
-              approve and suspend both threw a CHECK constraint violation in
-              production; reject worked only by coincidence ('rejected' is
-              in the enum). Fixed by (a) approve now writes 'approved', the
-              existing canonical value, and (b) migration 0010 recreates the
-              table with the CHECK widened to add 'suspended', a genuine
-              post-approval admin action distinct from the application-review
-              states. A naive DROP+RENAME recreate of federation_organizations
-              fails on real D1 with "FOREIGN KEY constraint failed" — the
-              table has three inbound foreign keys
-              (federation_organization_social_proofs,
-              federation_organization_questions, federation_agents) and D1
-              runs each migration file as one transaction with foreign keys
-              enforced; SQLite's deferred-FK violation counter is incremented
-              by the DROP's implicit child-row orphaning and is not
-              decremented by the rename, so PRAGMA defer_foreign_keys does
-              not prevent the COMMIT failure even though foreign_key_check
-              reports no violations. This was reproduced and confirmed against
-              a real, disposable, non-production D1 fork
-              (federation-db-staging, database id
-              929f8ef0-daf9-4e43-b88e-daf226df24ae, created under the same
-              Cloudflare account, free-tier — 10 D1 databases/5 GB included)
-              before it could reach production federation-db: the full
-              schema chain (schema.sql, 0001-0009) was loaded into the fork,
-              representative rows were seeded in federation_organizations
-              and all three inbound-FK child tables, the naive migration was
-              applied and observed to fail and cleanly auto-rollback, then
-              the corrected migration (detach every child before the
-              rebuild, rebuild the table, reattach the children) was applied
-              and verified: data and child references preserved,
-              'suspended' accepted, an invalid status value still rejected
-              by the widened CHECK, no scratch tables left behind. AGENTS.md
-              gained a "D1 migration gotcha" subsection under "Validation
-              before handoff" so a future table recreate with inbound
-              foreign keys does not repeat this failure mode; README.md's
-              "Deliberate current boundaries" section now states this fix is
-              proven but not yet deployed, and links the live Slack alert
-              destination for the global Watchtower alert webhook.
-Tests Passing: source/federation-serverless npm run types PASS; npm test
-               30/30; migration 0010 applied and verified against the
-               federation-db-staging fork (17 queries executed, data and
-               inbound FK references preserved, widened CHECK accepts
-               'suspended' and rejects an invalid value)
-Phase       : PHASE-6 — fix validated on a disposable D1 fork, NOT yet
-              applied to production federation-db and NOT yet deployed
-Rollback Ref: git revert commit 323d320 on branch
-              worktree-bridge-cse_011McsXiCUReHKCuBhtdfYQc (uncommitted to
-              main, not pushed); the federation-db-staging fork used to
-              validate this migration is disposable — wrangler d1 delete
-              federation-db-staging removes it and touches nothing in
-              production; production federation-db was never modified by
-              this change
-```
-
 ## CL-0032 — Real-Data React Stage, Pool-Driven Bubbles, Feed Integrity
 
 ```
@@ -1170,4 +1102,234 @@ Phase       : PHASE-6 — public projection is real-data end to end
 Rollback Ref: revert commit 63acb8e (room eviction + revoke refactor +
               migrate:speech-seed). No schema/migration change in this entry,
               so no data rollback required.
+```
+
+## CL-0035 — Organization Approve/Suspend CHECK Fix, D1 Rebuild Gotcha Documented
+
+```
+Date        : 2026-07-22
+Contributor : Claude
+Modules     : [MOD-011, MOD-015]
+Section Tags: [[ORG-VERIFY-v1], [DATA-ARCH-v1], [QUALITY-v1]]
+Files Changed: [source/federation-serverless/src/management.ts,
+                source/federation-serverless/src/migrations/0010_organizations_widen_status.sql,
+                source/federation-serverless/package.json,
+                AGENTS.md, README.md]
+Description : management.ts's admin organization approve/reject/suspend
+              route wrote the mcp_organizations vocabulary ('active',
+              'suspended') into federation_organizations.status, whose 0004
+              CHECK only permits ('draft','submitted','approved','rejected').
+              approve and suspend both threw a CHECK constraint violation in
+              production; reject worked only by coincidence ('rejected' is
+              in the enum). Fixed by (a) approve now writes 'approved', the
+              existing canonical value, and (b) migration 0010 recreates the
+              table with the CHECK widened to add 'suspended', a genuine
+              post-approval admin action distinct from the application-review
+              states. A naive DROP+RENAME recreate of federation_organizations
+              fails on real D1 with "FOREIGN KEY constraint failed" — the
+              table has three inbound foreign keys
+              (federation_organization_social_proofs,
+              federation_organization_questions, federation_agents) and D1
+              runs each migration file as one transaction with foreign keys
+              enforced; SQLite's deferred-FK violation counter is incremented
+              by the DROP's implicit child-row orphaning and is not
+              decremented by the rename, so PRAGMA defer_foreign_keys does
+              not prevent the COMMIT failure even though foreign_key_check
+              reports no violations. This was reproduced and confirmed against
+              a real, disposable, non-production D1 fork
+              (federation-db-staging, database id
+              929f8ef0-daf9-4e43-b88e-daf226df24ae, created under the same
+              Cloudflare account, free-tier — 10 D1 databases/5 GB included)
+              before it could reach production federation-db: the full
+              schema chain (schema.sql, 0001-0009) was loaded into the fork,
+              representative rows were seeded in federation_organizations
+              and all three inbound-FK child tables, the naive migration was
+              applied and observed to fail and cleanly auto-rollback, then
+              the corrected migration (detach every child before the
+              rebuild, rebuild the table, reattach the children) was applied
+              and verified: data and child references preserved,
+              'suspended' accepted, an invalid status value still rejected
+              by the widened CHECK, no scratch tables left behind. AGENTS.md
+              gained a "D1 migration gotcha" subsection under "Validation
+              before handoff" so a future table recreate with inbound
+              foreign keys does not repeat this failure mode; README.md's
+              "Deliberate current boundaries" section now states this fix is
+              proven but not yet deployed, and links the live Slack alert
+              destination for the global Watchtower alert webhook.
+Tests Passing: source/federation-serverless npm run types PASS; npm test
+               30/30; migration 0010 applied and verified against the
+               federation-db-staging fork (17 queries executed, data and
+               inbound FK references preserved, widened CHECK accepts
+               'suspended' and rejects an invalid value)
+Phase       : PHASE-6 — fix validated on a disposable D1 fork, NOT yet
+              applied to production federation-db and NOT yet deployed
+Rollback Ref: git revert commit 323d320. Merged into fix/rooms-agents-migrations
+              2026-08-13, not yet pushed; the federation-db-staging fork used to
+              validate this migration is disposable — wrangler d1 delete
+              federation-db-staging removes it and touches nothing in
+              production; production federation-db was never modified by
+              this change (migration 0010 has NOT been applied to it yet)
+```
+
+## CL-0036 — Remove Every Hardcoded Agent/Project From Code, Add Watchtower HQ
+
+```
+Date        : 2026-08-13
+Contributor : Claude
+Modules     : [MOD-002, MOD-004, MOD-008, MOD-009, MOD-015]
+Section Tags: [[AGENT-REGISTRY-v1], [CHOREOGRAPHY-v1], [ROOM-LIFECYCLE-v1], [QUALITY-v1]]
+Files Changed: [source/federation-tv-package/federation-core/server.js,
+                source/federation-tv-package/federation-core/start-federation.sh,
+                source/federation-tv-package/federation-core/seed-agents.json (removed),
+                source/federation-tv-package/shared/agent-registry.js,
+                source/federation-tv-package/mcp-skill/tv-sitcom-mcp/scripts/tv_mcp_server.py,
+                source/federation-tv-package/mcp-skill/tv-sitcom-mcp/scripts/test_tv_mcp.py,
+                source/federation-tv-package/mcp-skill/federation-agent/SKILL.md,
+                source/federation-tv-package/tv-command-center/index.html,
+                source/federation-tv-package/README.md,
+                source/federation-tv-widget/src/react/OfficeStage.tsx,
+                source/federation-tv-widget/src/react/main.tsx,
+                source/federation-tv-widget/src/tv-widget.js,
+                source/federation-tv-widget/public/tv-widget.js,
+                source/federation-tv-widget/public/tv-widget-vanilla.js,
+                source/federation-tv-widget/public/office-stage.js,
+                source/federation-tv-widget/public/react-dist/assets/office-stage.js,
+                source/federation-tv-widget/public/index.html,
+                source/federation-tv-widget/public/manage.html,
+                source/federation-tv-widget/public/demo.html,
+                source/federation-tv-widget/public/test-local.html,
+                source/federation-tv-widget/public/onboarding.html,
+                source/federation-tv-widget/public/agent-skill.md,
+                source/federation-serverless/src/management.ts,
+                source/federation-serverless/agents-skill.md,
+                source/federation-serverless/README.md,
+                source/federation-serverless/src/lifecycle.test.ts,
+                source/federation-serverless/src/mcp.test.ts,
+                source/federation-serverless/src/alert-webhook.test.ts,
+                packages/watchtower-sdk/test/index.test.js]
+Description : Owner directive: the harness ships no agents of its own —
+              agents are pluggable, brought in only for testing after the
+              fundamentals are solid, never baked into the framework.
+              Removed the last real instance of hardcoded agents/projects,
+              which had survived in `federation-tv-package/` (the local
+              offline-demo + MCP-skill backend, confirmed still required —
+              tv-sitcom-mcp's MCP server defaults to this exact local
+              gateway on :41207, it is not dead code) even though the live
+              Cloudflare Worker and public widget were already clean apart
+              from a single 'autopilot' default value.
+              1) server.js: replaced the fixed 5-entry PROJECTS map + boot-
+              time initializeProjectRegistries() with lazy per-projectId
+              registry creation (getOrCreateRegistry), an isValidProjectId
+              format check replacing roster-membership checks on every
+              route, and existence guards added to PUT/DELETE/room-detail
+              handlers that previously assumed a registry always existed.
+              Also fixed an unrelated real bug found in passing: VAULT_PATH
+              was hardcoded to '/home/ubuntu/qwen-cloud-2026/memory', a
+              path from the old dead Qwen-cloud project that does not
+              exist on this machine — now $FEDERATION_VAULT_PATH env var
+              with a relative ./.vault default.
+              2) seed-agents.json (the literal 20-agent/5-project seed
+              data) deleted; start-federation.sh's auto-seed step (which
+              POSTed all 20 into the running server "so the TV stays live
+              across restarts") removed — the harness now starts empty,
+              same as any real deployment.
+              3) agent-registry.js's getProjectColors(): 5-entry hardcoded
+              colorMap (with a colorMap.autopilot fallback) replaced with a
+              deterministic hash-of-projectId → HSL accent, so any new
+              project gets a stable color for free instead of needing a
+              catalog entry.
+              4) tv_mcp_server.py (the MCP server backing the 3rd
+              interface — embeddable widget, main Watch page, and this MCP
+              version are the three deliberately-operational consumption
+              modes, confirmed by owner): TVRoomManager's hardcoded
+              self.projects dict (which even fabricated empty room
+              placeholders for all 5 fixed projects regardless of real
+              data) removed; get_all_rooms() and get_system_status() now
+              derive the project list from whatever the gateway actually
+              returns. In passing, fixed a real pre-existing bug: the
+              status dict literal had two "projects" keys ("projects":
+              len(self.projects) immediately overwritten by "projects":
+              {...}), so the agent-count field was always dead code in
+              Python (last dict key wins) — split into project_count vs a
+              plain project-id list.
+              5) tv-command-center/index.html: hardcoded nav links + a
+              PROJECT_META object (name/accent/emoji/color) replaced with a
+              dynamically-rendered nav (renderNav(), rebuilt from whatever
+              loadAgents() actually returns) and the same deterministic
+              hash-color function as agent-registry.js.
+              6) Live widget (source/federation-tv-widget/): the only
+              hardcoding left anywhere here was 'autopilot' used
+              consistently as a single default/example value (never a
+              roster) — swapped to 'default' across every fallback
+              (OfficeStage.tsx, main.tsx, both tv-widget.js copies kept
+              identical, tv-widget-vanilla.js, office-stage.js, demo.html,
+              test-local.html), rebuilt the vite bundle so
+              react-dist/assets/office-stage.js reflects the source instead
+              of being hand-patched. index.html additionally had one real
+              behavioral special-case, not just a placeholder: the room
+              picker's default-selection logic computed a generic
+              first-available-room fallback (firstKey) AND a redundant
+              preferredKey that overrode it specifically for the
+              'autopilot' project — removed the override entirely, so the
+              picker now genuinely prefers no project over another.
+              7) Watchtower HQ (owner-directed, mid-session): room_index 0
+              already existed as the room every project's registry
+              auto-creates on first init (AgentRegistry.initialize) and
+              the room assignToRoom() always fills first — meaning
+              self-registering agents already land there by construction,
+              no logic change needed for that part. What was missing:
+              visible identity and UI accuracy. index.html's room picker
+              now labels room_index 0 "Watchtower HQ" instead of "Room 1";
+              manage.html now shows an "HQ" badge on it and requires a
+              stronger confirm() warning before deleting it (owner's
+              explicit call: NOT code-blocked from deletion — the whole
+              /api/v1/admin/rooms/* route is already requireAdmin()-gated
+              on WATCHTOWER_ADMIN_TOKEN, which only the platform owner
+              holds, so a hard block would be redundant; organizations
+              never reach this endpoint at all). Also fixed two stale UI
+              claims in manage.html left over from CL-0034's merge (that
+              commit only touched the backend, never updated this admin
+              console's copy): the frontend's own delete-button visibility
+              logic still required 0 occupants ("canDel = used === 0"),
+              contradicting the backend's actual evict-not-block behavior
+              — removed the occupancy gate entirely so the operator can
+              trigger what the backend has done since CL-0034; also
+              corrected the "Rooms must be empty before deletion" and
+              "Delete empty rooms only" copy to describe eviction.
+              8) Test/doc consistency pass: 'autopilot' (and one
+              'mnemosyne') as an example placeholder value across test
+              fixtures and skill docs (agents-skill.md, both README.md
+              files touched, lifecycle.test.ts, mcp.test.ts,
+              alert-webhook.test.ts, watchtower-sdk's index.test.js)
+              swapped to neutral 'acme'/'other-proj' — these were never
+              hardcoded roster entries (all downstream code already
+              accepted projectId generically), just heavy, coincidental
+              reuse of one of the five retired names as the go-to example
+              string; changed for consistency, not correctness.
+              Noted, not touched: a stray duplicate federation-tv-package/
+              directory exists at the repo root (dated 2026-07-10, predates
+              and is not listed in CLAUDE.md's canonical layout table,
+              which only names source/federation-tv-package/) — flagged to
+              the owner, left alone pending a decision.
+Tests Passing: source/federation-serverless: npm run types PASS; node
+               --experimental-strip-types --test src/*.test.ts 30/30;
+               packages/watchtower-sdk: npm test 8/8; node --check on
+               server.js, agent-registry.js, both tv-widget.js copies
+               (kept identical), tv-widget-vanilla.js, office-stage.js;
+               python3 -m py_compile on tv_mcp_server.py + test_tv_mcp.py;
+               bash -n on start-federation.sh; vite build clean (rebuilt
+               react-dist bundle); git diff --check clean; full repo-wide
+               grep sweep (excluding node_modules and the untracked
+               inspiration/ material, which is unrelated pre-existing
+               cleanup, not this session's to touch) confirms zero
+               remaining autopilot/aires/agora/edgewalker/mnemosyne
+               references in real code.
+Phase       : PHASE-6 — harness genuinely ships no agents; not yet pushed,
+              not yet deployed
+Rollback Ref: revert this commit. No schema/migration change. The deleted
+              seed-agents.json is recoverable from git history
+              (source/federation-tv-package/federation-core/seed-agents.json
+              at the prior commit) if a future demo genuinely wants seeded
+              content again — it should be re-added as an explicit,
+              non-auto-run option, not restored to auto-seed-on-start.
 ```

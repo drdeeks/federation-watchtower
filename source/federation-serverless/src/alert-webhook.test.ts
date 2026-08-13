@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { alertWebhookFormat, formatAlertMessage, buildAlertDelivery } from "./alert-webhook.ts";
 
 const alert = {
-  deliveryId: "notify_1", projectId: "autopilot", incidentId: "inc_1", eventId: "evt_1",
+  deliveryId: "notify_1", projectId: "acme", incidentId: "inc_1", eventId: "evt_1",
   agentId: "build-01", severity: "critical", action: "pause",
   statement: "chain depth exceeded", reason: "chain depth 6 exceeds 5",
 };
@@ -19,7 +19,7 @@ test("formatAlertMessage is one readable line with severity and context", () => 
   const m = formatAlertMessage(alert);
   assert.match(m, /Watchtower alert/);
   assert.match(m, /critical/);
-  assert.match(m, /autopilot/);
+  assert.match(m, /acme/);
   assert.match(m, /agent build-01/);
   assert.match(m, /chain depth 6 exceeds 5/);
 });

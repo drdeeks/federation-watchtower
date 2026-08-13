@@ -2,12 +2,12 @@
  * Federation TV Widget — Embeddable Agent Diorama
  * 
  * Usage (script tag):
- *   <script src="https://watch.drdeeks.xyz/tv-widget.js" data-project="autopilot" data-gateway="https://fapi.drdeeks.xyz"></script>
+ *   <script src="https://watch.drdeeks.xyz/tv-widget.js" data-project="default" data-gateway="https://fapi.drdeeks.xyz"></script>
  *   <div id="federation-tv"></div>
  * 
  * Usage (ES Module):
  *   import { FederationTV } from 'https://watch.drdeeks.xyz/tv-widget.js';
- *   new FederationTV({ projectId: 'autopilot', container: '#federation-tv' });
+ *   new FederationTV({ projectId: 'default', container: '#federation-tv' });
  * 
  * Agents submit speech via MCP:
  *   submitSpeechLine(agentId, "deploying to prod at 3am 🚀")
