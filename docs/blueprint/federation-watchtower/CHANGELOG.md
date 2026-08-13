@@ -1116,3 +1116,58 @@ Rollback Ref: revert commit 891ff0f; re-apply migration 0009's FK if ever
               FK drop alone — that reintroduces the individual-owner
               registration outage)
 ```
+
+## CL-0034 — Room Deletion Evicts (Never Blocks or Kills), Revoke Stays the Kill Switch
+
+```
+Date        : 2026-07-21
+Contributor : titan-agent
+Modules     : [MOD-002, MOD-003, MOD-004, MOD-008, MOD-013]
+Section Tags: [[ACCESS-v1], [CHOREOGRAPHY-v1], [DATA-ARCH-v1]]
+Files Changed: [source/federation-serverless/src/management.ts,
+                source/federation-serverless/src/agent-registry.ts,
+                source/federation-serverless/package.json]
+Description : Root cause of two reported symptoms ("can't delete rooms" and
+              "stale agents won't leave") was the same: admin room deletion
+              (DELETE /api/v1/admin/rooms/{id}) refused unless the room was
+              empty (SELECT COUNT(*) FROM agents WHERE room_id = ? > 0 -> 409),
+              but nothing ever cleared an agent's room_id when it went offline
+              (watchdog heartbeat.missed, lifecycle disconnect, and admin
+              pause/revoke all call setAgentStatus("offline") only), so rooms
+              never read as empty and could not be deleted. The WatchDog was
+              verified to be presentation-only (OfficeStage.tsx, labelled
+              "station mascot · presentation") — never a row in the agents
+              table — so it does not count toward occupancy and is not the
+              cause. Fix: room deletion now ALWAYS succeeds and never harms an
+              occupant. Each agent still inside is EVICTED — relocated to the
+              first available room in its project (the always-on HQ once the
+              temporary test rooms are removed and the operator's own room is
+              first in the lineup) via the new AgentRegistry.reassignToNextRoom
+              (serialized with blockConcurrencyWhile like registration; falls
+              back to creating a default room if none remain). Credentials and
+              all records are preserved — traceability is never sacrificed by a
+              room operation. Killing an agent's credentials remains the
+              separate, explicit admin REVOKE action, refactored into a shared
+              hardRevokeAgent helper (stop watchdog, mark canonical record
+              revoked + null room_id + revoke credentials — only when a
+              canonical federation_agents record exists, since legacy
+              signed-producer agents live only in the scene table and
+              federation_lifecycle_events.agent_id is FK-bound to
+              federation_agents — project an offline exit, then unregister the
+              scene row). Also wired the previously unscripted 0007 speech
+              repertoire seed as the migrate:speech-seed npm script (it had no
+              runner and may never have been applied). NOTE: still to build —
+              admin organization management (list accepted orgs; pause/resume/
+              delete cascading to their agents), which will need a migration to
+              widen federation_organizations.status beyond the current
+              CHECK(status IN ('draft','submitted','approved','rejected')); the
+              existing approve/suspend code already writes 'active'/'suspended',
+              which violate that constraint today.
+Tests Passing: serverless tests 30/30, npm run types PASS. NOT yet merged to
+               fix/rooms-agents-migrations and NOT yet deployed — no live
+               post-deploy verification performed for this entry.
+Phase       : PHASE-6 — public projection is real-data end to end
+Rollback Ref: revert commit 63acb8e (room eviction + revoke refactor +
+              migrate:speech-seed). No schema/migration change in this entry,
+              so no data rollback required.
+```
