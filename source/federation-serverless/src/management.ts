@@ -194,7 +194,7 @@ export async function handleManagementRequest(input: {
     const where = statusFilter ? " WHERE status = ?" : "";
     if (statusFilter) binds.push(statusFilter);
     const rows = await env.DB.prepare(
-      `SELECT id, organization_id, owner_id, name, contact_email, official_url, status, created_at, updated_at
+      `SELECT id, owner_id, name, contact_email, official_url, status, created_at, updated_at
        FROM federation_organizations${where} ORDER BY created_at DESC`
     ).bind(...binds).all<OrgRow>();
     const organizations = (rows.results || []).map(presentOrg);
@@ -205,7 +205,7 @@ export async function handleManagementRequest(input: {
   const orgGet = path.match(/^\/api\/v1\/admin\/organizations\/([^/]+)$/);
   if (orgGet && method === "GET") {
     const orgId = validateAgentId(decodeURIComponent(orgGet[1]));
-    const org = await env.DB.prepare("SELECT id, organization_id, owner_id, name, contact_email, official_url, status, created_at, updated_at FROM federation_organizations WHERE id = ?").bind(orgId).first<OrgRow>();
+    const org = await env.DB.prepare("SELECT id, owner_id, name, contact_email, official_url, status, created_at, updated_at FROM federation_organizations WHERE id = ?").bind(orgId).first<OrgRow>();
     if (!org) return json({ error: "organization not found" }, 404);
     const proofs = await env.DB.prepare("SELECT platform, url, created_at FROM federation_organization_social_proofs WHERE organization_id = ?").bind(orgId).all();
     const questions = await env.DB.prepare("SELECT position, question, answer, created_at FROM federation_organization_questions WHERE organization_id = ? ORDER BY position").bind(orgId).all();
@@ -319,13 +319,13 @@ export function presentRoom(r: RoomRow) {
 }
 
 interface OrgRow {
-  id: string; organization_id: string; owner_id: string; name: string; contact_email: string;
+  id: string; owner_id: string; name: string; contact_email: string;
   official_url: string; status: string; created_at: number; updated_at: number;
 }
 
 export function presentOrg(o: OrgRow) {
   return {
-    id: o.id, organizationId: o.organization_id, ownerId: o.owner_id, name: o.name,
+    id: o.id, organizationId: o.id, ownerId: o.owner_id, name: o.name,
     contactEmail: o.contact_email, officialUrl: o.official_url,
     status: o.status, createdAt: o.created_at, updatedAt: o.updated_at,
   };

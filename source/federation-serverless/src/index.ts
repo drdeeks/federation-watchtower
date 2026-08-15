@@ -1,25 +1,28 @@
-import { AgentRegistry } from "./agent-registry";
-import { FederationCoordinator } from "./federation-coordinator";
-import type { WatchtowerEnv } from "./agent-registry";
-import { AgentWatchdog } from "./agent-watchdog";
-import { RoomScene } from "./room-scene";
-import { ProjectGuardrail, type AlertDispatch } from "./project-guardrail";
+import { AgentRegistry } from "./agent-registry.ts";
+import { FederationCoordinator } from "./federation-coordinator.ts";
+import type { WatchtowerEnv } from "./agent-registry.ts";
+import { AgentWatchdog } from "./agent-watchdog.ts";
+import { RoomScene } from "./room-scene.ts";
+import { ProjectGuardrail, type AlertDispatch } from "./project-guardrail.ts";
 import { createMcpHandler } from "agents/mcp";
-import { createWatchtowerMcpServer, isIpAllowed, parseMcpCredential, toMcpPrincipal, verifyMcpApiKey } from "./mcp";
-import { handleLifecycleRequest, authenticateAgent } from "./lifecycle";
-import { handleManagementRequest } from "./management";
-import { alertWebhookFormat, buildAlertDelivery } from "./alert-webhook";
+import { createWatchtowerMcpServer, isIpAllowed, parseMcpCredential, toMcpPrincipal, verifyMcpApiKey } from "./mcp.ts";
+import { handleLifecycleRequest, authenticateAgent, authenticateOwner } from "./lifecycle.ts";
+import { handleManagementRequest } from "./management.ts";
+import { authenticateOperatorOrAdmin, issueOperatorCredential, revokeOperatorCredentials } from "./operator-rbac.ts";
+import { alertWebhookFormat, buildAlertDelivery } from "./alert-webhook.ts";
+import { HttpError, authenticateProducer, authenticateCanonicalOrProducer } from "./http-auth.ts";
+import { validateWebhookDestinationBody, upsertWebhookDestination, resolveWebhookDestination } from "./webhooks.ts";
 import {
   constantTimeEqual, hmacSha256Hex, sha256Hex, validateAgentId,
   validateCommandAcknowledgement, validateControlledToolAuthorizationRequest, validateLeaseRequest, validateLeaseValidationRequest,
   validateOperationalEvent, validateProjectId, validateValidationGateRequest, ValidationError,
-} from "./watchtower";
+} from "./watchtower.ts";
 
-export { AgentRegistry } from "./agent-registry";
-export { FederationCoordinator } from "./federation-coordinator";
-export { ProjectGuardrail } from "./project-guardrail";
-export { AgentWatchdog } from "./agent-watchdog";
-export { RoomScene } from "./room-scene";
+export { AgentRegistry } from "./agent-registry.ts";
+export { FederationCoordinator } from "./federation-coordinator.ts";
+export { ProjectGuardrail } from "./project-guardrail.ts";
+export { AgentWatchdog } from "./agent-watchdog.ts";
+export { RoomScene } from "./room-scene.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,11 +39,6 @@ function error(message: string, status = 400): Response {
 }
 
 const MAX_EVENT_BYTES = 64 * 1024;
-const SIGNATURE_WINDOW_MS = 5 * 60 * 1_000;
-
-class HttpError extends Error {
-  constructor(readonly status: number, message: string) { super(message); }
-}
 
 async function readBoundedJson(request: Request, maxBytes = MAX_EVENT_BYTES): Promise<{ raw: string; value: unknown }> {
   const contentLength = request.headers.get("Content-Length");
@@ -65,24 +63,6 @@ async function readBoundedJson(request: Request, maxBytes = MAX_EVENT_BYTES): Pr
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
   const raw = new TextDecoder().decode(bytes);
   try { return { raw, value: JSON.parse(raw) }; } catch { throw new HttpError(400, "request body must be valid JSON"); }
-}
-
-async function authenticateProducer(request: Request, rawBody: string, env: WatchtowerEnv): Promise<string> {
-  const secret = env.WATCHTOWER_INGESTION_SECRET;
-  if (!secret) {
-    if (env.ENVIRONMENT === "production") throw new HttpError(503, "event ingestion is not configured");
-    return "local-development";
-  }
-  const timestamp = request.headers.get("X-Watchtower-Timestamp");
-  const supplied = request.headers.get("X-Watchtower-Signature")?.replace(/^sha256=/i, "");
-  if (!timestamp || !supplied || !/^\d{10,13}$/.test(timestamp) || !/^[a-f0-9]{64}$/i.test(supplied)) throw new HttpError(401, "missing or malformed producer signature");
-  const timestampMs = timestamp.length === 10 ? Number(timestamp) * 1_000 : Number(timestamp);
-  if (!Number.isSafeInteger(timestampMs) || Math.abs(Date.now() - timestampMs) > SIGNATURE_WINDOW_MS) throw new HttpError(401, "producer signature timestamp is stale");
-  const expected = await hmacSha256Hex(secret, `${timestamp}.${rawBody}`);
-  if (!constantTimeEqual(expected, supplied.toLowerCase())) throw new HttpError(401, "producer signature is invalid");
-  const producer = request.headers.get("X-Watchtower-Producer") || "signed-producer";
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(producer)) throw new HttpError(400, "producer identifier contains unsupported characters");
-  return producer;
 }
 
 function requireAdmin(request: Request, env: WatchtowerEnv): Response | null {
@@ -355,8 +335,8 @@ export default {
         const projectId = validated(() => validateProjectId(leaseValidationMatch[1]));
         const leaseId = validated(() => validateAgentId(leaseValidationMatch[2]));
         const { raw, value } = await readBoundedJson(request);
-        await authenticateProducer(request, raw, env);
         const { agentId } = validated(() => validateLeaseValidationRequest(value));
+        await authenticateCanonicalOrProducer(request, raw, env, projectId, agentId);
         if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
         const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
         const result = await guardrail.validateLease(projectId, leaseId, agentId);
@@ -367,9 +347,9 @@ export default {
       if (controlledToolMatch && method === "POST") {
         const projectId = validated(() => validateProjectId(controlledToolMatch[1]));
         const { raw, value } = await readBoundedJson(request);
-        const producerId = await authenticateProducer(request, raw, env);
         const authorization = validated(() => validateControlledToolAuthorizationRequest(value));
         if (authorization.projectId !== projectId) return error("projectId must match the request path", 400);
+        const producerId = await authenticateCanonicalOrProducer(request, raw, env, projectId, authorization.agentId);
         if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
         const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
         const result = await guardrail.authorizeControlledTool(authorization, producerId);
@@ -380,9 +360,9 @@ export default {
       if (validationGateMatch && method === "POST") {
         const projectId = validated(() => validateProjectId(validationGateMatch[1]));
         const { raw, value } = await readBoundedJson(request);
-        const producerId = await authenticateProducer(request, raw, env);
         const gate = validated(() => validateValidationGateRequest(value));
         if (gate.projectId !== projectId) return error("projectId must match the request path", 400);
+        const producerId = await authenticateCanonicalOrProducer(request, raw, env, projectId, gate.agentId);
         if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
         const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
         const result = await guardrail.evaluateValidationGate(gate, producerId);
@@ -432,7 +412,7 @@ export default {
       if (commandListMatch && method === "GET") {
         const projectId = validated(() => validateProjectId(commandListMatch[1]));
         const agentId = validated(() => validateAgentId(commandListMatch[2]));
-        await authenticateProducer(request, "", env);
+        await authenticateCanonicalOrProducer(request, "", env, projectId, agentId);
         if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
         const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
         return json({ commands: await guardrail.getPendingCommands(projectId, agentId) });
@@ -442,8 +422,8 @@ export default {
       if (commandAcknowledgementMatch && method === "POST") {
         const projectId = validated(() => validateProjectId(commandAcknowledgementMatch[1]));
         const { raw, value } = await readBoundedJson(request);
-        await authenticateProducer(request, raw, env);
         const acknowledgement = validated(() => validateCommandAcknowledgement(value));
+        await authenticateCanonicalOrProducer(request, raw, env, projectId, acknowledgement.agentId);
         if (!await coordinator.getProjectSummary(projectId)) return error("project not found", 404);
         const guardrail = env.PROJECT_GUARDRAIL.get(env.PROJECT_GUARDRAIL.idFromName(projectId)) as DurableObjectStub<ProjectGuardrail>;
         const result = await guardrail.acknowledgeCommand(projectId, acknowledgement);
@@ -582,6 +562,69 @@ export default {
         return json(await coordinator.getMCPAccessLogs(orgId, limit));
       }
 
+      // ==================== ORGANIZATION OPERATOR CREDENTIALS (MOD-001) ====================
+      // Issue a per-organization operator credential, scoped server-side to
+      // this organizationId only -- replaces operator.html's ?project= convenience
+      // riding on the platform-wide WATCHTOWER_ADMIN_TOKEN. Admin-gated issuance,
+      // one-time reveal, same pattern as fw_owner_*/fw_agent_*.
+      const operatorCredentialMatch = path.match(/^\/api\/v1\/organizations\/([^/]+)\/operator-credential$/);
+      if (operatorCredentialMatch && method === "POST") {
+        const denied = requireAdmin(request, env);
+        if (denied) return denied;
+        const organizationId = validated(() => validateAgentId(operatorCredentialMatch[1]));
+        const org = await env.DB.prepare("SELECT id, status FROM federation_organizations WHERE id = ?").bind(organizationId).first<{ id: string; status: string }>();
+        if (!org) return error("organization not found", 404);
+        if (org.status !== "approved") return error("operator credentials can only be issued to an approved organization", 409);
+        const credential = await issueOperatorCredential(env, organizationId);
+        return json({ organizationId, credential: { token: credential.token, scopes: credential.scopes, issuedAt: credential.issuedAt }, requestId: crypto.randomUUID() }, 201);
+      }
+
+      const operatorCredentialRevokeMatch = path.match(/^\/api\/v1\/organizations\/([^/]+)\/operator-credential\/revoke$/);
+      if (operatorCredentialRevokeMatch && method === "POST") {
+        const denied = requireAdmin(request, env);
+        if (denied) return denied;
+        const organizationId = validated(() => validateAgentId(operatorCredentialRevokeMatch[1]));
+        const org = await env.DB.prepare("SELECT id FROM federation_organizations WHERE id = ?").bind(organizationId).first<{ id: string }>();
+        if (!org) return error("organization not found", 404);
+        const revoked = await revokeOperatorCredentials(env, organizationId);
+        return json({ organizationId, revoked, requestId: crypto.randomUUID() });
+      }
+
+      // ==================== WEBHOOK DESTINATIONS (MOD-003) ====================
+      // Set/replace this organization's own alert webhook destination.
+      // Operator credential (scoped to this org) or platform admin.
+      const orgWebhookMatch = path.match(/^\/api\/v1\/organizations\/([^/]+)\/webhook$/);
+      if (orgWebhookMatch && method === "PUT") {
+        const organizationId = validated(() => validateAgentId(orgWebhookMatch[1]));
+        const org = await env.DB.prepare("SELECT id FROM federation_organizations WHERE id = ?").bind(organizationId).first<{ id: string }>();
+        if (!org) return error("organization not found", 404);
+        const auth = await authenticateOperatorOrAdmin(request, env, organizationId);
+        if (!auth) return error("an operator credential for this organization (or admin) is required", 401);
+        const { value } = await readBoundedJson(request);
+        const destination = validated(() => validateWebhookDestinationBody(value));
+        const result = await upsertWebhookDestination(env, "organization", organizationId, destination);
+        return json({ organizationId, webhook: result, requestId: crypto.randomUUID() });
+      }
+
+      // Set/replace one agent's own webhook override. Requires that specific
+      // agent's owner credential, or platform admin -- never another owner's
+      // fw_owner_*, even one that owns a different agent in the same project.
+      const agentWebhookMatch = path.match(/^\/api\/v1\/agents\/([^/]+)\/webhook$/);
+      if (agentWebhookMatch && method === "PUT") {
+        const canonicalAgentId = decodeURIComponent(agentWebhookMatch[1]);
+        const agentRow = await env.DB.prepare("SELECT id, owner_id FROM federation_agents WHERE id = ?").bind(canonicalAgentId).first<{ id: string; owner_id: string }>();
+        if (!agentRow) return error("agent not found", 404);
+        const adminDenied = requireAdmin(request, env);
+        if (adminDenied) {
+          const owner = await authenticateOwner(request, env);
+          if (!owner || owner.id !== agentRow.owner_id) return error("this agent's owner credential (or admin) is required", 401);
+        }
+        const { value } = await readBoundedJson(request);
+        const destination = validated(() => validateWebhookDestinationBody(value));
+        const result = await upsertWebhookDestination(env, "agent", canonicalAgentId, destination);
+        return json({ agentId: canonicalAgentId, webhook: result, requestId: crypto.randomUUID() });
+      }
+
       // ==================== PROJECT-SPECIFIC ROUTES ====================
       const projectMatch = path.match(/^\/api\/projects\/([^/]+)\/(.*)$/);
       if (projectMatch) {
@@ -624,7 +667,12 @@ export default {
         continue;
       }
 
-      const configuredUrl = env.WATCHTOWER_ALERT_WEBHOOK_URL;
+      // MOD-003: an agent-level override wins, then that agent's organization's
+      // destination, then the global WATCHTOWER_ALERT_WEBHOOK_URL as the
+      // last resort -- preserves today's behavior for anyone who hasn't
+      // configured a scoped destination yet.
+      const scoped = await resolveWebhookDestination(env, alert.projectId, alert.agentId);
+      const configuredUrl = scoped?.url ?? env.WATCHTOWER_ALERT_WEBHOOK_URL;
       if (!configuredUrl) {
         await guardrail.updateNotification(alert.deliveryId, "suppressed", "no alert webhook is configured");
         message.ack();
@@ -633,8 +681,9 @@ export default {
 
       try {
         const webhookUrl = alertWebhookUrl(configuredUrl);
-        const format = alertWebhookFormat(env.WATCHTOWER_ALERT_WEBHOOK_FORMAT);
-        const { body, headers } = await buildAlertDelivery(alert, format, env.WATCHTOWER_ALERT_WEBHOOK_SECRET);
+        const format = scoped?.format ?? alertWebhookFormat(env.WATCHTOWER_ALERT_WEBHOOK_FORMAT);
+        const secret = scoped ? (scoped.secret ?? undefined) : env.WATCHTOWER_ALERT_WEBHOOK_SECRET;
+        const { body, headers } = await buildAlertDelivery(alert, format, secret);
         const response = await fetch(webhookUrl, { method: "POST", headers, body });
         if (!response.ok) throw new Error(`webhook returned HTTP ${response.status}`);
         await guardrail.updateNotification(alert.deliveryId, "delivered");

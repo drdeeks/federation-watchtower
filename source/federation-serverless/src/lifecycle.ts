@@ -85,8 +85,8 @@ export async function handleLifecycleRequest(input: {
       // Pipe question and answer into the speech pool (truncated to 120 chars, best-effort unique)
       const q = item.question.slice(0, 120);
       const a = item.answer.slice(0, 120);
-      statements.push(env.DB.prepare("INSERT OR IGNORE INTO federation_speech_lines (federation_id, agent_id, project_id, statement, is_unique, submitted_at) VALUES (?, ?, ?, ?, 1, ?)").bind(organizationId, "org-applicant", manifest?.projectId || organizationId, q, now));
-      statements.push(env.DB.prepare("INSERT OR IGNORE INTO federation_speech_lines (federation_id, agent_id, project_id, statement, is_unique, submitted_at) VALUES (?, ?, ?, ?, 1, ?)").bind(organizationId, "org-applicant", manifest?.projectId || organizationId, a, now));
+      statements.push(env.DB.prepare("INSERT OR IGNORE INTO federation_speech_lines (federation_id, agent_id, project_id, statement, is_unique, submitted_at) VALUES (?, ?, ?, ?, 1, ?)").bind(organizationId, "org-applicant", organizationId, q, now));
+      statements.push(env.DB.prepare("INSERT OR IGNORE INTO federation_speech_lines (federation_id, agent_id, project_id, statement, is_unique, submitted_at) VALUES (?, ?, ?, ?, 1, ?)").bind(organizationId, "org-applicant", organizationId, a, now));
     });
     await env.DB.batch(statements);
     return json({ application: { organizationId, name, status: "submitted", questionCount: 5, socialProofCount: socialProofs.length }, requestId: crypto.randomUUID() }, 201);
@@ -201,15 +201,22 @@ export async function handleLifecycleRequest(input: {
   return json({ agent: { ...presentAgent(agent), lifecycleState: "connected", lastHeartbeatAt: now }, watchdogDeadlineAt: deadlineAt, requestId: crypto.randomUUID() });
 }
 
-async function authenticateOwner(request: Request, env: WatchtowerEnv): Promise<Owner | null> {
+export async function authenticateOwner(request: Request, env: WatchtowerEnv): Promise<Owner | null> {
   const token = bearer(request, OWNER_PREFIX); if (!token) return null;
   return env.DB.prepare("SELECT id, display_name, owner_type, status FROM federation_owners WHERE credential_hash = ? AND status = 'active'").bind(await sha256Hex(token)).first<Owner>();
 }
 
 export async function authenticateAgent(request: Request, env: WatchtowerEnv, projectId: string, agentId: string): Promise<CanonicalAgent | null> {
   const token = bearer(request, AGENT_PREFIX); if (!token) return null;
-  return env.DB.prepare(`SELECT a.* FROM federation_agents a JOIN federation_agent_credentials c ON c.agent_id = a.id WHERE a.project_id = ? AND a.agent_id = ? AND a.lifecycle_state != 'revoked' AND a.paused_at IS NULL AND c.credential_hash = ? AND c.revoked_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > ?)`)
-    .bind(projectId, agentId, await sha256Hex(token), Date.now()).first<CanonicalAgent>();
+  const credentialHash = await sha256Hex(token);
+  const agent = await env.DB.prepare(`SELECT a.* FROM federation_agents a JOIN federation_agent_credentials c ON c.agent_id = a.id WHERE a.project_id = ? AND a.agent_id = ? AND a.lifecycle_state != 'revoked' AND a.paused_at IS NULL AND c.credential_hash = ? AND c.revoked_at IS NULL AND (c.expires_at IS NULL OR c.expires_at > ?)`)
+    .bind(projectId, agentId, credentialHash, Date.now()).first<CanonicalAgent>();
+  // federation_agent_credentials.last_used_at existed in the 0004 schema but
+  // was never written anywhere -- mcp_organizations.last_access_at already
+  // gets this same tracking (authenticateMcpPrincipal), this brings the
+  // per-agent credential to the same observability standard.
+  if (agent) await env.DB.prepare("UPDATE federation_agent_credentials SET last_used_at = ? WHERE credential_hash = ?").bind(Date.now(), credentialHash).run();
+  return agent;
 }
 
 export function validateLifecycleManifest(value: unknown): Manifest {
