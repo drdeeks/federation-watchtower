@@ -26,8 +26,9 @@ presentation with no source event.
    Do not mark work complete until its acceptance evidence exists.
 2. `docs/blueprint/federation-watchtower/blueprint.md` is immutable reference
    material. Do not edit it for ordinary implementation work.
-3. `docs/blueprint/federation-watchtower/CHANGELOG.md` is append-only. Record
-   material implementation work using the Part V format from the blueprint.
+3. `CHANGELOG.md` (repo root) is the one project-wide change log — every
+   material change, regardless of which part of the repo it touches. Append
+   only; don't split changelogs by subsystem or blueprint.
 4. `docs/review/FEDERATION_SYSTEM_SPEC.md` gives the current expanded product
    context. `docs/review/HOST_SURFACE_CONTRACT.md` records current domain
    boundaries and explicit gaps.
@@ -154,8 +155,18 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   signature), while `json` (default) posts the generic HMAC-signed envelope that
   a custom receiver such as `POST /api/v1/alert-sink` verifies. The format set is
   intentionally small so more destinations (PagerDuty, Teams, email relay) can be
-  added later behind the same switch. Per-owner webhook destinations remain a
-  separate, unbuilt increment.
+  added later behind the same switch.
+- Per-organization operator credentials (`fw_operator_*`, admin-issued, scoped
+  server-side to one organizationId): `POST /api/v1/organizations/{id}/operator-credential`
+  and `.../operator-credential/revoke`. Per-organization and per-agent webhook
+  destinations: `PUT /api/v1/organizations/{id}/webhook` (operator-or-admin) and
+  `PUT /api/v1/agents/{id}/webhook` (that agent's owner, or admin) — resolution is
+  agent override → organization destination → global webhook URL.
+  `organization.html` has a live config form for this. Canonical
+  `fw_owner_*`/`fw_agent_*` bearer auth also now covers the 4 previously
+  HMAC-only legacy routes (lease validate, tool authorize, validation gate,
+  command acknowledge/list) — canonical bearer, if present, is used
+  exclusively, no HMAC fallback.
 
 ### Important work that is not done
 
@@ -170,14 +181,13 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   end-to-end test. Never expose the shared ingestion or administrator secret in
   a browser.
 - Stream cursors, public snapshots, and a complete room-family model.
-- A separate per-organization operator credential. `operator.html`'s
-  `?project=<id>` lock (see above) narrows the UI but still authenticates with
-  the shared `WATCHTOWER_ADMIN_TOKEN`; it is not organization-scoped RBAC.
-  **Owner's explicit directive (2026-08-13): organizations must never share
-  the platform admin key.** This is not optional polish — it's the
-  prerequisite for the next two items to work correctly, since neither
-  branding nor webhook attribution can be scoped to "this org" without a
-  real, distinct identity for that org to hold.
+- The per-organization operator credential API exists (issue/revoke, see
+  above), but `operator.html` itself hasn't been wired to use it —
+  its `?project=<id>` lock still authenticates with the shared
+  `WATCHTOWER_ADMIN_TOKEN`, not the new scoped credential. **Owner's explicit
+  directive (2026-08-13): organizations must never share the platform admin
+  key.** Branding below still depends on this UI wiring, not on the
+  credential primitive itself, which is done.
 - Normalized organization questions/answers and a secure applicant/reviewer UX.
 - Payments, subscriptions, x402 settlement, and tier enforcement.
 - **Organization branding (logo + color), gated on approval status.**
@@ -194,16 +204,6 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   exists for evidence exports and could plausibly serve this), a real color
   picker somewhere in the org's own flow (not admin-only), and an
   approval-status gate in front of both.
-- **Per-organization and per-agent designated webhook destinations.**
-  Today's alert webhook is global and singular
-  (`WATCHTOWER_ALERT_WEBHOOK_URL`/`WATCHTOWER_ALERT_WEBHOOK_FORMAT`, one
-  destination for the whole platform — see `alert-webhook.ts` and
-  `docs/review/COMPLETE_SPEC.md` §4). Owner wants each organization AND
-  each individual agent to have its own webhook, so notifications are
-  correctly attributed to the actual recipient instead of all funneling
-  through one shared destination. Depends on the real per-org/per-agent
-  identity item above — attribution is only meaningful once there's a real
-  distinct identity to attribute to.
 - **Watch page's "On camera" counter needs a companion global-total stat,
   not a replacement.** `index.html`'s `agent-count` (labeled "On camera")
   is deliberately scoped to whichever room is currently selected — a
@@ -227,27 +227,6 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   do that review before attempting to wire it up for real.
 
 Do not describe any item in this second list as live or complete.
-
-## Submission truth
-
-Audited against the live Devpost OpenAI Build Week configuration on 2026-07-18:
-
-- Devpost project **Federation Watchtower** (`1346118`) is published as a
-  standalone project.
-- The Federation mark thumbnail is uploaded and publicly retrievable.
-- The project is **not yet submitted to OpenAI Build Week**.
-- No public demo video is attached yet; the submission requires a public
-  YouTube video under three minutes with audio explaining the build and the use
-  of Codex and GPT-5.6.
-- Required submission fields are submitter type, country of residence,
-  category (`Developer Tools`), repository URL, `/feedback` session ID, plus
-  the optional developer-tool testing instructions field.
-- The repository, Watchtower, API, Federation member page, and published npm
-  SDK are linked from the Devpost project.
-
-Do not mark the hackathon submission complete until the user has entered the
-required identity fields, attached the project to the `openai` challenge,
-added the video and `/feedback` ID, and pressed the final submission action.
 
 ## Current legacy registration shape
 
@@ -464,11 +443,10 @@ prior version of this section are resolved; see CL-0034/0035/0036.
 4. **Org-management cascade behavior is unbuilt.** Pause should pause an
    org's agents; delete should evict agents to HQ and remove rooms while
    preserving records. Separate from the CHECK-constraint fix above — not
-   started. Related, also unbuilt: real per-organization operator
-   credentials — `operator.html`'s `?project=<id>` lock narrows the UI but
-   still authenticates with the shared admin token, not org-scoped RBAC (see
-   "Important work that is not done" above). The owner's stated intent:
-   organizations should ultimately manage only their own room and agents.
+   started. The per-organization operator credential API itself is now built
+   (see above); `operator.html` still hasn't been wired to use it in place of
+   the shared admin token. The owner's stated intent: organizations should
+   ultimately manage only their own room and agents.
 5. **`.claude/` + root `CLAUDE.md` git-history cleanup is still paused for
    the history-rewrite part.** The rooms worktree's `9b824d2` (merged
    2026-08-13) untracks `.claude/` and `CLAUDE.md` **going forward only** —

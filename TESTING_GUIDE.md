@@ -405,6 +405,4 @@ After running tests, verify:
 
 After tests pass:
 
-1. **Record demo video** - Follow `VIDEO_RECORDING_GUIDE.md`
-2. **Complete Devpost submission** - Attach to OpenAI Build Week challenge
-3. **Monitor production** - Check admin console for real agent activity
+1. **Monitor production** - Check admin console for real agent activity
