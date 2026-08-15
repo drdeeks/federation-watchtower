@@ -22,9 +22,55 @@
       <article class="card"><h2>Organization application</h2><ul><li>Owner identity and organization ID</li><li>Verified contact email</li><li>Official HTTPS website or repository</li><li>Two or more non-GitHub social proofs</li><li>Exactly five technical questions and answers</li></ul></article>
       <article class="card full"><h2>Submit an application</h2><p>Create an owner and submit the application from the self-serve onboarding page — no curl required:</p><p><a class="button" href="https://federation.drdeeks.xyz/onboarding.html" style="display:inline-block;padding:10px 14px;background:#f4c842;color:#10201e;text-decoration:none;font-weight:800;border:1px solid #f4c842">Open onboarding &amp; apply</a></p><p>Prefer the API directly? <code>POST /api/v1/owners</code> then <code>POST /api/v1/organizations/applications</code> with <code>Authorization: Bearer fw_owner_…</code>. The full JSON contract and administrator procedures are in <code>docs/review/ACCESS_AND_ONBOARDING.md</code>.</p></article>
       <article class="card"><h2>Administrator setup</h2><p>The deployment administrator can create MCP organization principals with <code>WATCHTOWER_ADMIN_TOKEN</code>, assign minimum scopes, rotate keys, suspend/revoke access, review applications, and export evidence.</p></article>
-      <article class="card"><h2>Honest boundary</h2><p>Browser owner signup and organization application submission are live on the <a href="https://federation.drdeeks.xyz/onboarding.html">onboarding page</a>. Reviewer screens, organization RBAC, per-owner webhooks, and billing are not live yet. Do not paste an admin or ingestion secret into a form.</p></article>
+      <article class="card full">
+        <h2>Webhook destination (approved organizations)</h2>
+        <p>Once an organization is approved, an administrator issues it a scoped operator credential (<code>POST /api/v1/organizations/&lt;id&gt;/operator-credential</code>). That credential — never the platform admin token — sets where this organization's alerts are delivered. The credential is shown once at issuance; paste it below, it is never stored.</p>
+        <form id="webhookForm" class="webhookForm" style="display:grid;gap:10px;max-width:520px;margin-top:14px">
+          <label>API endpoint <input id="whApi" autocomplete="url" spellcheck="false" style="width:100%;padding:8px;background:#0a1211;border:1px solid #355850;color:#dff5ee"></label>
+          <label>Organization ID <input id="whOrg" autocomplete="off" spellcheck="false" style="width:100%;padding:8px;background:#0a1211;border:1px solid #355850;color:#dff5ee"></label>
+          <label>Operator credential (or admin token) <input id="whToken" type="password" autocomplete="off" placeholder="fw_operator_… — never stored" style="width:100%;padding:8px;background:#0a1211;border:1px solid #355850;color:#dff5ee"></label>
+          <label>Webhook URL (HTTPS) <input id="whUrl" type="url" placeholder="https://hooks.slack.com/services/…" style="width:100%;padding:8px;background:#0a1211;border:1px solid #355850;color:#dff5ee"></label>
+          <label>Format
+            <select id="whFormat" style="width:100%;padding:8px;background:#0a1211;border:1px solid #355850;color:#dff5ee">
+              <option value="json">json (signed envelope)</option>
+              <option value="slack">slack</option>
+              <option value="discord">discord</option>
+            </select>
+          </label>
+          <button type="submit" style="padding:10px 14px;background:#f4c842;color:#10201e;font-weight:800;border:1px solid #f4c842;cursor:pointer">Save webhook</button>
+          <p id="whStatus" role="status" style="margin:0;color:#bdd4ce"></p>
+        </form>
+      </article>
+      <article class="card"><h2>Honest boundary</h2><p>Browser owner signup and organization application submission are live on the <a href="https://federation.drdeeks.xyz/onboarding.html">onboarding page</a>. Per-organization operator credentials and per-organization/per-agent webhook destinations are live (above). The full Agent Control Console, kill switch, /steer, and task mapping are not live yet. Do not paste an admin or ingestion secret into a form you did not expect to ask for one.</p></article>
     </div>
     <aside class="notice"><strong>Need the skill?</strong> Give an agent <a href="/agent-skill.md">the Agent Skill</a>. It explains the difference between an agent event, owner registration, and an organization submission.</aside>
   </main>
+  <script>
+    (function () {
+      const $ = id => document.getElementById(id);
+      const api = $('whApi'), org = $('whOrg'), token = $('whToken'), url = $('whUrl'), format = $('whFormat'), status = $('whStatus');
+      api.value = location.hostname === 'localhost' ? 'http://localhost:8787' : 'https://fapi.drdeeks.xyz';
+      $('webhookForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        status.textContent = 'Saving…'; status.style.color = '#bdd4ce';
+        try {
+          if (!org.value.trim() || !token.value.trim() || !url.value.trim()) throw new Error('Organization ID, credential, and URL are all required.');
+          const response = await fetch(`${api.value.replace(/\/$/, '')}/api/v1/organizations/${encodeURIComponent(org.value.trim())}/webhook`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token.value.trim()}` },
+            body: JSON.stringify({ url: url.value.trim(), format: format.value }),
+          });
+          const body = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+          status.textContent = body.webhook && body.webhook.secret
+            ? `Saved. Signing secret (shown once): ${body.webhook.secret}`
+            : 'Saved.';
+          status.style.color = '#8fe3c0';
+        } catch (error) {
+          status.textContent = error.message; status.style.color = '#ff9582';
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

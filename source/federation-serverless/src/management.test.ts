@@ -96,13 +96,16 @@ test("presentRoom handles empty rooms", () => {
 
 // ==================== ORGANIZATION PRESENTATION TESTS ====================
 test("presentOrg formats organization contact info", () => {
+  // federation_organizations has no separate organization_id column -- id
+  // IS the organization id (see migration 0004). organizationId in the
+  // presented shape mirrors id, it is not read from a distinct DB field.
   const org = {
-    id: "org-1", organization_id: "acme-labs", owner_id: "owner-1", name: "Acme Labs",
+    id: "acme-labs", owner_id: "owner-1", name: "Acme Labs",
     contact_email: "ops@acme.example", official_url: "https://acme.example",
     status: "submitted", created_at: 1721487600000, updated_at: 1721487600000,
   };
   const p = presentOrg(org);
-  assert.equal(p.id, "org-1");
+  assert.equal(p.id, "acme-labs");
   assert.equal(p.organizationId, "acme-labs");
   assert.equal(p.ownerId, "owner-1");
   assert.equal(p.name, "Acme Labs");
