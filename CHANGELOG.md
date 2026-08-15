@@ -1,7 +1,24 @@
 # Federation Watchtower — CHANGELOG
 
-> This file is the append-only change log. No entry may be modified or deleted.
-> All entries must follow the format defined in blueprint.md Part V.
+One log for the entire project. Every change that matters goes here, no
+matter which part of the repo it touches — not split by subsystem, blueprint,
+or module. Append-only: no entry may be modified or deleted. If a prior
+entry was wrong or superseded, add a new entry saying so — never edit or
+remove the old one.
+
+Every entry uses this format:
+
+```
+Date        : YYYY-MM-DD [HH:MM UTC]
+Contributor : [name/handle]
+Modules     : [MOD-XXX, ...]           (optional, free-form)
+Section Tags: [[TAG-NAME-v1], ...]     (optional, free-form)
+Files Changed: [every file changed]
+Description : [what changed and why — minimum 3 sentences]
+Tests Passing: [test names/counts, or 'none — pre-build']
+Phase       : [PHASE-N, if applicable]
+Rollback Ref: [git commit hash or migration rollback filename]
+```
 
 ---
 
@@ -1332,4 +1349,211 @@ Rollback Ref: revert this commit. No schema/migration change. The deleted
               at the prior commit) if a future demo genuinely wants seeded
               content again — it should be re-added as an explicit,
               non-auto-run option, not restored to auto-seed-on-start.
+```
+
+## CL-0037 — Document Initialization (Federation Ecosystem Hardening blueprint)
+
+```
+Date        : 2026-08-14
+Contributor : [author]
+Modules     : [MOD-001]
+Section Tags: [[PHASE-0-v1]]
+Files Changed: [blueprint.md, checklist.md, CHANGELOG.md]
+Description : Initial blueprint created via enterprise-blueprint skill.
+              Project: Federation Ecosystem Hardening. Scope: PROJECT. All sections
+              pre-populated with required structure awaiting content population.
+Tests Passing: none — pre-build
+Phase       : PHASE-0
+Rollback Ref: N/A — initial document creation
+```
+
+
+## CL-0038 — Full Content Population from Verified Source Research (Federation Ecosystem Hardening blueprint)
+
+```
+Date        : 2026-08-14 01:20 UTC
+Contributor : Claude (session continuing from watchtower-ack-adapter Phase 2/route-map work)
+Modules     : [MOD-001, MOD-002, MOD-003, MOD-004, MOD-005, MOD-006, MOD-007, MOD-008]
+Section Tags: [[SYS-OVERVIEW-v1], [MODULE-REGISTRY-v1], [SPECS-v1], [DATA-ARCH-v1], [QUALITY-v1]]
+Files Changed: [blueprint.md]
+Description : Populated all seven parts with content grounded in this session's
+              verified findings (FEDERATION_ROUTE_MAP.md's canonical-vs-legacy
+              route audit, direct source reads of agent_enforcer_daemon.js,
+              node/bin/ack.js, node/src/memory/index.js, and
+              source/federation-serverless's migrations/index.ts/AGENTS.md) plus
+              targeted Phase-0-style research done specifically for this
+              blueprint: confirmed Character Kit already has memory, audit
+              logging, and habit/policy config (all local-only, no remote
+              surface); confirmed no existing "/steer" or "task" concept
+              anywhere across all three repos; confirmed Watchtower's
+              cooperative-only design principle, which directly shaped
+              FEAT-006's honesty constraint on the kill switch. 9 feature
+              specs, 4 new D1 schemas (plus one widen-migration), 9 new API
+              endpoints, 7 phases with real deliverables mapped to specific
+              files across all three repos.
+Tests Passing: none — pre-build (this is planning, not implementation)
+Phase       : PHASE-0
+Rollback Ref: N/A — documentation-only change, no code touched
+```
+
+
+## CL-0039 — Credentials/MCP/Webhooks Implementation Pass (temp copy, single agent)
+
+```
+Date        : 2026-08-14 (UTC time not captured; see SESSION_CHANGELOG.md for
+              precise ordering)
+Contributor : Claude (session continuing from the drdeeks/CL-0001 authoring
+              session; single agent, no distinct Reviewer Agent)
+Modules     : [MOD-001, MOD-002 (federation-side only), MOD-003]
+Section Tags: [[PHASE-0-v1], [PHASE-1-v1], [PHASE-2-v1], [DATA-ARCH-v1]]
+Files Changed: [source/federation-serverless/src/lifecycle.ts,
+              source/federation-serverless/src/management.ts,
+              source/federation-serverless/src/management.test.ts,
+              source/federation-serverless/src/index.ts,
+              source/federation-serverless/src/operator-rbac.ts (new),
+              source/federation-serverless/src/operator-rbac.test.ts (new),
+              source/federation-serverless/src/http-auth.ts (new),
+              source/federation-serverless/src/http-auth.test.ts (new),
+              source/federation-serverless/src/webhooks.ts (new),
+              source/federation-serverless/src/webhooks.test.ts (new),
+              source/federation-serverless/src/migrations/0011_operator_credentials.sql (new),
+              source/federation-serverless/src/migrations/0011_operator_credentials_rollback.sql (new),
+              source/federation-serverless/src/migrations/0012_webhook_destinations.sql (new),
+              source/federation-serverless/src/migrations/0012_webhook_destinations_rollback.sql (new),
+              source/federation-tv-widget/public/organization.html,
+              docs/blueprint/federation-ecosystem-hardening/blueprint.md,
+              docs/blueprint/federation-ecosystem-hardening/CHANGELOG.md]
+Description : Executed a narrowed scope of this blueprint (credentials + MCP +
+              webhooks only, explicitly excluding the Agent Control Console,
+              kill switch, /steer, task mapping, and Character Kit remote
+              bridge -- those need a separate authorized pass) entirely inside
+              a disposable temp copy of ~/projects/federation
+              (/tmp/federation-ecosystem-hardening-20260814), per explicit
+              instruction: never touch the real federation repo, the
+              hackathon repo, or the watchtower-ack-adapter repo (the latter
+              was read-only reviewed for compatibility, never edited).
+              PHASE-0 re-verification surfaced two real, previously-unknown
+              bugs directly in the credential/organization code path this
+              work depends on and fixed both: (1) lifecycle.ts's org
+              application handler referenced an out-of-scope `manifest`
+              variable, throwing ReferenceError on every submission with
+              technical questions (always, since exactly 5 are required);
+              (2) management.ts's admin org list/get routes SELECTed a
+              nonexistent federation_organizations.organization_id column
+              (id IS the organization id per migration 0004), 500ing on
+              every call. PHASE-0 also found this blueprint's own claim that
+              MOD-002 could reuse "the same dual-auth pattern the
+              lease-request route already uses" was false -- lease-request
+              is canonical-bearer-only with zero HMAC fallback -- and
+              proceeded with genuine additive dual-auth anyway, since that
+              is what backward compatibility with the adapter's current
+              HMAC-only calls actually requires (verified against
+              watchtower-ack-adapter/docs/FEDERATION_ROUTE_MAP.md).
+              Implemented: MOD-001 per-organization operator credential
+              (federation_operator_credentials, src/operator-rbac.ts,
+              issue/revoke admin routes, organization.html webhook form using
+              it); MOD-002 federation-side canonical-bearer-or-HMAC dual auth
+              on lease-validate, tool-authorize, validation-gates, and
+              commands get+acknowledge (adapter-side SDK wiring explicitly
+              left undone -- MOD-004 belongs to the adapter repo); MOD-003
+              per-organization/per-agent webhook destinations
+              (webhook_destinations, PUT routes, queue() consumer scoped
+              lookup with agent-override -> org -> global precedence, a
+              deliberate amendment to this Part's literal org-then-agent
+              prose -- "override" only makes sense checked first). Also
+              hardened the existing (pre-dating this pass) per-agent
+              credential model: federation_agent_credentials.last_used_at
+              existed in the 0004 schema but was never written by
+              authenticateAgent; now stamped on every successful canonical
+              auth, matching mcp_organizations.last_access_at's existing
+              tracking. Found and fixed two Node-test-runner-only
+              incompatibilities blocking integration test coverage of
+              index.ts's routing logic: a TS parameter-property constructor
+              (HttpError) that node --experimental-strip-types cannot erase,
+              and index.ts's relative imports omitting .ts extensions (every
+              other file in this codebase includes them) which Node's native
+              ESM loader requires. Fixing both was necessary to write
+              PHASE-2.4's required integration tests at all, and both are
+              genuine production-safe fixes (esbuild/wrangler already
+              resolved the extensionless imports fine; behavior unchanged).
+Tests Passing: 51/51 (`npm test` in the temp copy's federation-serverless;
+              was 30/30 before this pass -- 21 net new tests, counted via
+              `grep -c '^test(' *.test.ts`, not estimated: 6 in
+              operator-rbac.test.ts, 6 in http-auth.test.ts, 9 in
+              webhooks.test.ts. Plus one pre-existing test corrected to
+              match the organization_id bug fix.) `npx wrangler deploy --dry-run`
+              bundles cleanly (verified 4 times across this pass, after each
+              structural change) -- the real esbuild/Workers build path, not
+              just the Node test runner.
+Phase       : PHASE-1, PHASE-2 (federation-side subset), PHASE-4 (webhook
+              subset only)
+Rollback Ref: Each new migration ships its own _rollback.sql
+              (0011_operator_credentials_rollback.sql,
+              0012_webhook_destinations_rollback.sql -- both are plain DROPs,
+              no inbound foreign keys reference either new table). Code
+              changes are captured in this pass's single commit in the temp
+              copy's local git history (see `git log -1 -- source/` there,
+              or SESSION_CHANGELOG.md for the hash); revert via `git revert`
+              if and when this work is merged forward into the real repo.
+```
+
+## CL-0040 — Operator Credentials, Canonical Bearer Auth, Per-Org/Per-Agent Webhooks Merged Into Real Repo
+
+```
+Date        : 2026-08-14
+Contributor : Claude
+Modules     : [MOD-002, MOD-005, MOD-011]
+Section Tags: [[PHASE-2-v1], [PHASE-1-v1]]
+Files Changed: [source/federation-serverless/src/index.ts,
+              source/federation-serverless/src/lifecycle.ts,
+              source/federation-serverless/src/management.ts,
+              source/federation-serverless/src/management.test.ts,
+              source/federation-tv-widget/public/organization.html,
+              source/federation-serverless/src/operator-rbac.ts (new),
+              source/federation-serverless/src/operator-rbac.test.ts (new),
+              source/federation-serverless/src/http-auth.ts (new),
+              source/federation-serverless/src/http-auth.test.ts (new),
+              source/federation-serverless/src/webhooks.ts (new),
+              source/federation-serverless/src/webhooks.test.ts (new),
+              source/federation-serverless/src/migrations/0011_operator_credentials.sql (new),
+              source/federation-serverless/src/migrations/0011_operator_credentials_rollback.sql (new),
+              source/federation-serverless/src/migrations/0012_webhook_destinations.sql (new),
+              source/federation-serverless/src/migrations/0012_webhook_destinations_rollback.sql (new)]
+Description : Brings CL-0039's temp-copy work into this repository for real, on
+              branch fix/rooms-agents-migrations (not main, not pushed). Ported via
+              a scoped git diff between the temp copy's base commit (which
+              exactly matched this branch's HEAD) and its final commit, then
+              git apply -- not a wholesale copy. New src/operator-rbac.ts:
+              admin-issued, per-organization operator credential (fw_operator_*),
+              scoped server-side to one organizationId. New routes
+              POST /api/v1/organizations/{id}/operator-credential and
+              .../operator-credential/revoke, both admin-gated. New src/http-auth.ts
+              (extracted from index.ts, which transitively imports
+              cloudflare:workers and can't be loaded by a Node test file
+              directly): authenticateCanonicalOrProducer now applies to the 4
+              legacy HMAC-signed producer routes (lease validate, tool
+              authorize, validation gate, command acknowledge/list) -- a
+              canonical fw_owner_*/fw_agent_* bearer, if present, is used
+              exclusively (no HMAC fallback, preventing a downgrade attack);
+              absent, the existing HMAC flow is unchanged. New src/webhooks.ts:
+              PUT /api/v1/organizations/{id}/webhook (operator-or-admin) and
+              PUT /api/v1/agents/{id}/webhook (that agent's owner, or admin).
+              Resolution: agent override -> organization destination -> global
+              WATCHTOWER_ALERT_WEBHOOK_URL. organization.html got a live
+              webhook config form. lifecycle.ts's ReferenceError bug
+              (undefined `manifest` in the org-application handler) and
+              management.ts's nonexistent organization_id column bug -- both
+              already fixed in CL-0039 -- carried over unchanged.
+Tests Passing: node --experimental-strip-types --test src/*.test.ts: 51/51,
+              run fresh in this repo post-port. npx wrangler deploy --dry-run:
+              clean bundle, 30 asset files, all 5 Durable Objects + Queue + D1
+              + R2 bindings intact. All 10 new files verified byte-for-byte
+              identical to the tested temp-copy source via diff -q before
+              committing. main branch confirmed untouched (reflog shows no
+              new entries; git apply only ever modifies the checked-out
+              branch's working tree).
+Phase       : PHASE-2 (federation-side subset), PHASE-4 (webhook subset)
+Rollback Ref: commit 3f9b140 on fix/rooms-agents-migrations (not pushed) --
+              revert via git revert. Each migration ships its own
+              _rollback.sql (both plain DROPs, no inbound foreign keys).
 ```

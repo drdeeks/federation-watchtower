@@ -155,8 +155,6 @@ log "Validating documentation..."
 DOC_FILES=(
   "README.md"
   "AGENTS.md"
-  "FINAL_SUBMISSION_STATUS.md"
-  "VIDEO_RECORDING_GUIDE.md"
 )
 
 for file in "${DOC_FILES[@]}"; do

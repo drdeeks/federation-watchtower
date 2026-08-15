@@ -27,7 +27,7 @@ Themes are deliberately token-compatible. An organization can select one theme w
 
 - `federation-f-mark.svg` — primary scalable logo
 - `federation-wordmark.svg` — horizontal lockup for headers
-- `federation-watchtower-thumbnail.jpg` — square Federation mark for Devpost and project listings
+- `federation-watchtower-thumbnail.jpg` — square Federation mark for project listings
 - `tokens.css` — theme variables and embed helpers
 - `splash.html` — lightweight standalone splash/loading screen
 

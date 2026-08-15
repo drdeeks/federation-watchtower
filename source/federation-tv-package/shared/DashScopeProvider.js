@@ -1,4 +1,4 @@
-// DashScopeProvider — shared Qwen Cloud API client for all hackathon projects.
+// DashScopeProvider — shared Qwen Cloud API client for local demo/legacy tooling.
 // OpenAI-compatible endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1
 //
 // Usage:

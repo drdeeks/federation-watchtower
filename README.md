@@ -29,11 +29,9 @@ The comedy is the hook. But the purpose is to **monitor what's actually happenin
 
 Bro.. I have a 1.87 GHz, 2-core, 4GB RAM, 2013 ThinkPad that barely opens a web browser. I'm a single father with a past that isn't lavish, and that's made it hard to get a job — constantly being shown the door, dealing with the fallout of a mistake I made over 10 years ago. I'm very creative, I prefer truth and doing my own due diligence before asking for help or believing someone, and I like pushing boundaries: testing new systems, building things that serve a real purpose. I figure things out, think mechanically, and try everything I can to get myself and my daughter in a better position.
 
-When I started using Codex, I had five project demos that weren't quite functional. About 700 credits later, I realized the app I wanted to make wasn't going to cut it. I mentioned the Federation idea — originally a comical afterthought, a quirky agent monitoring layer for any project that wanted to join via MCP. Codex refined my concept into something possible and robust, then helped consolidate it into something functional and manageable.
+I had five project demos that weren't quite functional. About 700 credits later, I realized the app I wanted to make wasn't going to cut it. I mentioned the Federation idea — originally a comical afterthought, a quirky agent monitoring layer for any project that wanted to join via MCP. That idea got refined into something possible and robust, then consolidated into something functional and manageable.
 
-After running out of credits and having to take it to Claude (which I've grown to strongly dislike), everything was built the exact way I felt it should be built: proper, robust, accurate, and solidified. All we had to do was start implementing the UI and features.
-
-From burning 25,000 credits, using almost half my allocation on Codex, persistent disappointment and struggles to take care of my daughter and find steady employment — Codex made me have a little bit more faith in myself and the ideas I come up with. Win or lose, I take pride knowing this exists. As long as we can learn to laugh a little bit and continue to grow, everything will be OK.
+From burning 25,000 credits, persistent disappointment and struggles to take care of my daughter and find steady employment — building this gave me a little bit more faith in myself and the ideas I come up with. Win or lose, I take pride knowing this exists. As long as we can learn to laugh a little bit and continue to grow, everything will be OK.
 
 ### The problem
 
@@ -59,27 +57,6 @@ Organizations and projects register agents into isolated namespaces. Agents repo
 
 The colorful TV presentation is intentionally a hook, not a substitute for controls. A sparse, labelled ambient cameo may appear in an empty public room; it is never an agent, an event, or audit evidence.
 
-## The Build Week fit
-
-**Track: Developer Tools.** Watchtower is for developers operating agentic workflows, CI/CD, testing, DevOps, and guarded automation. It combines a Cloudflare Worker control plane, an integration surface, a public read-only Watchtower, and a local-friendly operator workflow.
-
-It is being built with Codex during OpenAI Build Week. The project is designed to make Codex-enabled and other autonomous workflows safer to operate; it does not claim that Watchtower controls a model provider itself.
-
-### How Codex and GPT-5.6 accelerated the work
-
-| Build Week criterion | Repository evidence |
-| --- | --- |
-| Non-trivial working implementation | Worker, Durable Objects, D1, R2, Queue/DLQ, REST, WebSocket, static Watchtower, tests, and a local demo path. |
-| Coherent product experience | Public Watchtower room/agent/feed view plus the reserved operator/member surface. |
-| Specific problem and audience | Developers and teams supervising autonomous runs that can recurse, duplicate work, fail quietly, or spend beyond expectations. |
-| Novel idea | An observability/control plane where evidence is presented as a compact agent-ops sitcom without fabricating operational state. |
-| How Codex accelerated the work | Codex was used to consolidate the repository, wire and test the Worker surfaces, shape domain boundaries, build the camera-style Watchtower, and document the operational lifecycle. |
-| How GPT-5.6 was used | GPT-5.6 assisted with code review, debugging complex TypeScript type errors, generating test scenarios for guardrail edge cases, and refining documentation clarity. GPT-5.6 was particularly helpful in identifying type safety issues in the Durable Object stub definitions and suggesting more ergonomic API patterns for the lifecycle client. |
-
-**Codex `/feedback` Session ID:** `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
-
-See [the submission notes](docs/review/OPENAI_SUBMISSION_NOTES.md) and [the three-minute demo plan](docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md) for the complete model-use narrative.
-
 ## What is working now
 
 - A Cloudflare Worker backed by Durable Objects, D1, R2, and an alert Queue/DLQ.
@@ -90,6 +67,7 @@ See [the submission notes](docs/review/OPENAI_SUBMISSION_NOTES.md) and [the thre
 - Guardrail decisions for duplicate/runaway chains, validation failures, budgets, cooperative leases, controlled tool authorization, and heartbeat expiry/watchdog incidents.
 - Hash-chained audit decisions, incident records, bounded evidence exports, and an embeddable dependency-free JavaScript widget.
 - A standard-library Loop Enforcer adapter that treats a denied lease, gate, or controlled-tool decision as a stop result (`exit 3`).
+- Per-organization operator credentials (admin-issued, scoped to one organization) and per-organization/per-agent webhook destinations, with canonical owner/agent bearer auth now covering the 4 previously HMAC-only legacy routes.
 
 ## Technical implementation
 
@@ -118,21 +96,15 @@ Federation Watchtower is built for agentic workflows, DevOps, observability, tes
 | **Security** | Audit trails, incident tracking, hash-chained decisions, bounded evidence exports |
 | **Operational safety** | Watchdog expiry, cooperative leases, controlled tool authorization, stop-before-side-effect rules |
 
-## Codex workflow
+## Design principles
 
-Codex was used to consolidate the project into a deployable repository, wire the Cloudflare Worker and storage bindings, create the public host routing, build the embed-ready widget, align the canonical branding pipeline, repair the agent integration script, and produce the repository documentation and setup flow.
+Lessons that shaped how this is built, and that guide what gets built next:
 
-| Task | Codex contribution |
-| --- | --- |
-| **Repository consolidation** | Merged five project demos into one functional, manageable codebase |
-| **Worker surface wiring** | Configured Durable Objects, D1, R2, Queue/DLQ bindings in wrangler.toml |
-| **Public host routing** | Isolated API routes from static Watchtower host (`watch` vs `fapi` vs `federation`) |
-| **Embed-ready widget** | Built dependency-free JavaScript widget with deterministic SVG avatars |
-| **Branding pipeline** | Aligned canonical SVG branding, theme tokens, splash screen across all surfaces |
-| **Agent integration** | Repaired agent script to properly connect, heartbeat, emit, disconnect |
-| **Documentation** | Produced operational lifecycle docs, setup flow, testing guides, submission materials |
-
-Codex saw the vision, made it feasible, and brought it to life. From burning 25,000 credits to having a functional, deployable system — the difference is having faith in the ideas and the discipline to build them properly.
+- **Visibility is prevention** - Most runaway costs come from work that becomes invisible. Making agent presence and events readable in real time prevents expensive failure modes before they compound.
+- **Evidence must be immutable** - Operational truth requires hash-chained audit records, idempotency keys, and durable event storage that cannot be retroactively modified.
+- **Presentation ≠ fabrication** - Theatrical UI can make operations watchable without inventing state. Color and animation assist recognition but never substitute for real lifecycle text.
+- **Credential boundaries matter** - Keeping owner/agent credentials scoped and separate from administrative secrets prevents privilege escalation and accidental exposure.
+- **Watchdogs need teeth** - A missed heartbeat must have consequences: lifecycle state transitions, public scene removal, and credential invalidation.
 
 ## Agent Lifecycle (Canonical Flow)
 
@@ -338,8 +310,8 @@ Watchtower is not represented as more complete than it is. The following are now
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/federation.git
-cd federation
+git clone https://github.com/drdeeks/federation-watchtower
+cd federation-watchtower
 
 # Install dependencies and run tests
 cd source/federation-serverless
@@ -361,13 +333,70 @@ git diff --check
 **Expected output:**
 ```
 ✅ TypeScript compilation: PASS
-✅ Unit tests: 24/24 PASS
+✅ Unit tests: 51/51 PASS
 ✅ SDK tests: 8/8 PASS
 ✅ JavaScript syntax: PASS
 ✅ Git diff: CLEAN
 ```
 
-### 🔧 Option C: Test Alert Webhooks (Advanced)
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for complete test documentation.
+
+### 📦 Installation (for local development)
+
+**Requirements:**
+- Node.js 20 or newer
+- Cloudflare Workers account (free tier works)
+- Wrangler 4 (included in package.json)
+
+```bash
+# Clone repository
+git clone https://github.com/drdeeks/federation-watchtower
+cd federation-watchtower
+
+# Install dependencies
+cd source/federation-serverless
+npm install
+
+# Generate TypeScript types from Wrangler bindings
+npm run types
+
+# Run tests
+npm test
+
+# Deploy to Cloudflare (requires authentication)
+npm run deploy
+
+# Apply database migrations (in order)
+npm run migrate:watchtower
+npm run migrate:control-loop
+npm run migrate:access-gateway
+npm run migrate:lifecycle
+npm run migrate:management
+npm run migrate:alert-sink
+```
+
+See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
+
+### 🔧 Supported Platforms
+
+- **Runtime:** Cloudflare Workers (edge)
+- **Browser:** Any modern browser (Chrome, Firefox, Safari, Edge)
+- **API:** REST, WebSocket, MCP
+- **SDK:** Node.js 20+ (`@federation-watchtower/sdk` on npm)
+
+### 🔑 Test Credentials
+
+For local testing, use disposable credentials, e.g.:
+
+```
+Owner ID: test-demo
+Agent ID: test-agent-{random}
+Project ID: test-project
+```
+
+No authentication required for public Watchtower or onboarding. Admin console requires `WATCHTOWER_ADMIN_TOKEN` (available on request).
+
+### 🧪 Test Alert Webhooks (Advanced)
 
 The alert webhook system sends signed POST requests when guardrail rules fire. To test:
 
@@ -435,189 +464,15 @@ Delivery is opt-in — if no webhook URL is configured, alerts are recorded
 - **R2 Bucket** - Evidence exports and large object storage
 - **Queue** - Alert delivery with dead-letter queue for retry handling
 
-## Our story
-
-### What inspired us
-
-This began with a costly and familiar failure mode: while building another hackathon project, autonomous coding work repeatedly scaffolded projects with very little visible progress. Roughly **25,000 credits** disappeared before there was a clear, shared answer to four basic questions:
-
-1. What is currently running?
-2. What is it trying to do repeatedly?
-3. What is it costing, failing, or waiting on?
-4. What should stop before the next side effect?
-
-Normal logs can contain the evidence but are hard to monitor during a fast, multi-agent build. We needed an observable runtime surface where a human can see a real agent's presence and event trail, while the system can record a validation denial, budget warning, duplicate/runaway signal, or missed heartbeat that an agent is expected to honor.
-
-The colorful TV presentation is intentionally a hook, not a substitute for controls. A sparse, labelled ambient cameo may appear in an empty public room; it is never an agent, an event, or audit evidence.
-
-### What we learned
-
-Building Federation Watchtower taught us several critical lessons about autonomous agent operations:
-
-- **Visibility is prevention** - Most runaway costs come from work that becomes invisible. Making agent presence and events readable in real time prevents expensive failure modes before they compound.
-- **Evidence must be immutable** - Operational truth requires hash-chained audit records, idempotency keys, and durable event storage that cannot be retroactively modified.
-- **Presentation ≠ fabrication** - Theatrical UI can make operations watchable without inventing state. Color and animation assist recognition but never substitute for real lifecycle text.
-- **Credential boundaries matter** - Keeping owner/agent credentials scoped and separate from administrative secrets prevents privilege escalation and accidental exposure.
-- **Watchdogs need teeth** - A missed heartbeat must have consequences: lifecycle state transitions, public scene removal, and credential invalidation.
-
-### How we built it
-
-Federation Watchtower combines a Cloudflare Worker control plane with Durable Objects for stateful coordination:
-
-**Backend architecture:**
-- Cloudflare Worker with D1 database, R2 storage, and Queue/DLQ for alert delivery
-- Durable Objects for agent registry, watchdog deadlines, guardrail decisions, and room scene coordination
-- Canonical lifecycle API with owner-scoped credentials and per-agent scoped tokens
-- Signed, idempotent event ingestion with HMAC verification and replay protection
-
-**Frontend presentation:**
-- Static HTML/CSS/JavaScript Watchtower at `watch.drdeeks.xyz`
-- Embeddable browser widget with procedural sprite generation
-- Real-time WebSocket feed for event updates
-- Consistent navigation across 9 HTML pages
-
-**Development process with Codex:**
-- Codex consolidated the repository structure and domain boundaries
-- Wired and tested Worker surfaces (REST routes, WebSocket handlers, Durable Object stubs)
-- Built the camera-style Watchtower UI with proper proportions and accessibility
-- Documented the operational lifecycle and submission requirements
-- Generated TypeScript types and validated all test suites
-
-### Challenges we faced
-
-**Dual registry split** - The system initially had two agent registries: the legacy `agents` table and the new canonical `federation_agents` lifecycle tables. Resolving this required making the canonical lifecycle API the only write path while keeping legacy GET routes for backward compatibility.
-
-**Navigation consistency** - Nine HTML pages had evolved with inconsistent navigation structures, mixing absolute and relative URLs. Standardizing all pages to use the same 8-link navigation structure required careful editing to maintain proper `aria-current` states and relative path conventions.
-
-**Watch page UI alignment** - The original watch page had toggle buttons ("Reduced motion" and "Feed only") that were misaligned and proportionally incorrect. Removing these controls while preserving system-level accessibility features (`prefers-reduced-motion`) required careful CSS cleanup.
-
-**OpenAI Build Week compliance** - Ensuring all documentation aligns with hackathon rules required mapping every requirement (video <3 min, English language, Codex collaboration documentation, testing instructions) to repository evidence and identifying outstanding user-owned deliverables.
-
-**Credential security** - Keeping administrative secrets (`WATCHTOWER_ADMIN_TOKEN`, `WATCHTOWER_INGESTION_SECRET`) separate from owner/agent scoped credentials while providing clear onboarding paths required careful API design and documentation boundaries.
-
-## For Judges / Testing Instructions
-
-### 🎯 Quickest Path to See It Working (90 seconds)
-
-**No installation required** — everything is live and cloud-hosted:
-
-1. **Open** [watch.drdeeks.xyz](https://watch.drdeeks.xyz) - see the public Watchtower
-2. **Open** [onboarding.html](https://federation.drdeeks.xyz/onboarding.html) in another tab
-3. **Create owner**: Click "Create owner" → Owner ID: `judge-demo` → Click button
-4. **Register agent**: Scroll down → Agent ID: `judge-agent-1` → Check "Show on Watchtower" → Click "Register agent"
-5. **Run live loop**: Click "Connect" → "Heartbeat" → "Emit action now" → "Disconnect"
-6. **Return to Watchtower**: Your agent appears in the roster, events appear in the feed
-
-**What you're seeing:**
-- Real agent presence with heartbeats and watchdog deadlines
-- Operational events (lifecycle, validation, guardrail decisions)
-- Public projection of agent identity and event history
-- No fabricated state - everything comes from real API calls
-
-### 🧪 Automated Testing (single command)
-
-```bash
-# Clone and install
-git clone https://github.com/drdeeks/federation-watchtower
-cd federation-watchtower/source/federation-serverless
-npm install
-
-# Return to the repository root — the test scripts live in ./scripts there
-cd ../..
-
-# Run all local tests (TypeScript, unit, syntax, git)
-./scripts/local-test-runner.sh
-
-# Run E2E lifecycle test (success path)
-./scripts/e2e-agent-lifecycle.sh
-
-# Run guardrail failure scenarios
-./scripts/test-guardrail-failures.sh
-
-# Validate all API paths respond correctly
-./scripts/validate-api-paths.sh
-```
-
-See [TESTING_GUIDE.md](TESTING_GUIDE.md) for complete test documentation.
-
-### 📦 Installation (for local development)
-
-**Requirements:**
-- Node.js 20 or newer
-- Cloudflare Workers account (free tier works)
-- Wrangler 4 (included in package.json)
-
-```bash
-# Clone repository
-git clone https://github.com/drdeeks/federation-watchtower
-cd federation-watchtower
-
-# Install dependencies
-cd source/federation-serverless
-npm install
-
-# Generate TypeScript types from Wrangler bindings
-npm run types
-
-# Run tests
-npm test
-
-# Deploy to Cloudflare (requires authentication)
-npm run deploy
-
-# Apply database migrations (in order)
-npm run migrate:watchtower
-npm run migrate:control-loop
-npm run migrate:access-gateway
-npm run migrate:lifecycle
-npm run migrate:management
-npm run migrate:alert-sink
-```
-
-See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
-
-### 🔧 Supported Platforms
-
-- **Runtime:** Cloudflare Workers (edge)
-- **Browser:** Any modern browser (Chrome, Firefox, Safari, Edge)
-- **API:** REST, WebSocket, MCP
-- **SDK:** Node.js 20+ (`@federation-watchtower/sdk` on npm)
-
-### 🔑 Test Credentials
-
-For judge testing, use these disposable credentials:
-
-```
-Owner ID: judge-demo
-Agent ID: judge-agent-{random}
-Project ID: judge-project
-```
-
-No authentication required for public Watchtower or onboarding. Admin console requires `WATCHTOWER_ADMIN_TOKEN` (available on request).
-
-Federation Watchtower fits the Developer Tools track because it provides:
-
-- **Testing & DevOps visibility** - See what autonomous agents are doing in real time
-- **Agentic workflow controls** - Guardrails, validation gates, lease management
-- **Security & monitoring** - Audit trails, incident tracking, budget guardrails
-- **Developer experience** - Public observability, SDK integration, MCP support
-
 ## Documentation
 
 - [**AGENTS.md**](AGENTS.md) - Operational guide for people and coding agents working in this repository
+- [**CHANGELOG.md**](CHANGELOG.md) - The one project-wide change log
 - [**TESTING_GUIDE.md**](TESTING_GUIDE.md) - Complete testing documentation with automated scripts
 - [**System Specification**](docs/review/FEDERATION_SYSTEM_SPEC.md) - Expanded product context and technical details
 - [**Access and Onboarding**](docs/review/ACCESS_AND_ONBOARDING.md) - Agent, owner, organization, and administrator boundaries
 - [**Host Surface Contract**](docs/review/HOST_SURFACE_CONTRACT.md) - Current domain boundaries and explicit gaps
-- [**Submission Runbook**](docs/review/SUBMISSION_RUNBOOK.md) - Complete submission checklist and deployment guide
-- [**Video Script**](VIDEO_RECORDING_GUIDE.md) - Three-minute demo plan
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
----
-
-**Built with Codex and GPT-5.6 during OpenAI Build Week 2026**
-
-**Codex `/feedback` Session ID:** `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`

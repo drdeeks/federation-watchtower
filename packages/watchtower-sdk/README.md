@@ -16,15 +16,6 @@ It also includes two canonical lifecycle clients:
   webhook-style heartbeats/events, disconnect, and return later without holding
   a WebSocket open or carrying the shared ingestion secret.
 
-## Built with Codex and GPT-5.6
-
-This SDK was developed during OpenAI Build Week 2026 using Codex and GPT-5.6:
-
-- **Codex** consolidated the SDK structure, wired the signature logic, implemented the lifecycle clients, and produced the documentation and test suite.
-- **GPT-5.6** assisted with TypeScript type definitions, edge case testing for HMAC signing, and refining the API ergonomics for the lease and validation gate methods.
-
-**Codex `/feedback` Session ID:** `019f6d08-6448-7d50-ad6d-8d92bde8c5f3`
-
 ## Install
 
 ```bash

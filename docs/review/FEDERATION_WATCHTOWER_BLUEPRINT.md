@@ -139,18 +139,4 @@ Current state:
 - ERC-8004 appears as a planned/stubbed agent registration concept in the enterprise-organization references.
 - ERC-8021 builder-code attribution is the more detailed documented implementation.
 
-Safe submission wording:
-
-> Federation Watchtower is prepared for on-chain agent identity and includes documented builder-code attribution hooks. Full ERC-8004 registration remains a planned extension unless implemented before submission.
-
-## OpenAI Build Week fit
-
-Track: Developer Tools.
-
-Why it fits:
-
-- Agentic workflow observability.
-- MCP-accessible tool surface.
-- Debugging and DevOps utility.
-- Codex-built product with clear developer value.
-- Real-world problem: runaway autonomous agents burning credits and corrupting work.
+Federation Watchtower is prepared for on-chain agent identity and includes documented builder-code attribution hooks. Full ERC-8004 registration remains a planned extension.
