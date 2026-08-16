@@ -15,6 +15,8 @@ It also includes two canonical lifecycle clients:
   owner-issued `fw_agent_` credential. It lets an agent connect, send
   webhook-style heartbeats/events, disconnect, and return later without holding
   a WebSocket open or carrying the shared ingestion secret.
+- FederationOperatorClient uses an organization-scoped fw_operator_ credential
+  for webhook configuration.
 
 ## Install
 

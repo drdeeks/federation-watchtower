@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { FederationAgentClient, FederationOwnerClient, WatchtowerApiError, WatchtowerClient, hmacSha256Hex, stableJson } from "../src/index.js";
+import { FederationAgentClient, FederationOperatorClient, FederationOwnerClient, WatchtowerApiError, WatchtowerClient, hmacSha256Hex, stableJson } from "../src/index.js";
 
 test("stableJson is deterministic and rejects non-JSON values", () => {
   assert.equal(stableJson({ z: [true, 2], a: "one" }), '{"a":"one","z":[true,2]}');
@@ -41,6 +41,25 @@ test("agent lifecycle client uses only its scoped credential", async () => {
   assert.equal(requests[0].url, "https://fapi.drdeeks.xyz/api/v1/agents/build-01/heartbeat");
   assert.equal(requests[0].init.headers.Authorization, "Bearer fw_agent_test");
   assert.equal(requests[0].init.body, '{"idempotencyKey":"heartbeat-1","projectId":"acme"}');
+});
+
+test("agent lease methods bind bearer scope", async () => {
+  const requests = [];
+  const client = new FederationAgentClient({ gateway: "https://gateway.example", projectId: "acme", agentId: "build-01", agentToken: "fw_agent_test", fetch: async (url, init) => { requests.push({ url, init }); return new Response("{}"); } });
+  await client.requestLease({ projectId: "other", agentId: "other-agent", runId: "run-1", ttlSeconds: 60, scopes: ["deploy"] });
+  await client.validateLease("lease-1");
+  assert.equal(requests[0].url, "https://gateway.example/api/v1/projects/acme/leases");
+  assert.equal(requests[0].init.headers.Authorization, "Bearer fw_agent_test");
+  assert.equal(requests[0].init.body, '{"agentId":"build-01","projectId":"acme","runId":"run-1","scopes":["deploy"],"ttlSeconds":60}');
+  assert.equal(requests[1].init.body, '{"agentId":"build-01","projectId":"acme"}');
+});
+
+test("operator client uses scoped bearer for webhook configuration", async () => {
+  let request;
+  const client = new FederationOperatorClient({ gateway: "https://gateway.example/", organizationId: "acme", operatorToken: "fw_operator_test", fetch: async (url, init) => { request = { url, init }; return new Response("{}"); } });
+  await client.setWebhook({ url: "https://hooks.example/acme", format: "json" });
+  assert.equal(request.url, "https://gateway.example/api/v1/organizations/acme/webhook");
+  assert.equal(request.init.headers.Authorization, "Bearer fw_operator_test");
 });
 
 test("createOwner posts the unauthenticated owner body and binds the returned token", async () => {

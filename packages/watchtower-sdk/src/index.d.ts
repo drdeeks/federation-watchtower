@@ -79,6 +79,14 @@ export class FederationAgentClient {
   heartbeat(input?: { idempotencyKey?: string }): Promise<unknown>;
   disconnect(input?: { idempotencyKey?: string }): Promise<unknown>;
   emit(input: AgentLifecycleEvent): Promise<unknown>;
+  requestLease(input: { runId: string; ttlSeconds: number; scopes: string[] }): Promise<unknown>;
+  validateLease(leaseId: string | { leaseId: string }): Promise<unknown>;
+}
+
+export interface FederationOperatorClientOptions { gateway?: string; operatorToken: string; organizationId: string; fetch?: typeof globalThis.fetch; }
+export class FederationOperatorClient {
+  constructor(options: FederationOperatorClientOptions);
+  setWebhook(input: { url: string; format?: "json" | "slack" | "discord" }): Promise<unknown>;
 }
 
 /**
