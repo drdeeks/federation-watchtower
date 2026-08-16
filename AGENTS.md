@@ -58,6 +58,12 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
 | `source/federation-tv-package/` | Local demo package and legacy adapter/MCP material; useful for provenance and offline demos, not the production source of truth. |
 | `brand/` | Canonical wordmark, mark, theme tokens, and splash assets. Copy intentional changes into `source/federation-tv-widget/public/brand/`. |
 
+Repository organization note: archived root tarballs are recoverable under
+`.trash/archives-20260816/`; active source remains in `source/`, `packages/`,
+`brand/`, `scripts/`, and the scoped documentation directories. Root deployment,
+testing, validation, and recording guides remain because the public README
+links to them.
+
 ## Current reality: what exists and what does not
 
 ### Useful baseline that exists
@@ -69,8 +75,9 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
 - Event redaction, idempotency handling, runaway/duplicate/attempt/budget rules,
   watchdog incidents, cooperative leases, controlled-tool decisions, audit
   hashing, and operator evidence exports.
-- MCP organization credential handling and a published server-side SDK at
-  `@federation-watchtower/sdk@0.1.0`.
+- MCP organization credential handling and the server-side SDK package
+  `@federation-watchtower/sdk` (the inspected working branch reports version
+  `0.2.0`; publication status is separate evidence).
 - Additive canonical owner/agent lifecycle endpoints: owner-issued scoped
   credentials, manifest validation, agent connect/heartbeat/event/disconnect,
   Durable Object watchdog expiry, and package-facing agent client support.
@@ -217,14 +224,20 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
   federation_agents WHERE lifecycle_state != 'revoked'`) — it's just not
   wired into any page's UI yet. This is additive, not a fix to the existing
   counter.
-- **Character Kit ⇄ Watchtower adapter (`~/projects/hackathon/canonical/adapter/`)
-  needs review and finalization to become genuinely functional**, not just
-  scaffolded. Per that adapter's own README (last checked 2026-08-13):
-  12/12 unit tests pass and `tsc --noEmit` is clean, but `character-kit.ts`
-  is an explicit boundary stub that throws "unavailable" by design — no live
-  Character Kit socket connection, no live delivery to any real Watchtower
-  instance has ever been exercised. Not yet reviewed in this repo's context;
-  do that review before attempting to wire it up for real.
+- **`@drdeeks/character-kit` ⇄ `@federation-watchtower/sdk` adapter** lives in
+  the canonical `watchtower-ack-adapter` repository/package. It is newly built translator
+  infrastructure, not Watchtower policy. Its
+  responsibility is Character Kit protocol access, normalized event
+  translation, dedupe/order protection, bounded retry, and Watchtower
+  lifecycle/event transport. It owns no identity, memory, lease decision,
+  operator management, MCP, or canonical event record. Federation consumes
+  Watchtower's current SDK/MCP control surfaces directly through its own
+  integration layer.
+
+  The adapter's current verified baseline is documented in its own
+  `README.md`, `AGENTS.md`, and `docs/FEDERATION_ROUTE_MAP.md`: TypeScript
+  validation passes, 32 hermetic tests pass, and live Character Kit and live
+  Watchtower deployment tests remain separate evidence requirements.
 
 Do not describe any item in this second list as live or complete.
 
