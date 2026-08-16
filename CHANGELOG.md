@@ -22,6 +22,43 @@ Rollback Ref: [git commit hash or migration rollback filename]
 
 ---
 
+## CL-NEW — Canonical adapter documentation synchronized
+
+```
+Date        : 2026-08-16
+Contributor : Codex
+Modules     : [ADAPTER]
+Files Changed: [AGENTS.md, CHANGELOG.md]
+Description : Corrected the canonical adapter reference to the
+              `watchtower-ack-adapter` repository/package. Recorded that the
+              adapter is a translator for Character Kit
+              activity and Watchtower lifecycle/events, not a policy or lease
+              authority. Federation/Watchtower integration layers retain
+              ownership of control, MCP, operator, identity, and canonical
+              records.
+Tests Passing: documentation review; adapter validation and 32 unit tests in
+               the canonical adapter repository
+Phase       : N/A
+Rollback Ref: N/A — documentation-only
+```
+
+## CL-NEW-2 — Root archive cleanup
+
+```
+Date        : 2026-08-16
+Contributor : Codex
+Modules     : [REPOSITORY-ORGANIZATION]
+Files Changed: [.trash/archives-20260816/]
+Description : Moved four untracked root tarball archives into the recoverable
+              .trash archive area. The archives were not referenced by active
+              documentation or source paths and are preserved for recovery.
+              Active deployment, testing, validation, and recording guides
+              remain at the root because the README links to them.
+Tests Passing: documentation and repository-structure review
+Phase       : N/A
+Rollback Ref: Move files back from .trash/archives-20260816/
+```
+
 ## CL-0000 — Document Initialization
 
 ```
@@ -1565,3 +1602,10 @@ Rollback Ref: commit 3f9b140 on fix/rooms-agents-migrations (not pushed) --
 - Bound canonical agent request bodies to the client's project and agent identity, with regression coverage.
 - SDK checks: 10/10 tests, syntax check, and package dry-run passed.
 - SDK checks: 10/10 tests, syntax check, and package dry-run passed.
+
+## CL-0042 - Host Resource Inspection
+
+- Inspected host CPU, memory, swap, process states, user process trees, Docker workloads, and relevant services after a report of system overload.
+- No runaway, zombie, or uninterruptible processes were found, and no Docker containers were running. The detached guardrail `watchdog.sh` process is an intentional 15-minute scan loop, not an orphaned workload.
+- `clamd` was the dominant resident-memory consumer at approximately 820 MiB (1.1 GiB peak); Docker's daemon used approximately 145 MiB while idle.
+- No remediation or process termination was performed.

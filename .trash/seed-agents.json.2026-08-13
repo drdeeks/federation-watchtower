@@ -1,0 +1,32 @@
+{
+  "mnemosyne": [
+    {"agentId": "mnemosyne-lead-1", "name": "MemoryAgent Lead", "role": "lead", "capabilities": ["orchestration", "memory"]},
+    {"agentId": "mnemosyne-ingestion-1", "name": "IngestionEngine", "role": "ingestion", "capabilities": ["text", "json", "conversation"]},
+    {"agentId": "mnemosyne-recall-1", "name": "RecallEngine", "role": "recall", "capabilities": ["semantic", "keyword", "temporal"]},
+    {"agentId": "mnemosyne-forget-1", "name": "ForgetEngine", "role": "forget", "capabilities": ["decay", "archive", "retention"]},
+    {"agentId": "mnemosyne-learning-1", "name": "LearningEngine", "role": "learning", "capabilities": ["patterns", "insights", "synthesis"]}
+  ],
+  "autopilot": [
+    {"agentId": "autopilot-lead-1", "name": "Workflow Orchestrator", "role": "lead", "capabilities": ["decomposition", "routing", "approval"]},
+    {"agentId": "autopilot-connector-1", "name": "Connector Hub", "role": "connector", "capabilities": ["email", "slack", "jira", "calendar", "github"]},
+    {"agentId": "autopilot-glitch-1", "name": "Glitch Reporter", "role": "cynic", "capabilities": ["adversarial", "failure-detection"]},
+    {"agentId": "autopilot-audit-1", "name": "Compliance Auditor", "role": "auditor", "capabilities": ["compliance", "audit", "regulatory"]}
+  ],
+  "aires": [
+    {"agentId": "aires-director-1", "name": "Creative Director", "role": "director", "capabilities": ["narrative", "direction"]},
+    {"agentId": "aires-dialogue-1", "name": "Script Doctor", "role": "dialogue", "capabilities": ["dialogue", "voice"]},
+    {"agentId": "aires-bible-1", "name": "Bible Compiler", "role": "bible", "capabilities": ["bible", "continuity", "lore"]},
+    {"agentId": "aires-composer-1", "name": "Storyboard Composer", "role": "composer", "capabilities": ["storyboard", "shots"]},
+    {"agentId": "aires-continuity-1", "name": "Continuity Checker", "role": "continuity", "capabilities": ["frame-diff", "drift"]}
+  ],
+  "agora": [
+    {"agentId": "agora-legislative-1", "name": "Legislative Agent", "role": "legislative", "capabilities": ["policy", "proposal", "voting"]},
+    {"agentId": "agora-executive-1", "name": "Executive Marshal", "role": "executive", "capabilities": ["enforcement", "execution"]},
+    {"agentId": "agora-judicial-1", "name": "Judicial Agent", "role": "judicial", "capabilities": ["disputes", "interpretation"]}
+  ],
+  "edgewalker": [
+    {"agentId": "edgewalker-kernel-1", "name": "Kernel Engineer", "role": "kernel", "capabilities": ["rust", "capability"]},
+    {"agentId": "edgewalker-mesh-1", "name": "Mesh Networker", "role": "mesh", "capabilities": ["libp2p", "topology"]},
+    {"agentId": "edgewalker-telemetry-1", "name": "Telemetry Deception", "role": "deception", "capabilities": ["privacy", "burst"]}
+  ]
+}
