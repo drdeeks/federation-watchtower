@@ -1557,3 +1557,11 @@ Rollback Ref: commit 3f9b140 on fix/rooms-agents-migrations (not pushed) --
               revert via git revert. Each migration ships its own
               _rollback.sql (both plain DROPs, no inbound foreign keys).
 ```
+
+## CL-0041 - SDK canonical operator and lease coverage
+
+- Added FederationOperatorClient for organization-scoped fw_operator_ webhook configuration.
+- Added bearer-authenticated lease request/validation methods to FederationAgentClient.
+- Bound canonical agent request bodies to the client's project and agent identity, with regression coverage.
+- SDK checks: 10/10 tests, syntax check, and package dry-run passed.
+- SDK checks: 10/10 tests, syntax check, and package dry-run passed.

@@ -155,15 +155,42 @@ export class FederationAgentClient {
   heartbeat(input = {}) { return this.request("heartbeat", input); }
   disconnect(input = {}) { return this.request("disconnect", input); }
   emit(input) { return this.request("events", input); }
+  requestLease(input) { return this.requestProject("POST", `/api/v1/projects/${encodeURIComponent(this.projectId)}/leases`, { ...input, projectId: this.projectId, agentId: this.agentId }); }
+  validateLease(input) {
+    const leaseId = typeof input === "string" ? input : input?.leaseId;
+    if (typeof leaseId !== "string" || !leaseId) throw new TypeError("leaseId is required");
+    return this.requestProject("POST", `/api/v1/projects/${encodeURIComponent(this.projectId)}/leases/${encodeURIComponent(leaseId)}/validate`, { projectId: this.projectId, agentId: this.agentId });
+  }
 
   async request(action, payload) {
-    const body = stableJson({ projectId: this.projectId, ...payload });
+    const body = stableJson({ ...payload, projectId: this.projectId });
     const response = await this.fetch(`${this.gateway}/api/v1/agents/${encodeURIComponent(this.agentId)}/${action}`, {
       method: "POST", headers: { "Authorization": `Bearer ${this.agentToken}`, "Content-Type": "application/json" }, body,
     });
     const responseBody = await parseResponse(response);
     if (!response.ok) throw new WatchtowerApiError(response.status, responseBody);
     return responseBody;
+  }
+
+  async requestProject(method, path, payload) {
+    const body = stableJson(payload);
+    const response = await this.fetch(`${this.gateway}${path}`, { method, headers: { "Authorization": `Bearer ${this.agentToken}`, "Content-Type": "application/json" }, body });
+    const responseBody = await parseResponse(response); if (!response.ok) throw new WatchtowerApiError(response.status, responseBody); return responseBody;
+  }
+}
+
+export class FederationOperatorClient {
+  constructor(options) {
+    if (!options || typeof options.operatorToken !== "string" || !options.operatorToken.startsWith("fw_operator_")) throw new TypeError("an fw_operator_ scoped operator token is required");
+    if (typeof options.organizationId !== "string" || !options.organizationId) throw new TypeError("organizationId is required");
+    this.gateway = (options.gateway ?? DEFAULT_GATEWAY).replace(/\/+$/, ""); this.operatorToken = options.operatorToken; this.organizationId = options.organizationId; this.fetch = options.fetch ?? globalThis.fetch;
+    if (typeof this.fetch !== "function") throw new TypeError("a fetch implementation is required");
+  }
+  setWebhook(input) { return this.request("PUT", `/api/v1/organizations/${encodeURIComponent(this.organizationId)}/webhook`, input); }
+  async request(method, path, payload) {
+    const body = stableJson(payload);
+    const response = await this.fetch(`${this.gateway}${path}`, { method, headers: { "Authorization": `Bearer ${this.operatorToken}`, "Content-Type": "application/json" }, body });
+    const responseBody = await parseResponse(response); if (!response.ok) throw new WatchtowerApiError(response.status, responseBody); return responseBody;
   }
 }
 
