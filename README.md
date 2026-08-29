@@ -367,12 +367,21 @@ npm test
 npm run deploy
 
 # Apply database migrations (in order)
-npm run migrate:watchtower
-npm run migrate:control-loop
-npm run migrate:access-gateway
-npm run migrate:lifecycle
-npm run migrate:management
-npm run migrate:alert-sink
+# Convenience: run every migration 0001 -> 0012 in correct order:
+npm run migrate:all
+# Or individually:
+npm run migrate:watchtower           # 0001: Core enforcement
+npm run migrate:control-loop         # 0002: Watchdog, audit, sessions
+npm run migrate:access-gateway       # 0003: Owner credentials, org applications
+npm run migrate:lifecycle            # 0004: Canonical lifecycle events
+npm run migrate:management           # 0005: Admin management tables
+npm run migrate:alert-sink           # 0006: Alert webhook receipts
+npm run migrate:speech-seed          # 0007: Seed speech repertoire
+npm run migrate:audit-chain-integrity# 0008: Audit chain integrity
+npm run migrate:speech-lines-drop-fk # 0009: Drop federation FK on speech lines
+npm run migrate:organizations-widen-status # 0010: Widen org status CHECK (deploy-gated)
+npm run migrate:operator-credentials # 0011: Per-org operator credentials
+npm run migrate:webhook-destinations # 0012: Per-org/agent webhook destinations
 ```
 
 See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
