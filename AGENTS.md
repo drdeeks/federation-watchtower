@@ -367,7 +367,7 @@ Run the checks appropriate to the change:
 
 ```bash
 cd source/federation-serverless && npm run types && npm test
-cd ../adapters/watchtower-sdk && npm test  # SDK now lives in the federation-adapters super-repo
+cd ../plugins/watchtower-sdk && npm test  # SDK is its own standalone component under plugins/
 node --check source/federation-tv-widget/public/tv-widget.js
 node --check source/federation-tv-widget/src/tv-widget.js
 git diff --check
