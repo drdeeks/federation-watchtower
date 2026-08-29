@@ -1609,3 +1609,8 @@ Rollback Ref: commit 3f9b140 on fix/rooms-agents-migrations (not pushed) --
 - No runaway, zombie, or uninterruptible processes were found, and no Docker containers were running. The detached guardrail `watchdog.sh` process is an intentional 15-minute scan loop, not an orphaned workload.
 - `clamd` was the dominant resident-memory consumer at approximately 820 MiB (1.1 GiB peak); Docker's daemon used approximately 145 MiB while idle.
 - No remediation or process termination was performed.
+
+## 2026-08-28 — Repo hygiene: trashed stale/duplicate trees
+- Moved root stray `federation-tv-package/` (working copy retained at `source/federation-tv-package/`) to `.trash/`.
+- Moved `docs/blueprint/federation-ecosystem-hardening/` to `.trash/` (content recoverable from unpushed git history).
+- Pre-edit versions of changed files archived under `docs/outdated-labeling/`.
