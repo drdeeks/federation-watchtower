@@ -54,15 +54,13 @@ Do not put credential entry forms, webhooks, MCP, or mutating API endpoints on
 | --- | --- |
 | `source/federation-serverless/` | Cloudflare Worker, Durable Objects, D1 schema/migrations, watchdog, control loop, MCP gateway. |
 | `source/federation-tv-widget/` | Static public Watchtower and embeddable browser widget. Keep `src/tv-widget.js` and `public/tv-widget.js` identical. |
-| `packages/watchtower-sdk/` | Published Node/server-side signing SDK and source/tests for `@federation-watchtower/sdk`. |
+| `watchtower-sdk/` (in the `the-federation/adapters` super-repo) | Published Node/server-side signing SDK and source/tests for `@federation-watchtower/sdk`. |
 | `source/federation-tv-package/` | Local demo package and legacy adapter/MCP material; useful for provenance and offline demos, not the production source of truth. |
 | `brand/` | Canonical wordmark, mark, theme tokens, and splash assets. Copy intentional changes into `source/federation-tv-widget/public/brand/`. |
 
 Repository organization note: archived root tarballs are recoverable under
 `.trash/archives-20260816/`; active source remains in `source/`, `packages/`,
-`brand/`, `scripts/`, and the scoped documentation directories. Root deployment,
-testing, validation, and recording guides remain because the public README
-links to them.
+`brand/`, `scripts/`, and the scoped documentation directories. Deployment, testing, validation, and recording guides now live under `docs/`; the public README links to them there.
 
 ## Current reality: what exists and what does not
 
@@ -369,7 +367,7 @@ Run the checks appropriate to the change:
 
 ```bash
 cd source/federation-serverless && npm run types && npm test
-cd packages/watchtower-sdk && npm test
+cd ../adapters/watchtower-sdk && npm test  # SDK now lives in the federation-adapters super-repo
 node --check source/federation-tv-widget/public/tv-widget.js
 node --check source/federation-tv-widget/src/tv-widget.js
 git diff --check
