@@ -379,3 +379,9 @@ Cargo.lock
 # ============================================================
 # Repository is clean, modular, and production-ready
 # ============================================================
+
+# archived pre-edit versions (intentionally untracked)
+docs/outdated-labeling/
+
+# Local dev scratch (trash > purge; keep recoverable)
+.trash/
