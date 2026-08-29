@@ -442,8 +442,9 @@ prior version of this section are resolved; see CL-0034/0035/0036.
    competing `management.ts` room-delete edit mentioned in the old version of
    this note was resolved by taking the eviction-based approach
    (`63acb8e`) wholesale — it fully supersedes the narrower offline-aware
-   block it replaced. Both worktree branches kept on disk as backups (not
-   deleted). Branch is now 9 commits ahead of `origin/main`, **not pushed**.
+   block it replaced. Both worktree branches were moved to `refs/trash/`
+   (owner directive 2026-08-16) — not deleted, but no longer active. Branch is
+   now 9 commits ahead of `origin/main`, **not pushed**.
 3. **Watchtower HQ now has real identity, but is intentionally NOT
    code-blocked from deletion.** `room_index 0` (every project's
    auto-created first room, where `assignToRoom()` always lands

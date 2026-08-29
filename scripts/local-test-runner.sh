@@ -94,6 +94,12 @@ MIGRATION_FILES=(
   "0004_federation_lifecycle.sql"
   "0005_management.sql"
   "0006_alert_webhook_receipts.sql"
+  "0007_seed_speech_repertoire.sql"
+  "0008_audit_chain_integrity.sql"
+  "0009_speech_lines_drop_federation_fk.sql"
+  "0010_organizations_widen_status.sql"
+  "0011_operator_credentials.sql"
+  "0012_webhook_destinations.sql"
 )
 
 for migration in "${MIGRATION_FILES[@]}"; do

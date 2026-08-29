@@ -56,7 +56,7 @@ git push origin main
 ### Step 2: Deploy to Cloudflare
 
 ```bash
-cd /home/drdeek/projects/federation/source/federation-serverless
+cd source/federation-serverless
 
 # Deploy
 npm run deploy
@@ -71,18 +71,26 @@ npm run deploy
 ⚠️ **Migrations are NOT auto-applied.** Run these in order:
 
 ```bash
-cd /home/drdeek/projects/federation/source/federation-serverless
+cd source/federation-serverless
 
-# Apply all 6 migrations (adds tables, no destructive changes)
-npm run migrate:watchtower      # 0001: Core enforcement (agents, rooms, feed)
-npm run migrate:control-loop    # 0002: Watchdog, audit, sessions
-npm run migrate:access-gateway  # 0003: Owner credentials, org applications
-npm run migrate:lifecycle       # 0004: Canonical lifecycle events
-npm run migrate:management      # 0005: Admin management tables
-npm run migrate:alert-sink      # 0006: Alert webhook receipts
+# Apply all 12 migrations in order (0001 -> 0012).
+# NOTE: 0010 widens federation_organizations.status — deploy-gated per AGENTS.md.
+# Prefer proving risky migrations against a disposable forked D1 first.
+npm run migrate:watchtower           # 0001: Core enforcement (agents, rooms, feed)
+npm run migrate:control-loop         # 0002: Watchdog, audit, sessions
+npm run migrate:access-gateway       # 0003: Owner credentials, org applications
+npm run migrate:lifecycle            # 0004: Canonical lifecycle events
+npm run migrate:management           # 0005: Admin management tables
+npm run migrate:alert-sink           # 0006: Alert webhook receipts
+npm run migrate:speech-seed          # 0007: Seed speech repertoire
+npm run migrate:audit-chain-integrity# 0008: Audit chain integrity
+npm run migrate:speech-lines-drop-fk # 0009: Drop federation FK on speech lines
+npm run migrate:organizations-widen-status # 0010: Widen org status CHECK (deploy-gated)
+npm run migrate:operator-credentials # 0011: Per-org operator credentials
+npm run migrate:webhook-destinations # 0012: Per-org/agent webhook destinations
 
-# Or run all at once:
-for m in src/migrations/*.sql; do wrangler d1 execute federation-db --remote --file="$m"; done
+# Or run all in correct order with one command (excludes rollback files):
+npm run migrate:all
 ```
 
 ---
@@ -90,7 +98,7 @@ for m in src/migrations/*.sql; do wrangler d1 execute federation-db --remote --f
 ### Step 4: Set Secrets (First Deploy Only)
 
 ```bash
-cd /home/drdeek/projects/federation/source/federation-serverless
+cd source/federation-serverless
 
 # Required secrets (you'll be prompted to enter values)
 wrangler secret put WATCHTOWER_INGESTION_SECRET
@@ -127,7 +135,7 @@ open https://watch.drdeeks.xyz
 ### Option 1: Instant Rollback (Worker Code Only)
 
 ```bash
-cd /home/drdeek/projects/federation/source/federation-serverless
+cd source/federation-serverless
 
 # List recent deployments
 wrangler deployments list
@@ -301,12 +309,7 @@ After deploy, access `https://federation.drdeeks.xyz/manage.html` with admin tok
 cd source/federation-serverless && npm run deploy
 
 # MIGRATE (first deploy only, in order)
-npm run migrate:watchtower
-npm run migrate:control-loop
-npm run migrate:access-gateway
-npm run migrate:lifecycle
-npm run migrate:management
-npm run migrate:alert-sink
+npm run migrate:all   # applies 0001 -> 0012 in order (excludes rollback files)
 
 # VERIFY
 curl https://fapi.drdeeks.xyz/health
