@@ -385,3 +385,6 @@ docs/outdated-labeling/
 
 # Local dev scratch (trash > purge; keep recoverable)
 .trash/
+
+# Local tool cache (not a dependency)
+.impeccable/
