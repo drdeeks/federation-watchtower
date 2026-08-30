@@ -1650,3 +1650,23 @@ Tests Passing: documentation-only; no code or tests changed
 Phase       : N/A
 Rollback Ref: `git mv` reversions recoverable from working tree / git history
 ```
+
+## CL-0044 — Revert unauthorized migrate:all runner
+
+```
+Date        : 2026-08-29
+Contributor : opencode (drdeek directive)
+Modules     : [REPO-ORG]
+Files Changed: [scripts/migrate-all.sh (-> .trash/),
+               source/federation-serverless/package.json]
+Description : Reverted the unauthorized ordered migration runner added in
+              a prior session. scripts/migrate-all.sh was moved to .trash/
+              (not deleted). The "migrate:all" npm script entry was removed
+              from package.json. Migrations 0011 and 0012 npm scripts
+              retained — those are legitimate per-owner code. The one-shot
+              runner chained all 12 migrations including deploy-gated 0010,
+              which is unsafe for automated execution.
+Tests Passing: documentation-only; no code or tests changed
+Phase       : N/A
+Rollback Ref: recoverable from .trash/migrate-all.sh and git history
+```
