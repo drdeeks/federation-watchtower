@@ -223,7 +223,7 @@ Repository organization note: archived root tarballs are recoverable under
   wired into any page's UI yet. This is additive, not a fix to the existing
   counter.
 - **`@drdeeks/character-kit` ⇄ `@federation-watchtower/sdk` adapter** lives in
-  the canonical `@the-federation/watchtower-adapter` repository/package (repo `federation-adapters`). It is newly built translator
+  the canonical `@the-federation/watchtower-adapter` repository/package (repo `drdeeks/watchtower-adapter`). It is newly built translator
   infrastructure, not Watchtower policy. Its
   responsibility is Character Kit protocol access, normalized event
   translation, dedupe/order protection, bounded retry, and Watchtower

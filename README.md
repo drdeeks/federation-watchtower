@@ -339,7 +339,7 @@ git diff --check
 ✅ Git diff: CLEAN
 ```
 
-See [TESTING_GUIDE.md](TESTING_GUIDE.md) for complete test documentation.
+See [TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for complete test documentation.
 
 ### 📦 Installation (for local development)
 
@@ -384,7 +384,7 @@ npm run migrate:operator-credentials # 0011: Per-org operator credentials
 npm run migrate:webhook-destinations # 0012: Per-org/agent webhook destinations
 ```
 
-See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
+See [DEPLOY.md](docs/DEPLOY.md) for complete deployment guide.
 
 ### 🔧 Supported Platforms
 
@@ -477,7 +477,7 @@ Delivery is opt-in — if no webhook URL is configured, alerts are recorded
 
 - [**AGENTS.md**](AGENTS.md) - Operational guide for people and coding agents working in this repository
 - [**CHANGELOG.md**](CHANGELOG.md) - The one project-wide change log
-- [**TESTING_GUIDE.md**](TESTING_GUIDE.md) - Complete testing documentation with automated scripts
+- [**TESTING_GUIDE.md**](docs/TESTING_GUIDE.md) - Complete testing documentation with automated scripts
 - [**System Specification**](docs/review/FEDERATION_SYSTEM_SPEC.md) - Expanded product context and technical details
 - [**Access and Onboarding**](docs/review/ACCESS_AND_ONBOARDING.md) - Agent, owner, organization, and administrator boundaries
 - [**Host Surface Contract**](docs/review/HOST_SURFACE_CONTRACT.md) - Current domain boundaries and explicit gaps
