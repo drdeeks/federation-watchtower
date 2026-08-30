@@ -2,6 +2,12 @@
 
 # Federation Watchtower
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
+[![Wrangler](https://img.shields.io/badge/Cloudflare-Wrangler-orange.svg)](https://developers.cloudflare.com/workers/)
+[![Socket](https://img.shields.io/badge/Socket.dev-safe-brightgreen)](https://socket.dev/)
+
 **Federation Watchtower is a developer tool that makes autonomous work visible before it becomes expensive.** It is an agent-operations control plane with a security-camera sitcom presentation: real agents, heartbeats, events, guardrails, validation decisions, and watchdog signals are made readable for humans without turning the operational record into theater.
 
 **Live public Watchtower:** [watch.drdeeks.xyz](https://watch.drdeeks.xyz)
