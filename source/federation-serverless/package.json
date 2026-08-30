@@ -27,7 +27,7 @@
   "devDependencies": {
     "@types/node": "^26.1.1",
     "socket": "^1.1.143",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.127.1"
   },
   "allowScripts": {
     "workerd@1.20260714.1": true,
