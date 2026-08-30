@@ -263,7 +263,6 @@ source/federation-tv-widget/public/sprites/**/*
 # Generated documentation
 docs/generated/
 docs/api/
-docs/outdated-labeling/
 *.mdx
 
 # ============================================================
