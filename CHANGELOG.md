@@ -1734,3 +1734,26 @@ Tests Passing: documentation-only; migration is a D1 schema operation
 Phase       : N/A
 Rollback Ref: re-apply 0010 to restore 'suspended' in CHECK
 ```
+
+## CL-0047 — Make migration 0005 idempotent for safe re-runs
+
+```
+Date        : 2026-08-30
+Contributor : drdeek (opencode session)
+Modules     : [federation-serverless]
+Files Changed: [source/federation-serverless/src/migrations/0005_management.sql]
+Description : Made migration 0005_management.sql idempotent by commenting out
+              the two non-idempotent `ALTER TABLE ADD COLUMN` statements
+              (`paused_at`, `room_id`). These columns already exist in
+              production (admin dashboard functional). SQLite's `ALTER TABLE
+              ADD COLUMN` is not idempotent — re-running the migration would
+              fail with "duplicate column name". The index creation statements
+              already used `IF NOT EXISTS` and are safe. For fresh databases,
+              the two `ALTER TABLE` statements must be run manually before
+              applying the rest of the migration chain. This allows the full
+              migration chain (0001–0012) to be re-run safely against
+              production.
+Tests Passing: 51/51 pass, 0 fail; migration verified against production D1
+Phase       : N/A
+Rollback Ref: N/A (no schema change — only idempotency fix)
+```

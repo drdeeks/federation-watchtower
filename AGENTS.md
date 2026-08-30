@@ -117,10 +117,12 @@ Repository organization note: archived root tarballs are recoverable under
     `'suspended'`. Migration 0010 was applied to production and then rolled
     back via `0010_organizations_widen_status_rollback.sql` — the production
     CHECK is currently the original `('draft','submitted','approved','rejected')`.
-    Re-apply 0010 when ready to deploy the approve/suspend fix; use the
-    rollback to revert if needed. Confirm current state via `wrangler d1
-    execute federation-db --remote --command "SELECT sql FROM sqlite_master
-    WHERE name='federation_organizations'"` before relying on it.
+    **All migrations 0001–0012 are now applied to production.** Migration 0005
+    was made idempotent (commented out non-idempotent `ALTER TABLE ADD COLUMN`
+    statements; columns already exist in production). Re-apply 0010 when ready
+    to deploy the approve/suspend fix; use the rollback to revert if needed.
+    Confirm current state via `wrangler d1 execute federation-db --remote
+    --command "SELECT sql FROM sqlite_master WHERE name='federation_organizations'"`.
   - **Alerts**: view all webhook delivery receipts with HMAC verification
   - **Evidence**: export project evidence to R2 with configurable retention
   Backed by `/api/v1/admin/*` endpoints (`src/management.ts`). All mutations logged via `federation_lifecycle_events`.
@@ -428,15 +430,14 @@ Open threads left in-flight; pick up here instead of re-investigating from
 scratch. **Updated 2026-08-13** — items 2 and (partially) 4 below from the
 prior version of this section are resolved; see CL-0034/0035/0036.
 
-1. **Org approve/suspend fix — code done, migration applied then rolled back.**
+1. **Org approve/suspend fix — code done, migrations 0001–0012 applied to production.**
    `management.ts` writes the canonical `'approved'`/`'suspended'` enum
-   values; migration `0010_organizations_widen_status.sql` widens the CHECK.
-   Migration 0010 was applied to production (2026-08-30) without explicit
-   go-ahead, then rolled back via `0010_organizations_widen_status_rollback.sql`
-   (same session). Production CHECK is currently the original
-   `('draft','submitted','approved','rejected')`. A rollback migration now
-   exists for safe reversion. Next: explicit go-ahead, re-run `npm run
-   migrate:organizations-widen-status` (remote) + deploy.
+   values; migration 0010 widens the CHECK. Migration 0010 was applied to
+   production then rolled back; all 12 migrations are now on production.
+   Production CHECK is currently the original
+   `('draft','submitted','approved','rejected')`. A rollback migration exists
+   for safe reversion. Next: explicit go-ahead, re-run `npm run
+   migrate:organizations-widen-status` (remote) + `wrangler deploy`.
 2. ~~`fix/rooms-agents-migrations` branch is blocked~~ — **RESOLVED
    2026-08-13.** Both orphaned worktree branches
    (`worktree-bridge-cse_011McsXiCUReHKCuBhtdfYQc` org-migration,
