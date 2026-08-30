@@ -22,11 +22,11 @@ presentation with no source event.
 
 ## Authority and reading order
 
-1. `docs/blueprint/federation-watchtower/checklist.md` is the execution driver.
+1. `checklist.md` is the execution driver.
    Do not mark work complete until its acceptance evidence exists.
-2. `docs/blueprint/federation-watchtower/blueprint.md` is immutable reference
+2. `blueprint.md` is immutable reference
    material. Do not edit it for ordinary implementation work.
-3. `docs/blueprint/federation-watchtower/CHANGELOG.md` is append-only. Record
+3. `CHANGELOG.md` is append-only. Record
    material implementation work using the Part V format from the blueprint.
 4. `docs/review/FEDERATION_SYSTEM_SPEC.md` gives the current expanded product
    context. `docs/review/HOST_SURFACE_CONTRACT.md` records current domain

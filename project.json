@@ -13,8 +13,8 @@
   ],
   "version": "1.0",
   "created_at": "2026-07-18T04:40:00.876945+00:00",
-  "blueprint": "/home/drdeek/projects/federation/docs/blueprint/federation-watchtower/blueprint.md",
-  "checklist": "/home/drdeek/projects/federation/docs/blueprint/federation-watchtower/checklist.md",
-  "changelog": "/home/drdeek/projects/federation/docs/blueprint/federation-watchtower/CHANGELOG.md",
-  "assignments": "/home/drdeek/projects/federation/docs/blueprint/federation-watchtower/assignments.json"
+  "blueprint": "./blueprint.md",
+  "checklist": "./checklist.md",
+  "changelog": "./CHANGELOG.md",
+  "assignments": "./assignments.json"
 }
