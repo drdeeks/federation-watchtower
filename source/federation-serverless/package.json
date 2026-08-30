@@ -17,6 +17,7 @@
     "migrate:audit-chain-integrity": "wrangler d1 execute federation-db --remote --file=src/migrations/0008_audit_chain_integrity.sql",
     "migrate:speech-lines-drop-fk": "wrangler d1 execute federation-db --remote --file=src/migrations/0009_speech_lines_drop_federation_fk.sql",
     "migrate:organizations-widen-status": "wrangler d1 execute federation-db --remote --file=src/migrations/0010_organizations_widen_status.sql",
+    "migrate:organizations-widen-status-rollback": "wrangler d1 execute federation-db --remote --file=src/migrations/0010_organizations_widen_status_rollback.sql",
     "migrate:operator-credentials": "wrangler d1 execute federation-db --remote --file=src/migrations/0011_operator_credentials.sql",
     "migrate:webhook-destinations": "wrangler d1 execute federation-db --remote --file=src/migrations/0012_webhook_destinations.sql",
     "test": "node --experimental-strip-types --test src/*.test.ts",

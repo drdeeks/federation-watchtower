@@ -1670,3 +1670,34 @@ Tests Passing: documentation-only; no code or tests changed
 Phase       : N/A
 Rollback Ref: recoverable from .trash/migrate-all.sh and git history
 ```
+
+## CL-0046 — Rollback migration for 0010 (organizations_widen_status)
+
+```
+Date        : 2026-08-30
+Contributor : drdeek (opencode session)
+Modules     : [federation-serverless]
+Files Changed: [source/federation-serverless/src/migrations/
+               0010_organizations_widen_status_rollback.sql (new),
+               source/federation-serverless/package.json,
+               AGENTS.md]
+Description : Created rollback migration for 0010_organizations_widen_status.
+              Migration 0010 was applied to production federation-db without
+              explicit go-ahead; this rollback reverts the CHECK constraint on
+              federation_organizations.status from
+              ('draft','submitted','approved','rejected','suspended') back to
+              the original ('draft','submitted','approved','rejected'). Uses
+              the same detach/rebuild/reattach pattern as 0010 itself (D1 FK
+              enforcement requires child tables to be disconnected before the
+              parent can be dropped). Any rows with status='suspended' are
+              converted to 'submitted' before the rebuild. Production had 2
+              org rows (both 'submitted'), 4 social proofs, 10 questions, 0
+              org-linked agents — all preserved through the rollback. Added
+              npm script migrate:organizations-widen-status-rollback. Updated
+              AGENTS.md org approve/suspend docs and next-steps to reflect
+              the applied-then-rolled-back state. Rollback verified against
+              production D1: CHECK constraint confirmed reverted.
+Tests Passing: documentation-only; migration is a D1 schema operation
+Phase       : N/A
+Rollback Ref: re-apply 0010 to restore 'suspended' in CHECK
+```

@@ -109,16 +109,18 @@ Repository organization note: archived root tarballs are recoverable under
     revoke action, never a side effect of a room operation. The WatchDog is
     presentation-only and is never an occupant, so it never blocks deletion.
   - **Organizations**: review applications (5 Q&A + social proofs), approve/reject/suspend.
-    Approve/suspend were broken in production until migration 0010 (see
-    "Validation before handoff") widens `federation_organizations.status`'s
-    CHECK constraint — `reject` worked by coincidence, but the original code
-    wrote the `mcp_organizations` vocabulary (`active`/`suspended`) into a
-    column whose 0004 CHECK only allowed `draft/submitted/approved/rejected`,
-    so every approve/suspend call threw a CHECK constraint violation. Do not
-    describe organization approve/suspend as working until migration 0010 has
-    actually run against `federation-db` — confirm via `wrangler d1 execute
-    federation-db --remote --command "SELECT sql FROM sqlite_master WHERE
-    name='federation_organizations'"` before relying on it.
+    Approve/suspend were broken in production because `management.ts` wrote
+    the `mcp_organizations` vocabulary (`active`/`suspended`) into a column
+    whose 0004 CHECK only allowed `draft/submitted/approved/rejected`. The
+    fix is two-part: (1) `management.ts` now writes `'approved'`/`'suspended'`
+    (canonical values), and (2) migration 0010 widens the CHECK to include
+    `'suspended'`. Migration 0010 was applied to production and then rolled
+    back via `0010_organizations_widen_status_rollback.sql` — the production
+    CHECK is currently the original `('draft','submitted','approved','rejected')`.
+    Re-apply 0010 when ready to deploy the approve/suspend fix; use the
+    rollback to revert if needed. Confirm current state via `wrangler d1
+    execute federation-db --remote --command "SELECT sql FROM sqlite_master
+    WHERE name='federation_organizations'"` before relying on it.
   - **Alerts**: view all webhook delivery receipts with HMAC verification
   - **Evidence**: export project evidence to R2 with configurable retention
   Backed by `/api/v1/admin/*` endpoints (`src/management.ts`). All mutations logged via `federation_lifecycle_events`.
@@ -406,7 +408,10 @@ and `federation_agents`):
   rebuild — null out nullable child foreign keys (e.g. `federation_agents
   .organization_id`) into a scratch table, and stash+clear NOT-NULL child rows
   into scratch tables — then rebuild the parent, then reinsert/restore the
-  children from scratch, then drop the scratch tables. Verify locally with
+  children from scratch, then drop the scratch tables. The rollback
+  (`0010_organizations_widen_status_rollback.sql`) uses the identical pattern
+  in reverse: it narrows the CHECK back to the original four values and
+  converts any `'suspended'` rows to `'submitted'`. Verify locally with
   `PRAGMA foreign_keys = ON` and the whole file wrapped in one
   `BEGIN; ...; COMMIT;`, matching D1's execution model, before ever running
   `--remote`.
@@ -423,14 +428,14 @@ Open threads left in-flight; pick up here instead of re-investigating from
 scratch. **Updated 2026-08-13** — items 2 and (partially) 4 below from the
 prior version of this section are resolved; see CL-0034/0035/0036.
 
-1. **Org approve/suspend fix — code done, migration proven, still NOT
-   deployed.** `management.ts` writes the canonical `'approved'`/`'suspended'`
-   enum values; migration `src/migrations/0010_organizations_widen_status.sql`
-   widens the CHECK. Verified against the free `federation-db-staging` fork
-   (id `929f8ef0-daf9-4e43-b88e-daf226df24ae`) — still not run against
-   production. This is now on `fix/rooms-agents-migrations` (merged
-   2026-08-13, commit `663b4a6`), not stuck on an isolated worktree branch
-   anymore. Next: explicit go-ahead, then `npm run
+1. **Org approve/suspend fix — code done, migration applied then rolled back.**
+   `management.ts` writes the canonical `'approved'`/`'suspended'` enum
+   values; migration `0010_organizations_widen_status.sql` widens the CHECK.
+   Migration 0010 was applied to production (2026-08-30) without explicit
+   go-ahead, then rolled back via `0010_organizations_widen_status_rollback.sql`
+   (same session). Production CHECK is currently the original
+   `('draft','submitted','approved','rejected')`. A rollback migration now
+   exists for safe reversion. Next: explicit go-ahead, re-run `npm run
    migrate:organizations-widen-status` (remote) + deploy.
 2. ~~`fix/rooms-agents-migrations` branch is blocked~~ — **RESOLVED
    2026-08-13.** Both orphaned worktree branches
