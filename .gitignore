@@ -122,7 +122,13 @@ $RECYCLE.BIN/
 *~
 .fuse_hidden*
 .trash-*
+.trash/
 .nfs*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
 
 # ============================================================
 # EDITOR & IDE FILES
@@ -257,6 +263,7 @@ source/federation-tv-widget/public/sprites/**/*
 # Generated documentation
 docs/generated/
 docs/api/
+docs/outdated-labeling/
 *.mdx
 
 # ============================================================
