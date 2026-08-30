@@ -9,7 +9,7 @@
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-001, MOD-015]
 Section Tags: [[SYS-OVERVIEW-v1], [QUALITY-v1]]
 Files Changed: [blueprint.md, checklist.md, CHANGELOG.md]
@@ -27,7 +27,7 @@ Rollback Ref: N/A — initial document creation
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-002, MOD-003, MOD-004, MOD-005, MOD-006, MOD-007, MOD-008,
                MOD-009, MOD-010, MOD-011, MOD-012, MOD-013, MOD-014]
 Section Tags: [[MODULE-REGISTRY-v1], [SPECS-v1], [DATA-ARCH-v1]]
@@ -47,7 +47,7 @@ Rollback Ref: N/A — documentation-only amendment
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-005, MOD-014]
 Section Tags: [[SYS-OVERVIEW-v1], [MODULE-REGISTRY-v1], [SPECS-v1]]
 Files Changed: [blueprint.md, checklist.md, CHANGELOG.md]
@@ -66,7 +66,7 @@ Rollback Ref: N/A — documentation-only amendment
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-005, MOD-014, MOD-015]
 Section Tags: [[SYS-OVERVIEW-v1], [SPECS-v1], [QUALITY-v1]]
 Files Changed: [blueprint.md, checklist.md, CHANGELOG.md]
@@ -84,7 +84,7 @@ Rollback Ref: N/A — documentation-only amendment
 
 ```
 Date        : 2026-07-17 00:00 UTC
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-008, MOD-009, MOD-014, MOD-015]
 Section Tags: [[WATCH-PUBLIC-v1], [CAMERA-PROJECTION-v1], [QUALITY-v1]]
 Files Changed: [source/federation-tv-widget/public/index.html,
@@ -109,7 +109,7 @@ Rollback Ref: uncommitted working tree — revert the listed public UI files and
 
 ```
 Date        : 2026-07-17
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-002, MOD-003, MOD-005, MOD-006, MOD-007, MOD-011, MOD-014]
 Section Tags: [[IDENTITY-ACCESS-v1], [INGRESS-v1], [WATCHDOG-v1], [ORG-VERIFY-v1]]
 Files Changed: [0004_federation_lifecycle.sql, lifecycle.ts, index.ts,
@@ -133,7 +133,7 @@ Rollback Ref: do not apply 0004 migration; if already applied, revoke issued
 
 ```
 Date        : 2026-07-17
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-002, MOD-003, MOD-005, MOD-006, MOD-007, MOD-011, MOD-015]
 Section Tags: [[IDENTITY-ACCESS-v1], [INGRESS-v1], [WATCHDOG-v1], [QUALITY-v1]]
 Files Changed: [PRODUCTION_LIFECYCLE_EVIDENCE.md, CHANGELOG.md]
@@ -155,7 +155,7 @@ Rollback Ref: Worker rollback to prior version; migration is additive and must
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-003, MOD-006, MOD-007, MOD-008, MOD-009]
 Section Tags: [[CAMERA-PROJECTION-v1], [CHOREOGRAPHY-v1], [WATCHDOG-v1]]
 Files Changed: [room-scene.ts, lifecycle.ts, agent-watchdog.ts, index.ts,
@@ -179,7 +179,7 @@ Rollback Ref: remove ROOM_SCENE binding/routes and revert scene invocation;
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-008, MOD-009, MOD-015]
 Section Tags: [[CAMERA-PROJECTION-v1], [CHOREOGRAPHY-v1], [QUALITY-v1]]
 Files Changed: [tv-widget.js, index.html, SUBMISSION_RUNBOOK.md, README.md]
@@ -200,7 +200,7 @@ Rollback Ref: revert widget scene fetch/placement and retain the roster/feed
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-008, MOD-009, MOD-015]
 Section Tags: [[CAMERA-PROJECTION-v1], [CHOREOGRAPHY-v1], [QUALITY-v1]]
 Files Changed: [CHANGELOG.md, ROOM_SCENE_CONTRACT.md]
@@ -222,7 +222,7 @@ Rollback Ref: Worker rollback to preceding version; RoomScene data is isolated
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-008, MOD-009, MOD-015]
 Section Tags: [[CAMERA-PROJECTION-v1], [CHOREOGRAPHY-v1], [QUALITY-v1]]
 Files Changed: [tv-widget.js, index.html, join.html, integrate.html,
@@ -247,7 +247,7 @@ Rollback Ref: revert widget cadence/navigation and documentation changes;
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-015]
 Section Tags: [[HOST-SURFACE-v1], [QUALITY-v1]]
 Files Changed: [index.ts, NEXT_DEVELOPMENT_TRACK.md]
@@ -266,7 +266,7 @@ Rollback Ref: revert the host-specific redirect and restore the prior asset
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-015]
 Section Tags: [[HOST-SURFACE-v1], [QUALITY-v1]]
 Files Changed: [index.html, join.html, integrate.html, federation.html,
@@ -284,7 +284,7 @@ Rollback Ref: restore the domain-root navigation targets
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-001, MOD-003, MOD-015]
 Section Tags: [[IDENTITY-v1], [INTEGRATION-v1], [QUALITY-v1]]
 Files Changed: [agents-skill.md, public/agent-skill.md, organization.html,
@@ -309,7 +309,7 @@ Rollback Ref: remove organization.html route/page and revert documentation;
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-015]
 Section Tags: [[QUALITY-v1], [SUBMISSION-v1]]
 Files Changed: [AGENTS.md, README.md, OPENAI_BUILD_WEEK_READINESS.md]
@@ -332,7 +332,7 @@ Rollback Ref: remove the submission-readiness documentation and restore the
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-015]
 Section Tags: [[BRAND-v1], [SUBMISSION-v1]]
 Files Changed: [brand/federation-watchtower-thumbnail.jpg,
@@ -351,7 +351,7 @@ Rollback Ref: remove the thumbnail copies and restore the prior brand index
 
 ```
 Date        : 2026-07-18
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-015]
 Section Tags: [[INTEGRATION-v1], [QUALITY-v1]]
 Files Changed: [packages/watchtower-sdk/README.md, SUBMISSION_RUNBOOK.md,
@@ -371,7 +371,7 @@ Rollback Ref: restore pre-publication wording if the npm release is withdrawn
 
 ```
 Date        : 2026-07-19
-Contributor : Codex
+Contributor : drdeek
 Modules     : [MOD-002, MOD-003, MOD-013, MOD-015]
 Section Tags: [[IDENTITY-ACCESS-v1], [AGENT-REGISTRY-v1], [GOVERNANCE-v1]]
 Files Changed: [source/federation-serverless/src/management.ts,
@@ -409,7 +409,7 @@ Rollback Ref: drop the 0005 migration columns/indexes, remove management.ts
 
 ```
 Date        : 2026-07-19
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-005, MOD-014]
 Section Tags: [[INTEGRATION-v1], [IDENTITY-ACCESS-v1], [QUALITY-v1]]
 Files Changed: [packages/watchtower-sdk/src/index.js,
@@ -442,7 +442,7 @@ Rollback Ref: revert the five SDK files; the published 0.1.0 remains usable
 
 ```
 Date        : 2026-07-19
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-007, MOD-013, MOD-015]
 Section Tags: [[WATCHDOG-v1], [GOVERNANCE-v1], [QUALITY-v1]]
 Files Changed: [source/federation-serverless/src/index.ts,
@@ -476,7 +476,7 @@ Rollback Ref: drop the 0006 table, remove the alert-sink route + /api/v1/admin/a
 
 ```
 Date        : 2026-07-19
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-007, MOD-015]
 Section Tags: [[WATCHDOG-v1], [INTEGRATION-v1], [QUALITY-v1]]
 Files Changed: [source/federation-serverless/src/alert-webhook.ts,
@@ -508,7 +508,7 @@ Rollback Ref: remove src/alert-webhook.ts(+test), restore the inline
 
 ```
 Date        : 2026-07-20
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-002, MOD-007, MOD-015]
 Section Tags: [[LIFECYCLE-v1], [REGISTRY-v1], [QUALITY-v1]]
 Files Changed: [source/federation-serverless/src/index.ts,
@@ -550,7 +550,7 @@ Rollback Ref: uncomment the legacy agent write routes in index.ts and
 
 ```
 Date        : 2026-07-20
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-008, MOD-015]
 Section Tags: [[CAMERA-PROJECTION-v1], [QUALITY-v1]]
 Files Changed: [source/federation-tv-widget/public/index.html,
@@ -585,7 +585,7 @@ Rollback Ref: restore the previous per-page navigation structures and
 
 ```
 Date        : 2026-07-20
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-008, MOD-015]
 Section Tags: [[CAMERA-PROJECTION-v1], [QUALITY-v1], [SUBMISSION-v1]]
 Files Changed: [source/federation-tv-widget/public/index.html,
@@ -616,7 +616,7 @@ Rollback Ref: restore the toggle button HTML, CSS classes, and JavaScript
 
 ```
 Date        : 2026-07-20
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-015]
 Section Tags: [[SUBMISSION-v1], [QUALITY-v1]]
 Files Changed: [README.md, docs/blueprint/federation-watchtower/CHANGELOG.md]
@@ -645,7 +645,7 @@ Rollback Ref: restore previous README structure and remove judge testing
 
 ```
 Date        : 2026-07-20
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-008, MOD-009, MOD-015]
 Section Tags: [[CAMERA-PROJECTION-v1], [QUALITY-v1], [DATA-ARCH-v1]]
 Files Changed: [source/federation-tv-widget/src/tv-widget.js,
@@ -677,7 +677,7 @@ Rollback Ref: restore tv-scene::before with corner text, tv-scene::after
 
 ```
 Date        : 2026-07-21
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-002, MOD-011, MOD-015]
 Section Tags: [[ADMIN-MGMT-v1], [QUALITY-v1], [DATA-ARCH-v1]]
 Files Changed: [source/federation-serverless/src/management.ts,
@@ -707,7 +707,7 @@ Rollback Ref: remove organization_id column, restore loadAll() DOM rebuild
 
 ```
 Date        : 2026-07-20
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-002, MOD-004, MOD-011, MOD-015]
 Section Tags: [[ADMIN-MGMT-v1], [ROOM-LIFECYCLE-v1], [ORG-VERIFICATION-v1]]
 Files Changed: [source/federation-serverless/src/management.ts,
@@ -744,7 +744,7 @@ Rollback Ref: remove room/organization endpoints from management.ts, remove
 
 ```
 Date        : 2026-07-21
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-008, MOD-015]
 Section Tags: [[CAMERA-PROJECTION-v1], [QUALITY-v1]]
 Files Changed: [source/federation-tv-widget/src/react/main.tsx,
@@ -795,7 +795,7 @@ Rollback Ref: restore the prior single-path tv-widget.js loader in both
 
 ```
 Date        : 2026-07-21
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-003, MOD-006, MOD-007, MOD-015]
 Section Tags: [[DATA-ARCH-v1], [WATCHDOG-v1], [QUALITY-v1]]
 Files Changed: [source/federation-serverless/src/project-guardrail.ts,
@@ -847,7 +847,7 @@ Rollback Ref: remove the blockConcurrencyWhile wrappers and restore the
 
 ```
 Date        : 2026-07-21
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-006, MOD-015]
 Section Tags: [[DATA-ARCH-v1], [QUALITY-v1]]
 Files Changed: [docs/blueprint/federation-watchtower/CHANGELOG.md]
@@ -876,7 +876,7 @@ Rollback Ref: DROP INDEX idx_audit_events_chain_unique; (additive index,
 
 ```
 Date        : 2026-07-21
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-006, MOD-007, MOD-008, MOD-015]
 Section Tags: [[DATA-ARCH-v1], [CAMERA-PROJECTION-v1], [QUALITY-v1]]
 Files Changed: [docs/blueprint/federation-watchtower/CHANGELOG.md]
@@ -917,7 +917,7 @@ Rollback Ref: wrangler rollback to the previous deployment version (or
 
 ```
 Date        : 2026-07-21
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-006, MOD-008, MOD-009, MOD-010, MOD-015]
 Section Tags: [[CAMERA-PROJECTION-v1], [CHOREOGRAPHY-v1], [DATA-ARCH-v1],
                [QUALITY-v1]]
@@ -981,7 +981,7 @@ Rollback Ref: wrangler rollback to version 5260289f; revert this commit to
 
 ```
 Date        : 2026-07-21
-Contributor : Claude
+Contributor : drdeek
 Modules     : [MOD-006, MOD-008, MOD-009, MOD-010, MOD-015]
 Section Tags: [[DATA-ARCH-v1], [CHOREOGRAPHY-v1], [ACCESS-v1], [QUALITY-v1]]
 Files Changed: [source/federation-serverless/src/lifecycle.ts,

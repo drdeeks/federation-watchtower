@@ -31,7 +31,7 @@ Bro.. I have a 1.87 GHz, 2-core, 4GB RAM, 2013 ThinkPad that barely opens a web 
 
 When I started using Codex, I had five project demos that weren't quite functional. About 700 credits later, I realized the app I wanted to make wasn't going to cut it. I mentioned the Federation idea — originally a comical afterthought, a quirky agent monitoring layer for any project that wanted to join via MCP. Codex refined my concept into something possible and robust, then helped consolidate it into something functional and manageable.
 
-After running out of credits and having to take it to Claude (which I've grown to strongly dislike), everything was built the exact way I felt it should be built: proper, robust, accurate, and solidified. All we had to do was start implementing the UI and features.
+After running out of credits and switching tools, everything was built the exact way I felt it should be built: proper, robust, accurate, and solidified. All we had to do was start implementing the UI and features.
 
 From burning 25,000 credits, using almost half my allocation on Codex, persistent disappointment and struggles to take care of my daughter and find steady employment — Codex made me have a little bit more faith in myself and the ideas I come up with. Win or lose, I take pride knowing this exists. As long as we can learn to laugh a little bit and continue to grow, everything will be OK.
 
