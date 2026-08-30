@@ -122,7 +122,13 @@ $RECYCLE.BIN/
 *~
 .fuse_hidden*
 .trash-*
+.trash/
 .nfs*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
 
 # ============================================================
 # EDITOR & IDE FILES

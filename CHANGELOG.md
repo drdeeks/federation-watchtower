@@ -1671,6 +1671,39 @@ Phase       : N/A
 Rollback Ref: recoverable from .trash/migrate-all.sh and git history
 ```
 
+## CL-0045 — Repo hygiene: Claude/opencode purge, dependabot merge, cleanup
+
+```
+Date        : 2026-08-30
+Contributor : drdeek
+Modules     : [REPO-ORG]
+Files Changed: [.claude/ (-> .trash/), CLAUDE.md (-> .trash/),
+               docs/inspiration/ (-> .trash/), manage-drive.mjs (-> .trash/),
+               packages/ (-> .trash/), scripts/migrate-all.sh (-> .trash/),
+               docs/outdated-labeling/ (-> .trash/),
+               docs/blueprint/federation-watchtower/CHANGELOG.md,
+               README.md, .gitignore, source/federation-serverless/package.json]
+Description : Full repo hygiene pass per owner directive.
+              1) Removed tracked .claude/ directory (106 files) and root
+              CLAUDE.md from git — moved to .trash/, not deleted.
+              2) Replaced all Contributor : Claude and Contributor : Codex
+              attributions in this CHANGELOG with drdeek.
+              3) Removed Claude reference from README.md personal narrative.
+              4) Untracked and trashed docs/inspiration/ (287 files of
+              vendored reference material).
+              5) Untracked and trashed manage-drive.mjs (one-off Playwright
+              script), empty packages/ directory, and scripts/migrate-all.sh
+              (unauthorized migration runner moved in CL-0044).
+              6) Moved docs/outdated-labeling/ to .trash/.
+              7) Updated .gitignore: added __pycache__/, .trash/, *.tgz.
+              8) Removed migrate:all npm script from package.json.
+              9) Added tooling badges to README.md.
+              10) Merged 6 safe dependabot branches (fast-uri, hono,
+              ip-address, body-parser, postcss, multi-dep bump).
+Tests Passing: documentation and repository-structure review only
+Phase       : N/A
+```
+
 ## CL-0046 — Rollback migration for 0010 (organizations_widen_status)
 
 ```
