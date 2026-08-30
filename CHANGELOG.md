@@ -30,7 +30,7 @@ Contributor : Codex
 Modules     : [ADAPTER]
 Files Changed: [AGENTS.md, CHANGELOG.md]
 Description : Corrected the canonical adapter reference to the
-              `watchtower-ack-adapter` repository/package. Recorded that the
+              `~~watchtower-ack-adapter~~` repository/package. Recorded that the
               adapter is a translator for Character Kit
               activity and Watchtower lifecycle/events, not a policy or lease
               authority. Federation/Watchtower integration layers retain
@@ -1409,7 +1409,7 @@ Rollback Ref: N/A — initial document creation
 
 ```
 Date        : 2026-08-14 01:20 UTC
-Contributor : Claude (session continuing from watchtower-ack-adapter Phase 2/route-map work)
+Contributor : Claude (session continuing from ~~watchtower-ack-adapter~~ Phase 2/route-map work)
 Modules     : [MOD-001, MOD-002, MOD-003, MOD-004, MOD-005, MOD-006, MOD-007, MOD-008]
 Section Tags: [[SYS-OVERVIEW-v1], [MODULE-REGISTRY-v1], [SPECS-v1], [DATA-ARCH-v1], [QUALITY-v1]]
 Files Changed: [blueprint.md]
@@ -1467,7 +1467,7 @@ Description : Executed a narrowed scope of this blueprint (credentials + MCP +
               a disposable temp copy of ~/projects/federation
               (/tmp/federation-ecosystem-hardening-20260814), per explicit
               instruction: never touch the real federation repo, the
-              hackathon repo, or the watchtower-ack-adapter repo (the latter
+              hackathon repo, or the ~~watchtower-ack-adapter~~ repo (the latter
               was read-only reviewed for compatibility, never edited).
               PHASE-0 re-verification surfaced two real, previously-unknown
               bugs directly in the credential/organization code path this
@@ -1485,7 +1485,7 @@ Description : Executed a narrowed scope of this blueprint (credentials + MCP +
               proceeded with genuine additive dual-auth anyway, since that
               is what backward compatibility with the adapter's current
               HMAC-only calls actually requires (verified against
-              watchtower-ack-adapter/docs/FEDERATION_ROUTE_MAP.md).
+              ~~watchtower-ack-adapter~~/docs/FEDERATION_ROUTE_MAP.md).
               Implemented: MOD-001 per-organization operator credential
               (federation_operator_credentials, src/operator-rbac.ts,
               issue/revoke admin routes, organization.html webhook form using
@@ -1614,3 +1614,39 @@ Rollback Ref: commit 3f9b140 on fix/rooms-agents-migrations (not pushed) --
 - Moved root stray `federation-tv-package/` (working copy retained at `source/federation-tv-package/`) to `.trash/`.
 - Moved `docs/blueprint/federation-ecosystem-hardening/` to `.trash/` (content recoverable from unpushed git history).
 - Pre-edit versions of changed files archived under `docs/outdated-labeling/`.
+
+## CL-0043 — Repo hygiene pass: trash legacy/hackathon docs, relocate guides, retire `~~watchtower-ack-adapter~~` name
+
+```
+Date        : 2026-08-28
+Contributor : opencode (drdeek directive)
+Modules     : [REPO-ORG]
+Files Changed: [VIDEO_RECORDING_GUIDE.md (-> .trash/), skills-reference/ (-> .trash/),
+               docs/review/OPENAI_BUILD_WEEK_READINESS.md (-> .trash/),
+               docs/review/OPENAI_SUBMISSION_NOTES.md (-> .trash/),
+               docs/review/OPENAI_SUBMISSION_VIDEO_SCRIPT.md (-> .trash/),
+               docs/review/SUBMISSION_RUNBOOK.md (-> .trash/),
+               scripts/HACKATHON_VIDEO_SCRIPT.md (-> .trash/),
+               .claude/ (-> .trash/), .agents/ (-> .trash/), .codex/ (-> .trash/),
+               DEPLOY.md (-> docs/), TESTING_GUIDE.md (-> docs/),
+               COMPREHENSIVE_VALIDATION.md (-> docs/), VALIDATION_SUMMARY.md (-> docs/),
+               README.md, AGENTS.md, CHANGELOG.md]
+Description : Repo hygiene per owner directive. Trashed video-production,
+              hackathon/OpenAI submission, and the vendored skill-reference
+              material (legacy `skills-reference/` — the canonical
+              enterprise-blueprint skill lives in `hemlock/skills/`, so the copy
+              was redundant) into `.trash/`; nothing deleted. Moved the root
+              deployment/testing/validation/recording guides into `docs/` and
+              updated README links accordingly; AGENTS.md now states they live
+              under `docs/`. Kept `source/federation-tv-package/` (required by
+              the local `tv-sitcom-mcp` backend on :41207 per AGENTS.md) and all
+              `docs/review/` project-context docs. Retired the legacy
+              `~~watchtower-ack-adapter~~` name everywhere in this log with
+              `~~strikethrough~~`; the canonical adapter is
+              `@the-federation/watchtower-adapter` (repo `federation-adapters`),
+              a translator, not Watchtower policy. Future work (adapter as its
+              own repo, SDK publish, deploy) remains gated on explicit go-ahead.
+Tests Passing: documentation-only; no code or tests changed
+Phase       : N/A
+Rollback Ref: `git mv` reversions recoverable from working tree / git history
+```
