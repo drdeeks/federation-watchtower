@@ -79,8 +79,8 @@
 
 - [x] **PHASE-7.1** Run unit, integration, contract, migration, browser, accessibility, and load tests — ✅ Unit tests (29/29 passing), ✅ Integration tests (E2E lifecycle script), ✅ API path validation (`validate-api-paths.sh`), ✅ Guardrail failure tests (`test-guardrail-failures.sh`); ⚠️ Contract tests, migration tests, browser tests, accessibility tests, load tests not implemented
 - [x] **PHASE-7.2** Validate all public endpoints, real event projection, registration, review, and payment paths — ✅ Public: `/api/projects`, `/api/feed`, `/api/search`, `/api/rooms`, `/api/health`; ✅ Owner: `/api/v1/owners`, `/api/v1/agents`, `/api/v1/connect`, `/api/v1/heartbeat`, `/api/v1/events`, `/api/v1/disconnect`; ✅ Admin: `/api/v1/admin/*` (agents, rooms, organizations, alerts); ✅ Review: org application Q&A dialog; ⚠️ Payment paths not implemented (PHASE-5)
-- [x] **PHASE-7.3** Produce final release evidence and holistic review with known limitations — ✅ `docs/review/PRODUCTION_LIFECYCLE_EVIDENCE.md` (owner registration, agent lifecycle, watchdog expiry, org application); ✅ `CHANGELOG.md` (CL-0025)
-- [ ] **PHASE-7.V** Validation gate: `npm test` → PASS — ⚠️ PENDING: production deployment not complete
+- [x] **PHASE-7.3** Produce final release evidence and holistic review with known limitations — ✅ `docs/review/PRODUCTION_LIFECYCLE_EVIDENCE.md` (owner registration, agent lifecycle, watchdog expiry, org application); ✅ `docs/review/OPENAI_BUILD_WEEK_READINESS.md`; ✅ `CHANGELOG.md` (CL-0025); ⚠️ Final video recording and Devpost submission pending
+- [ ] **PHASE-7.V** Validation gate: `npm test` → PASS — ⚠️ PENDING: production deployment, video recording, Devpost submission not complete
 
 ## Module Registry
 
