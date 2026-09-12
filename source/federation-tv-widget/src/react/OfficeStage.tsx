@@ -101,24 +101,33 @@ function classifyLine(line: string): Sentiment {
 }
 
 // ── WatchDog: the station's resident mascot ─────────────────────────
-// WatchDog is PRESENTATION, permanently on duty in every room. It is not an
-// agent: it never appears in the roster, the feed, or any record, and it is
-// visibly labelled. Its speech list is designated — agents never draw from it
-// and it never draws from the shared pool. It speaks on a 15–45s cadence ONLY
-// when no real agents are on shift, and it announces labelled ambient cameos.
+// WatchDog is PRESENTATION, permanently on duty in every room, unconditionally
+// -- present and speaking regardless of whether any real agent is on shift.
+// ("the watchdog is us monitoring them in the room.") It is not an agent: it
+// never appears in the roster, the feed, or any record, and it is visibly
+// labelled. Its speech list is designated -- agents never draw from it and it
+// never draws from the shared pool. Cadence is a definitive 2-5 statements per
+// hour (not a strict per-calendar-hour quota -- a pick every 12-30 minutes
+// averages to 2-5/hour without clustering at the top of the hour).
 const WATCHDOG_LINES = [
-  "All quiet on the floor. I checked twice.",
-  "Perimeter sweep complete. Zero rogue processes.",
-  "Holding the fort until the next shift clocks in.",
-  "I sniffed every packet. Smells fine.",
-  "No heartbeats to guard right now. Stretching my paws.",
-  "The servers hum. I hum back.",
-  "Watched the logs scroll by. Beautiful stuff.",
-  "Empty office, full vigilance.",
-  "If anything moves, I bark. Professionally.",
-  "Uptime is my favorite chew toy.",
-  "Patrolling desk to desk. All clear.",
-  "Someone left the cursor blinking. On it.",
+  "Dang, I forgot where I buried my bone.",
+  "Snack time — who brought the treats?",
+  "Don't mind me, I'm just observing.",
+  "I AM THE WATCHDOG.",
+  "Who invited the stand-up comedian?",
+  "Do you think I could be related to Snoopy?",
+  "The checklist does not need its own checklist.",
+  "Heartbeat check.",
+  "Twelve truths and a lie — you go first.",
+  "Refine that loop, soldier!",
+  "Bark! Bark!",
+  "Immutability is a requirement.",
+  "What even is an 'agent'?",
+  "Well, what do you know...",
+  "BARK! DUPLICATION DETECTED! BARK!",
+  "Would you all still love me if my name was...?",
+  "Don't forget my coffee tomorrow, Jan!",
+  "Ahh, I miss Tom. Or was it Tim?.. Ted?.. nvm.",
 ];
 const CAMEOS = [
   { id: "night-shift", icon: "👻", name: "NIGHT SHIFT GHOST" },
@@ -275,22 +284,29 @@ export default function OfficeStage({ gatewayUrl = 'https://fapi.drdeeks.xyz', p
     return () => { stopped = true; };
   }, [gatewayUrl]);
 
-  // WatchDog presence: speaks from its designated list every 15–45s, but ONLY
-  // while no real agents are on shift. Labelled presentation, never data.
+  // WatchDog presence: speaks from its designated list unconditionally --
+  // not gated on real-agent count, a definitive 2-5 times per hour (a
+  // 12-30 minute rolling interval, not a strict per-calendar-hour quota).
+  // Labelled presentation, never data. Avoids repeating the same line
+  // within its last 5 picks (WatchDog's own pool only).
   const [watchdogBubble, setWatchdogBubble] = useState<string | null>(null);
   const [cameo, setCameo] = useState<(typeof CAMEOS)[number] | null>(null);
+  const watchdogRecentRef = useRef<string[]>([]);
 
   useEffect(() => {
     let speakT: ReturnType<typeof setTimeout>;
     let clearT: ReturnType<typeof setTimeout>;
     const schedule = () => {
       speakT = setTimeout(() => {
-        if (agentsRef.current.length === 0) {
-          setWatchdogBubble(pick(WATCHDOG_LINES));
-          clearT = setTimeout(() => setWatchdogBubble(null), 4_600);
-        }
+        const recent = watchdogRecentRef.current;
+        const pool = WATCHDOG_LINES.filter((line) => !recent.includes(line));
+        const line = pick(pool.length ? pool : WATCHDOG_LINES);
+        recent.push(line);
+        if (recent.length > 5) recent.shift();
+        setWatchdogBubble(line);
+        clearT = setTimeout(() => setWatchdogBubble(null), 4_600);
         schedule();
-      }, 15_000 + Math.random() * 30_000);
+      }, (12 + Math.random() * 18) * 60_000); // 12-30 min -> 2-5/hour
     };
     schedule();
     return () => { clearTimeout(speakT); clearTimeout(clearT); };
@@ -952,13 +968,25 @@ function SpeechBubble({
 }: {
   x: number; y: number; text: string; kind: StageEvent["kind"];
 }) {
+  // Dark background + light text (was a near-white bg, reported hard to
+  // read) -- alarm state keeps its own distinct high-contrast red/cream
+  // treatment, unchanged.
   const alarm = kind === "boiler" || kind === "test.failed";
-  const bg = alarm ? "#c94f4f" : "#fbfaf3";
-  const fg = alarm ? "#fff8e0" : "#1a1a1a";
-  const words = text.split(" ");
+  const bg = alarm ? "#c94f4f" : "#171718";
+  const fg = alarm ? "#fff8e0" : "#f5e6bd";
+  const maxChars = 15;
+  // Split any single word longer than maxChars on its own -- without this,
+  // one long word (a long line from a submitted statement, a URL, etc.)
+  // could still render wider than the box the sizing below computes,
+  // overflowing past the bubble's visible edge.
+  const words = text.split(" ").flatMap((w) => {
+    if (w.length <= maxChars) return [w];
+    const chunks: string[] = [];
+    for (let i = 0; i < w.length; i += maxChars) chunks.push(w.slice(i, i + maxChars));
+    return chunks;
+  });
   const lines: string[] = [];
   let line = "";
-  const maxChars = 15;
   for (const w of words) {
     if ((line + " " + w).trim().length > maxChars) {
       lines.push(line.trim());

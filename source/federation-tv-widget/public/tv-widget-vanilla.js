@@ -140,6 +140,32 @@
     "Reduced motion enabled. The hallway appreciates it.", "New agent at the door. Please show your manifest.", "Welcome to the Federation. We missed you."
   ];
 
+  // Watchdog's own exclusive lines. Never merged into DEFAULT_SPEECH_LINES,
+  // FEDERATION_REPERTOIRE, or the live-submitted pool -- nothing else ever
+  // draws from this array, and Watchdog never draws from anything else.
+  // Watchdog is not a real registered agent (see renderWatchdogFixture) --
+  // this is scenery/presentation, same convention as the ambient cameos.
+  const WATCHDOG_LINES = [
+    "Dang, I forgot where I buried my bone.",
+    "Snack time — who brought the treats?",
+    "Don't mind me, I'm just observing.",
+    "I AM THE WATCHDOG.",
+    "Who invited the stand-up comedian?",
+    "Do you think I could be related to Snoopy?",
+    "The checklist does not need its own checklist.",
+    "Heartbeat check.",
+    "Twelve truths and a lie — you go first.",
+    "Refine that loop, soldier!",
+    "Bark! Bark!",
+    "Immutability is a requirement.",
+    "What even is an 'agent'?",
+    "Well, what do you know...",
+    "BARK! DUPLICATION DETECTED! BARK!",
+    "Would you all still love me if my name was...?",
+    "Don't forget my coffee tomorrow, Jan!",
+    "Ahh, I miss Tom. Or was it Tim?.. Ted?.. nvm.",
+  ];
+
   // ============================================================
   // OFFICE FLOOR — agents are drawn by the procedural sprite generator
   // above (a deterministic per-agent pixel character), rendered on a real
@@ -655,6 +681,15 @@
             .ambient-cameo b { font:800 10px ui-monospace,monospace; letter-spacing:.08em; }
             .ambient-cameo span { font:700 8px ui-monospace,monospace; color:#c8b992; letter-spacing:.06em; text-transform:uppercase; }
             .ambient-cameo i { font-size:34px; font-style:normal; filter:drop-shadow(0 0 8px rgba(244,200,66,.55)); }
+            /* Watchdog: a permanent scene fixture, present in every room
+               unconditionally (not gated on room emptiness/quiet). Fixed
+               corner position, deliberately distinct from real agents'
+               procedural sprite + waypoint system -- never mistakable for
+               a registered agent. */
+            .tv-watchdog { position:absolute; right:10px; bottom:10px; z-index:3; display:grid; justify-items:center; gap:2px; pointer-events:none; }
+            .tv-watchdog i { font-size:30px; font-style:normal; filter:drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+            .tv-watchdog span { font:800 7px ui-monospace,monospace; color:#c8b992; letter-spacing:.08em; text-transform:uppercase; text-shadow:0 1px 2px #000; }
+            .tv-watchdog .bubble-container { position:relative; min-height:0; }
             .federation-tv--camera { max-width:none !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:transparent !important; }
             .federation-tv--camera .tv-widget-header, .federation-tv--camera .tv-widget-feed { display:none !important; }
             .federation-tv--camera .tv-scene { border-radius:0; min-height:clamp(360px, 51vw, 560px); }
@@ -856,6 +891,70 @@
         this.dioramaEl.appendChild(node);
         this.ambientTimer = setTimeout(() => this.scheduleAmbientCameo(), 60_000);
       }, 12_000);
+    }
+
+    // ============================================================
+    // WATCHDOG — a permanent, unconditional scene fixture (not a real
+    // agent, not gated on room emptiness). "the watchdog is us monitoring
+    // them in the room." Exclusive line pool (WATCHDOG_LINES), exclusive
+    // rendering path, never merged with real-agent or generic-cameo pools.
+    // ============================================================
+    renderWatchdogFixture() {
+      if (!this.dioramaEl || this.dioramaEl.querySelector('.tv-watchdog')) return;
+      const node = document.createElement('div');
+      node.className = 'tv-watchdog';
+      node.setAttribute('role', 'note');
+      node.setAttribute('aria-label', 'Watchdog. Not a registered agent -- permanent scene fixture representing monitoring.');
+      node.innerHTML = `<i aria-hidden="true">🐾</i><span>watchdog</span><div class="bubble-container"></div>`;
+      this.dioramaEl.appendChild(node);
+    }
+
+    // Deliberately independent of showBubble()/activeBubbleOwner (the
+    // real-agent one-bubble-at-a-time lock) -- Watchdog occupies its own
+    // fixed corner, never overlaps a real agent's bubble, and its cadence
+    // must never be blocked by whatever a real agent happens to be saying.
+    // Same visual bubble styling and the same "not an operational event"
+    // labeling convention showBubble()'s options.ambient already
+    // established, reworded for Watchdog specifically.
+    showWatchdogBubble(text, duration = 6500) {
+      const container = this.dioramaEl?.querySelector('.tv-watchdog .bubble-container');
+      if (!container) return false;
+      clearTimeout(container._watchdogTimer);
+      container.innerHTML = '';
+
+      const bubble = this.buildSpeechBubble(text, { bottom: 56, tailAlign: 'right', label: 'WATCHDOG · NOT AN AGENT' });
+      container.appendChild(bubble);
+
+      container._watchdogTimer = setTimeout(() => {
+        bubble.style.animation = 'tv-bubble-fade 0.3s ease-in forwards';
+        setTimeout(() => bubble.remove(), 300);
+      }, duration);
+      return true;
+    }
+
+    // 2-5 Watchdog statements per hour, as a rolling rate rather than a
+    // strict per-calendar-hour quota (simpler, avoids clustering all N at
+    // the top of the hour, and reads as more natural/ambient). A pick every
+    // 12-30 minutes averages to 2-5/hour over any given hour. Independent
+    // of isQuietRoom()/room activity -- Watchdog's cadence never depends on
+    // what real agents are doing. Avoids repeating the same line within the
+    // last 5 picks (Watchdog's own pool only, not the shared no-repeat
+    // window from other pickers).
+    scheduleWatchdogStatement() {
+      if (this.watchdogTimer) clearTimeout(this.watchdogTimer);
+      const delayMs = (12 + Math.random() * 18) * 60_000; // 12-30 min
+      this.watchdogTimer = setTimeout(() => {
+        if (!this.isRunning) return;
+        this.renderWatchdogFixture();
+        const recent = this._watchdogRecent || (this._watchdogRecent = []);
+        const pool = WATCHDOG_LINES.filter(line => !recent.includes(line));
+        const choices = pool.length ? pool : WATCHDOG_LINES;
+        const line = choices[Math.floor(Math.random() * choices.length)];
+        recent.push(line);
+        if (recent.length > 5) recent.shift();
+        this.showWatchdogBubble(line);
+        this.scheduleWatchdogStatement();
+      }, delayMs);
     }
 
     // ============================================================
@@ -1163,50 +1262,71 @@
       return pool[idx];
     }
 
+    // Shared by showBubble() (real agents) and showWatchdogBubble() -- was
+    // two near-identical copies of this styling, now one. Dark background +
+    // light text (was light-bg/dark-text, reported hard to read); hard
+    // word-wrap + overflow:hidden so content can never spill past the
+    // bubble's visible edge no matter how long a word or line is.
+    buildSpeechBubble(text, { bottom = 142, tailAlign = 'center', label } = {}) {
+      const bubble = document.createElement('div');
+      const position = tailAlign === 'center'
+        ? 'left: 50%; transform: translateX(-50%);'
+        : 'right: 0; transform: none;';
+      bubble.style.cssText = `
+        position: absolute; bottom: ${bottom}px; ${position}
+        background: #171718; color: #f5e6bd;
+        padding: 8px 12px; border-radius: 2px; box-sizing: border-box;
+        font-size: 12px; line-height: 1.35; white-space: normal;
+        overflow-wrap: break-word; word-break: break-word; overflow: hidden;
+        width: max-content; max-width: 220px; box-shadow: 0 8px 18px rgba(0,0,0,0.32);
+        border: 2px solid #f5e6bd;
+        z-index: 10; pointer-events: none;
+        animation: tv-bubble-pop 0.3s ease-out;
+      `;
+      if (label) {
+        const labelEl = document.createElement('small');
+        labelEl.textContent = label;
+        labelEl.style.cssText = 'display:block;margin-bottom:4px;color:#f4c842;font:800 8px ui-monospace,monospace;letter-spacing:.04em;';
+        bubble.appendChild(labelEl);
+      }
+      const textEl = document.createElement('span');
+      textEl.textContent = text;
+      bubble.appendChild(textEl);
+
+      const tailPosition = tailAlign === 'center'
+        ? 'left: 50%; transform: translateX(-50%);'
+        : 'right: 12px; transform: none;';
+      const tail = document.createElement('div');
+      tail.style.cssText = `
+        position: absolute; top: 100%; ${tailPosition}
+        width: 0; height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-top: 8px solid #171718;
+      `;
+      bubble.appendChild(tail);
+      return bubble;
+    }
+
     showBubble(agentId, text, duration = 6500, options = {}) {
       if (this.activeBubbleOwner && this.activeBubbleOwner !== agentId) return false;
       const agentEl = this.dioramaEl?.querySelector(`[data-agent-id="${agentId}"]`);
       if (!agentEl) return false;
-      
+
       const container = agentEl.querySelector('.bubble-container');
       if (!container) return false;
-      
+
       // Clear existing bubble for this agent
       this.clearBubble(agentId);
       this.activeBubbleOwner = agentId;
-      
-      const bubble = document.createElement('div');
-      bubble.style.cssText = `
-        position: absolute; bottom: 142px; left: 50%; transform: translateX(-50%);
-        background: #f5e6bd; color: #171718;
-        padding: 8px 12px; border-radius: 2px;
-        font-size: 12px; line-height: 1.35; white-space: normal;
-        width: max-content; max-width: 220px; box-shadow: 0 8px 18px rgba(0,0,0,0.32);
-        border: 2px solid #171718;
-        z-index: 10; pointer-events: none;
-        animation: tv-bubble-pop 0.3s ease-out;
-      `;
-      bubble.textContent = text;
-      if (options.ambient) {
-        const label = document.createElement('small');
-        label.textContent = 'AMBIENT PRESENTATION · NO EVENT';
-        label.style.cssText = 'display:block;margin-bottom:4px;color:#5a2b24;font:800 8px ui-monospace,monospace;letter-spacing:.04em;';
-        bubble.prepend(label);
-      }
 
-      // Speech bubble tail
-      const tail = document.createElement('div');
-      tail.style.cssText = `
-        position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-        width: 0; height: 0;
-        border-left: 8px solid transparent;
-        border-right: 8px solid transparent;
-        border-top: 8px solid #f5e6bd;
-      `;
-      bubble.appendChild(tail);
-      
+      const bubble = this.buildSpeechBubble(text, {
+        bottom: 142,
+        tailAlign: 'center',
+        label: options.ambient ? 'AMBIENT PRESENTATION · NO EVENT' : undefined,
+      });
       container.appendChild(bubble);
-      
+
       // Auto-remove after duration
       const timeout = setTimeout(() => {
         bubble.style.animation = 'tv-bubble-fade 0.3s ease-in forwards';
@@ -1214,7 +1334,7 @@
         this.activeBubbles.delete(agentId);
         if (this.activeBubbleOwner === agentId) this.activeBubbleOwner = null;
       }, duration);
-      
+
       this.activeBubbles.set(agentId, { text, element: bubble, timeout });
       return true;
     }
@@ -1278,7 +1398,13 @@
       if (this.isRunning) return;
       this.isRunning = true;
       this.scheduleAmbientCameo();
-      
+
+      // Watchdog is a permanent, unconditional fixture -- present in every
+      // room regardless of agent count or activity, not gated on
+      // isQuietRoom() like the ambient cameos above.
+      this.renderWatchdogFixture();
+      this.scheduleWatchdogStatement();
+
       // Bounded refreshes keep the demo finite and predictable.
       let polls = 0;
       const poll = () => {
@@ -1302,6 +1428,7 @@
       if (this.speechTimer) clearTimeout(this.speechTimer);
       if (this.ambientTimer) clearTimeout(this.ambientTimer);
       if (this.presentationTimer) clearTimeout(this.presentationTimer);
+      if (this.watchdogTimer) clearTimeout(this.watchdogTimer);
       for (const [, bubble] of this.activeBubbles) clearTimeout(bubble.timeout);
       this.activeBubbles.clear();
       this.activeBubbleOwner = null;

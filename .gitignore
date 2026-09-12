@@ -394,3 +394,6 @@ docs/outdated-labeling/
 
 # Local tool cache (not a dependency)
 .impeccable/
+
+# Timestamped backup files
+*.bak.*
